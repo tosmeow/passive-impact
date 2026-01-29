@@ -29,14 +29,6 @@ impl QueueSimulator {
         }
     }
 
-    /// Simulate an unconditional queue path.
-    ///
-    /// # Arguments
-    /// * `market_orders` - Times of market order events (from Hawkes process)
-    /// * `meta_orders` - Times of meta order events (optional, adds to queue)
-    /// * `q0` - Initial queue size
-    /// * `stock_values` - Whether to store limit/cancel order times internally
-    /// * `seed` - Random seed
     pub fn simulation_queue(
         &mut self,
         market_orders: &[f64],
