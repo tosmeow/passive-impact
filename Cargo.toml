@@ -1,0 +1,35 @@
+[package]
+name = "simulation_project"
+version = "0.1.0"
+edition = "2021"
+authors = ["Joseph Leclere"]
+description = "Passive Impact Simulation"
+license = "MIT"
+
+[lib]
+name = "simulation_project"
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+# Core numerics
+ndarray = "0.15"
+rand = "0.8"
+rand_distr = "0.4"
+
+# Python bindings
+pyo3 = { version = "0.22", features = ["extension-module"] }
+numpy = "0.22"
+
+# Parallelism
+rayon = "1.10"
+
+# NOTE: Can't depend on point-process-library while both use pyo3 extension-module
+# point-process-library = { path = "../point-process-library" }
+
+[dev-dependencies]
+approx = "0.5"
+
+
+[profile.release]
+opt-level = 3
+lto = true
