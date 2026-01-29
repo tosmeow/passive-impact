@@ -18,8 +18,6 @@ where
         Self { f, a, b }
     }
 
-    /// Searches inward from endpoint to find a point where f is finite.
-    /// `from_left`: if true, search from a rightward; if false, search from b leftward.
     fn find_finite_point(&self, max_probes: usize) -> Option<(f64, f64)> {
         let len = self.b - self.a;
 
@@ -48,7 +46,6 @@ where
         }
         let mut f_lo = (self.f)(lo);
 
-        // Standard bisection
         for _ in 0..max_iter {
             let mid = (lo + hi) / 2.0;
             let f_mid = (self.f)(mid);
