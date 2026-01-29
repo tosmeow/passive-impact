@@ -10,8 +10,8 @@ fn main() {
     // Configuration
     let time_horizon = 500.0;
     let n_simulations = 500;
-    let initial_queue_size = 200;
-    let c_lambda = 0.3;
+    let initial_queue_size = 500;
+    let c_lambda = 0.1;
 
     // 1) Simulate a Hawkes path (market orders)
     let hawkes_model = MultiExponentialHawkes::new(1.0, vec![0.6, 0.6, 1.15], vec![1.0, 3.0, 9.0]);
@@ -25,8 +25,8 @@ fn main() {
     println!("Generated {} meta order events", meta_orders.len());
 
     // 2) Use QueueSimulator to generate the reference queue path
-    let lambda_l = |q: f64| 50.0 - 0.25 * q;
-    let lambda_c = |q: f64| 0.05 * q;
+    let lambda_l = |q: f64| 50.0 - 0.075 * q;
+    let lambda_c = |q: f64| 0.025 * q;
 
     let mut queue_sim = QueueSimulator::new(lambda_l, lambda_c, time_horizon);
     let q_path = queue_sim.simulation_queue(
