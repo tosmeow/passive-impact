@@ -9,7 +9,11 @@ pub struct TailIntensity {
     //Decay rate of each exponential component
     pub c_lambda: f64,
     //Excitation amplitude for each component
-    pub factors: Vec<f64>
+    pub factors: Vec<f64>,
+
+    pub lambda: Vec<f64>,
+
+    pub c: Vec<f64>,
 }
 
 impl TailIntensity {
@@ -22,11 +26,11 @@ impl TailIntensity {
             let factor = propagator_params.lambda.iter().zip(&propagator_params.c).map(|(lambda, c)|  c / (lambda - beta) * ((1.0 / (c_lambda + beta)) - (1.0 / (c_lambda + lambda)))).sum::<f64>() + 1.0 / (c_lambda + beta);
             factors.push(factor);
         }
-        Self {hawkes_params, c_lambda, factors}
+        Self {hawkes_params, c_lambda, factors, lambda: propagator_params.lambda.clone(), c: propagator_params.c.clone()}
     }
 
     pub fn compute(&self, state: &[f64]) -> f64 {
-        self.factors.iter().zip(state).map(|(f, r)| r * f).sum::<f64>() + self.hawkes_params.mu / self.c_lambda
+        self.factors.iter().zip(state).map(|(f, r)| r * f).sum::<f64>() + self.hawkes_params.mu * (1.0 / self.c_lambda + self.lambda.iter().zip(&self.c).map(|(lbd, c)| ((1.0 / self.c_lambda) - (1.0 / (self.c_lambda + lbd))) * c / lbd).sum::<f64>())
     }
 }
 
