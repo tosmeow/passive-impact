@@ -103,7 +103,6 @@ impl<'a> ConditionalQueueSimulator<'a> {
                 .min_by(|a, b| a.1.partial_cmp(b.1).unwrap())
                 .unwrap();
 
-
             t += tau_min;
 
             let current_size = bar_queue_events.last().unwrap().queue_size;

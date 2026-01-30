@@ -21,7 +21,7 @@ fn queue_at_time(path: &QueuePath, t: f64) -> u32 {
 
 fn main() {
     // Configuration
-    let time_horizon = 100.0;
+    let time_horizon = 250.0;
     let n_simulations = 500;
     let initial_queue_size = 500;
     let c_lambda = 0.1;
@@ -32,8 +32,8 @@ fn main() {
     println!("Generated {} market order events", market_orders.len());
 
     // Meta orders - trader's limit orders that ADD to the queue (distinguishes q from q_bar)
-    let n: u32 = 50;
-    let meta_orders: Vec<f64> = (0..n).map(|i| time_horizon / 2.0 + (i as f64 / (n - 1) as f64) * (2.0 * time_horizon / 3.0)).collect();
+    let n: u32 = 250;
+    let meta_orders: Vec<f64> = (0..n).map(|i| time_horizon / 4.0 + (i as f64 / (n - 1) as f64) * (1.0 * time_horizon / 2.0)).collect();
     println!("Generated {} meta order events", meta_orders.len());
 
     // 2) Use QueueSimulator to generate the reference queue path (with meta orders)
