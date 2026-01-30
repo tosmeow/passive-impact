@@ -86,13 +86,12 @@ impl<'a> ConditionalQueueRemoval<'a> {
             }
             let bar_queue_value = bar_queue.events[index_queue].queue_size as f64;
 
-
             // Simulate limit order from independent queue measure
-            let lambda_l_bar = ((self.lambda_l)(bar_queue_value) - (self.lambda_l)(queue_value)).max(0.0);
+            let lambda_l_bar = ((self.lambda_l)(queue_value) - (self.lambda_l)(bar_queue_value)).max(0.0);
             let tau_l = if lambda_l_bar == 0.0 {f64::INFINITY} else {sample_exponential(&mut rng, lambda_l_bar)};
 
             // Simulate cancel from independent queue measure
-            let lambda_c_bar = ((self.lambda_c)(bar_queue_value) - (self.lambda_c)(queue_value)).max(0.0);
+            let lambda_c_bar = ((self.lambda_c)(queue_value) - (self.lambda_c)(bar_queue_value)).max(0.0);
             let tau_c = if lambda_c_bar == 0.0 {f64::INFINITY} else {sample_exponential(&mut rng, lambda_c_bar)};
 
             // Find minimum tau
