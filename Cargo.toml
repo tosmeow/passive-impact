@@ -5,6 +5,7 @@ edition = "2021"
 authors = ["Joseph Leclere"]
 description = "Passive Impact Simulation"
 license = "MIT"
+default-run = "simulation_project"
 
 [lib]
 name = "simulation_project"
