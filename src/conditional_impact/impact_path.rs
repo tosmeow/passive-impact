@@ -35,12 +35,14 @@ impl ImpactPath {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::simulation::simulate_markovian;
-    use crate::models::{QueuePath,QueueEvent, MultiExponentialHawkes};
+    use crate::simulation::simulate;
+    use crate::models::{QueuePath, QueueEvent, MultiExponentialHawkes, AffineQueueProcess};
+
     #[test]
     fn zero_impact() {
         let model = MultiExponentialHawkes::new(1.0, vec![0.3, 3.5], vec![1.0, 5.0]);
-        let events = simulate_markovian(&model, 10.0, Some(42));
+        let result = simulate(&model, 10.0, Some(42));
+        let events = result.events_by_dim[0].clone();
         let c_lambda = 1.0;
         let n = events.len();
         let mut q = Vec::with_capacity(2 * n);
@@ -57,4 +59,27 @@ mod tests {
         println!("{:?}", _impact_path.impact_path);
     }
 
+    #[test]
+    fn test_from_affine_queue() {
+        // Test using the from_affine_queue convenience constructor
+        let mu = 1.0;
+        let alpha = vec![0.3, 3.5];
+        let beta = vec![1.0, 5.0];
+        let b_l = 0.5;  // λ^L slope
+        let b_c = 1.5;  // λ^C slope
+        // c_lambda = b_c - b_l = 1.0
+
+        let model = MultiExponentialHawkes::new(mu, alpha.clone(), beta.clone());
+        let result = simulate(&model, 10.0, Some(42));
+        let events = result.events_by_dim[0].clone();
+
+        // Both methods should produce same result
+        let tail_impact_explicit = TailImpact::new(model.clone(), AffineQueueProcess::c_lambda(b_l, b_c), events.clone());
+        let tail_impact_affine = TailImpact::from_affine_queue(mu, alpha, beta, b_l, b_c, events);
+
+        assert_eq!(tail_impact_explicit.tail_impact_events.len(), tail_impact_affine.tail_impact_events.len());
+        for (a, b) in tail_impact_explicit.tail_impact_events.iter().zip(&tail_impact_affine.tail_impact_events) {
+            assert!((a - b).abs() < 1e-10);
+        }
+    }
 }

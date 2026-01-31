@@ -1,0 +1,360 @@
+use crate::models::{MultivariateMarkovianIntensity, MultivariateEvent, MultivariateSimulationResult};
+use crate::rng::{create_rng, sample_exponential, sample_uniform};
+
+pub struct ConditionalSimulationContext<'a, P: MultivariateMarkovianIntensity> {
+    /// The process model
+    pub process: &'a P,
+
+    /// Internal events from the conditioning path, by dimension
+    pub conditioning_events_by_dim: &'a [Vec<f64>],
+
+    /// External events that were used when generating the conditioning path (None = no externals)
+    pub conditioning_external_events: Option<&'a MultivariateSimulationResult>,
+
+    /// External events for the new simulation (None = no externals)
+    pub new_external_events: Option<&'a MultivariateSimulationResult>,
+
+    /// Time horizon
+    pub t_max: f64,
+}
+
+impl<'a, P: MultivariateMarkovianIntensity> ConditionalSimulationContext<'a, P> {
+    /// Create context with explicit external events for both paths.
+    pub fn new(
+        process: &'a P,
+        conditioning_events_by_dim: &'a [Vec<f64>],
+        conditioning_external_events: Option<&'a MultivariateSimulationResult>,
+        new_external_events: Option<&'a MultivariateSimulationResult>,
+        t_max: f64,
+    ) -> Self {
+        Self {
+            process,
+            conditioning_events_by_dim,
+            conditioning_external_events,
+            new_external_events,
+            t_max,
+        }
+    }
+
+    /// Create context without any external events.
+    pub fn new_without_externals(
+        process: &'a P,
+        conditioning_events_by_dim: &'a [Vec<f64>],
+        t_max: f64,
+    ) -> Self {
+        Self {
+            process,
+            conditioning_events_by_dim,
+            conditioning_external_events: None,
+            new_external_events: None,
+            t_max,
+        }
+    }
+
+    pub fn simulate(&self, seed: Option<u64>) -> MultivariateSimulationResult {
+        let mut rng = create_rng(seed);
+        let k = self.process.dim();
+
+        let mut result = MultivariateSimulationResult::new(k);
+
+        let mut cond_state = self.process.initial_state();
+        let mut new_state = self.process.initial_state();
+
+        let mut t_last_cond = 0.0;
+        let mut t_last_new = 0.0;
+
+        // Current simulation time
+        let mut t = 0.0;
+
+        let mut cond_indices: Vec<usize> = vec![0; k]; // Index of each internal event type over which we condition.
+        let mut cond_ext_idx = 0; // Index for conditioning external events
+        let mut new_ext_idx = 0; // Index for new external events
+
+        let mut next_cond_times: Vec<f64> = self.conditioning_events_by_dim
+            .iter()
+            .map(|events| events.first().copied().unwrap_or(f64::INFINITY))
+            .collect(); // Pre-compute next conditioning event times per dimension
+
+        while t < self.t_max {
+            let cond_intensities = self.process.intensities_from_state(&cond_state, t, t_last_cond); // Compute intensities for conditional state at current time.
+            let new_intensities = self.process.intensities_from_state(&new_state, t, t_last_new); // Compute intensities for simulated state at current time.
+
+            // Next external event for conditioning path (updates cond_state)
+            let cond_ext_event = self.conditioning_external_events.and_then(|ext| ext.events.get(cond_ext_idx));
+            let t_cond_ext = cond_ext_event.map(|e| e.time).unwrap_or(f64::INFINITY);
+                
+            // Next external event for new simulation (updates new_state)
+            let new_ext_event = self.new_external_events.and_then(|ext| ext.events.get(new_ext_idx));
+            let t_new_ext = new_ext_event.map(|e| e.time).unwrap_or(f64::INFINITY);
+
+            let (next_cond_internal_dim, next_cond_internal_time) = next_cond_times
+                .iter()
+                .enumerate()
+                .min_by(|a, b| a.1.partial_cmp(b.1).unwrap())
+                .map(|(dim, &time)| (dim, time))
+                .unwrap_or((0, f64::INFINITY)); // Next internal event of conditional path.
+
+            const EPSILON: f64 = 1e-12;
+            let independent_taus: Vec<f64> = new_intensities
+                .iter()
+                .zip(cond_intensities.iter())
+                .map(|(&l_new, &l_cond)| {
+                    let c = (l_new - l_cond).max(0.0);
+                    if c > EPSILON {
+                        sample_exponential(&mut rng, c)
+                    } else {
+                        f64::INFINITY
+                    }
+                })
+                .collect(); // Independent measure: sample from (lambda_new - lambda_cond)^+ for each dimension
+
+            // Find the minimum independent event time and its dimension
+            let (independent_dim, independent_tau) = independent_taus
+                .iter()
+                .enumerate()
+                .min_by(|a, b| a.1.partial_cmp(b.1).unwrap())
+                .map(|(dim, &tau)| (dim, tau))
+                .unwrap_or((0, f64::INFINITY));
+
+
+            let taus = [
+                t_cond_ext - t,
+                t_new_ext - t,
+                next_cond_internal_time - t,
+                independent_tau,
+            ];
+
+            let (_argmin, &tau_min) = taus.iter()
+                .enumerate()
+                .min_by(|a, b| a.1.partial_cmp(b.1).unwrap())
+                .unwrap();
+
+            t += tau_min;
+
+            // Stop if we've exceeded the time horizon (matching original simulator behavior)
+            if t > self.t_max {
+                break;
+            }
+
+            if taus[0] == tau_min {
+                if let Some(ext_event) = cond_ext_event {
+                    self.process.update_state(&mut cond_state, ext_event.dim, t, t_last_cond);
+                    t_last_cond = t;
+                    cond_ext_idx += 1;
+                }
+            }
+
+            if taus[1] == tau_min {
+                if let Some(ext_event) = new_ext_event {
+                    self.process.update_state(&mut new_state, ext_event.dim, t, t_last_new);
+                    t_last_new = t;
+                    new_ext_idx += 1;
+                    // Record external event in result so queue path reconstruction includes it
+                    result.push(MultivariateEvent { time: t, dim: ext_event.dim });
+                }
+            }
+
+            if taus[2] == tau_min {
+                let u = sample_uniform(&mut rng);
+                // Re-compute intensities at new time t (after tau_min elapsed)
+                let cond_int = self.process.intensities_from_state(&cond_state, t, t_last_cond)[next_cond_internal_dim];
+                let new_int = self.process.intensities_from_state(&new_state, t, t_last_new)[next_cond_internal_dim];
+                if u * cond_int <= new_int {
+                    self.process.update_state(&mut new_state, next_cond_internal_dim, t, t_last_new);
+                    t_last_new = t;
+                    result.push(MultivariateEvent { time: t, dim: next_cond_internal_dim });
+                }
+                self.process.update_state(&mut cond_state, next_cond_internal_dim, t, t_last_cond);
+                t_last_cond = t;
+
+                cond_indices[next_cond_internal_dim] += 1;
+                next_cond_times[next_cond_internal_dim] = self.conditioning_events_by_dim[next_cond_internal_dim]
+                    .get(cond_indices[next_cond_internal_dim])
+                    .copied()
+                    .unwrap_or(f64::INFINITY);
+            } else if taus[3] == tau_min {
+                self.process.update_state(&mut new_state, independent_dim, t, t_last_new);
+                t_last_new = t;
+                result.push(MultivariateEvent { time: t, dim: independent_dim });
+            }
+        }
+        result
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::models::{MultiExponentialHawkes, MultivariateMarkovianIntensity};
+    use crate::simulation::simulate_with_externals;
+
+    /// Simple Poisson process with constant intensity (no state dependence).
+    /// This is useful for testing the conditional simulator in isolation.
+    struct ConstantIntensityProcess {
+        lambda: f64,
+    }
+
+    impl MultivariateMarkovianIntensity for ConstantIntensityProcess {
+        type State = ();
+
+        fn dim(&self) -> usize {
+            1
+        }
+
+        fn initial_state(&self) -> Self::State {
+            ()
+        }
+
+        fn intensities_from_state(&self, _state: &Self::State, _t: f64, _t_last: f64) -> Vec<f64> {
+            vec![self.lambda]
+        }
+
+        fn update_state(&self, _state: &mut Self::State, _dim: usize, _t: f64, _t_prev: f64) {}
+    }
+
+    /// Test with constant intensity (Poisson process) - simplest case.
+    /// With constant intensity, states don't matter, so paths should always match.
+    #[test]
+    fn test_constant_intensity_identical_path() {
+        let process = ConstantIntensityProcess { lambda: 2.0 };
+        let t_max = 50.0;
+
+        // Simulate conditioning path
+        let conditioning_result = crate::simulation::simulate(&process, t_max, Some(42));
+
+        // Run conditional simulation
+        let ctx = ConditionalSimulationContext::new_without_externals(
+            &process,
+            &conditioning_result.events_by_dim,
+            t_max,
+        );
+
+        let simulated_result = ctx.simulate(Some(999));
+
+        assert_eq!(
+            simulated_result.events.len(),
+            conditioning_result.events.len(),
+            "Poisson: event count mismatch: {} vs {}",
+            simulated_result.events.len(),
+            conditioning_result.events.len()
+        );
+
+        for (i, (sim, cond)) in simulated_result.events.iter()
+            .zip(conditioning_result.events.iter())
+            .enumerate()
+        {
+            assert_eq!(sim.time, cond.time, "Poisson: event {} time mismatch", i);
+            assert_eq!(sim.dim, cond.dim, "Poisson: event {} dim mismatch", i);
+        }
+    }
+
+    /// When conditioning_external_events == new_external_events, the simulated path
+    /// must be identical to the conditioning path.
+    ///
+    /// Rationale: With identical external events, both states (cond_state and new_state)
+    /// evolve identically, so:
+    /// 1. The independent measure (lambda_new - lambda_cond)^+ = 0, no independent events
+    /// 2. For conditioning events, the acceptance test `u * cond_int <= new_int` becomes
+    ///    `u * lambda <= lambda`, which is always true for u ∈ [0,1]
+    #[test]
+    fn test_identical_externals_produces_identical_path() {
+        let mu = 1.0;
+        let alpha = vec![0.3, 0.2];
+        let beta = vec![1.0, 5.0];
+        let t_max = 50.0;
+
+        let hawkes = MultiExponentialHawkes::new(mu, alpha, beta);
+
+        // Create external events (another Hawkes process)
+        let external_hawkes = MultiExponentialHawkes::new(0.5, vec![0.1], vec![2.0]);
+        let external_events = crate::simulation::simulate(&external_hawkes, t_max, Some(123));
+
+        // Simulate the conditioning path with these external events
+        let conditioning_result = simulate_with_externals(&hawkes, t_max, &external_events, Some(42));
+
+        // Run conditional simulation with identical external events
+        let ctx = ConditionalSimulationContext::new(
+            &hawkes,
+            &conditioning_result.events_by_dim,
+            Some(&external_events),
+            Some(&external_events),  // Same external events
+            t_max,
+        );
+
+        let simulated_result = ctx.simulate(Some(999));  // Different seed shouldn't matter
+
+        // The simulated path must be identical to the conditioning path
+        assert_eq!(
+            simulated_result.events.len(),
+            conditioning_result.events.len(),
+            "Event count mismatch: simulated {} vs conditioning {}",
+            simulated_result.events.len(),
+            conditioning_result.events.len()
+        );
+
+        for (i, (sim_event, cond_event)) in simulated_result
+            .events
+            .iter()
+            .zip(conditioning_result.events.iter())
+            .enumerate()
+        {
+            assert_eq!(
+                sim_event.time, cond_event.time,
+                "Event {} time mismatch: simulated {} vs conditioning {}",
+                i, sim_event.time, cond_event.time
+            );
+            assert_eq!(
+                sim_event.dim, cond_event.dim,
+                "Event {} dimension mismatch: simulated {} vs conditioning {}",
+                i, sim_event.dim, cond_event.dim
+            );
+        }
+    }
+
+    /// Test without any external events - same principle applies.
+    #[test]
+    fn test_no_externals_identical_path() {
+        let mu = 1.5;
+        let alpha = vec![0.4];
+        let beta = vec![2.0];
+        let t_max = 30.0;
+
+        let hawkes = MultiExponentialHawkes::new(mu, alpha, beta);
+
+        // Simulate the conditioning path without external events
+        let conditioning_result = crate::simulation::simulate(&hawkes, t_max, Some(42));
+
+        // Run conditional simulation with no external events (None == None)
+        let ctx = ConditionalSimulationContext::new_without_externals(
+            &hawkes,
+            &conditioning_result.events_by_dim,
+            t_max,
+        );
+
+        let simulated_result = ctx.simulate(Some(777));
+
+        assert_eq!(
+            simulated_result.events.len(),
+            conditioning_result.events.len(),
+            "Event count mismatch without externals"
+        );
+
+        for (i, (sim_event, cond_event)) in simulated_result
+            .events
+            .iter()
+            .zip(conditioning_result.events.iter())
+            .enumerate()
+        {
+            assert_eq!(
+                sim_event.time, cond_event.time,
+                "Event {} time mismatch (no externals)",
+                i
+            );
+            assert_eq!(
+                sim_event.dim, cond_event.dim,
+                "Event {} dim mismatch (no externals)",
+                i
+            );
+        }
+    }
+}

@@ -1,7 +1,9 @@
-mod model;
-mod multi_exponential;
-mod queue;
+mod multivariate_process;
+mod markovian_process;
+mod hawkes_processes;
+mod queue_processes;
 
-pub use model::{PointProcess, MarkovianIntensity};
-pub use multi_exponential::{MultiExponentialHawkes};
-pub use queue::{QueuePath, QueueEvent};
+pub use multivariate_process::{MultivariateMarkovianIntensity, MultivariateEvent, MultivariateSimulationResult};
+pub use markovian_process::{QueuePath, QueueEvent, MarkovianProcess};
+pub use hawkes_processes::{MultiExponentialHawkes};
+pub use queue_processes::{QueueProcess, AffineQueueProcess};
