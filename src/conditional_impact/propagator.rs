@@ -23,7 +23,7 @@ impl Propagator {
         let norm = hawkes_params.alpha.iter().zip(&hawkes_params.beta).map(|(a, b)| a * b).sum::<f64>();
         let len = hawkes_params.alpha.len();
         let f = |x:f64| 1.0 - hawkes_params.alpha.iter().zip(&hawkes_params.beta).map(|(a, b)| a / (x + b)).sum::<f64>();
-        
+
         // Smallest root
         let solver = IVTSolver::new(&f, norm, -hawkes_params.beta[0]);
         let root = solver.find_zero(1e-10, 100).expect("root not found");
@@ -40,7 +40,7 @@ impl Propagator {
             lambda.push(-root);
             c.push(fd_solver.solve(100, bounds * 1e-6).expect("derivative failed"));
         }
-        
+
         Self { hawkes_params, lambda, c }
     }
 

@@ -3,9 +3,10 @@ name = "simulation_project"
 version = "0.1.0"
 edition = "2021"
 authors = ["Joseph Leclere"]
-description = "Passive Impact Simulation"
+description = "Refactored Passive Impact Simulation"
 license = "MIT"
 default-run = "simulation_project"
+
 
 [lib]
 name = "simulation_project"
@@ -17,13 +18,11 @@ ndarray = "0.15"
 rand = "0.8"
 rand_distr = "0.4"
 
-
 # Parallelism
 rayon = "1.10"
 
 [dev-dependencies]
 approx = "0.5"
-
 
 [profile.release]
 opt-level = 3
