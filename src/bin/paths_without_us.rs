@@ -38,11 +38,11 @@ fn main() {
 
     // Meta orders - trader's limit orders that ADD to the queue (dim 0)
     // These are external events ONLY for bar_q, not for the original q
-    let n: u32 = 250;
+    let n: u32 = 375;
     let mut meta_orders = MultivariateSimulationResult::new(3);
     for i in 0..n {
         meta_orders.push(MultivariateEvent {
-            time: time_horizon / 4.0 + (i as f64 / (n - 1) as f64) * (time_horizon / 2.0),
+            time: time_horizon / 2.0 + (i as f64 / (n - 1) as f64) * (time_horizon / 4.0),
             dim: 0
         });
     }
