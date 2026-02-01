@@ -1,12 +1,8 @@
-//! Fast binary I/O using NumPy's .npy format
-//!
-//! This provides ~100x faster writes compared to CSV for large arrays.
-
 use std::fs::File;
 use std::io::{Write, BufWriter};
 
-/// Write a 2D array of f64 to .npy format (row-major, C order)
-/// Shape: (n_rows, n_cols)
+// Write a 2D array of f64 to .npy format (row-major, C order)
+// Shape: (n_rows, n_cols)
 pub fn write_npy_f64(path: &str, data: &[f64], n_rows: usize, n_cols: usize) -> std::io::Result<()> {
     let file = File::create(path)?;
     let mut writer = BufWriter::with_capacity(1 << 20, file); // 1MB buffer
@@ -36,7 +32,6 @@ pub fn write_npy_f64(path: &str, data: &[f64], n_rows: usize, n_cols: usize) -> 
     }
     writer.write_all(b"\n")?;
 
-    // Write data as raw bytes (little-endian f64)
     for &val in data {
         writer.write_all(&val.to_le_bytes())?;
     }
@@ -45,7 +40,7 @@ pub fn write_npy_f64(path: &str, data: &[f64], n_rows: usize, n_cols: usize) -> 
     Ok(())
 }
 
-/// Write a 2D array of u32 to .npy format (row-major, C order)
+/// Write a 2D array of u32 to .npy format.
 pub fn write_npy_u32(path: &str, data: &[u32], n_rows: usize, n_cols: usize) -> std::io::Result<()> {
     let file = File::create(path)?;
     let mut writer = BufWriter::with_capacity(1 << 20, file);

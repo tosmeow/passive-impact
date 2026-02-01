@@ -13,8 +13,6 @@ def load_data():
     impact_with = np.load('../impact_paths.npy')
     impact_without = np.load('../impact_paths_without.npy')
 
-    # Load queue paths (n_times x (1 + n_simulations))
-    # First column is reference (q or bar_q), rest are simulations
     queue_with = np.load('../queue_paths.npy')
     queue_without = np.load('../queue_paths_without.npy')
 
@@ -52,16 +50,6 @@ def load_data():
 
 
 def plot_queue_shades(df, sim_col, title, label, ref_col=None, save_path=None):
-    """Plot simulation paths with shaded individual trajectories and mean.
-
-    Args:
-        df: DataFrame with time index and simulation columns
-        sim_col: Prefix for simulation columns (e.g., 'sim_', 'bar_q_sim_')
-        title: Plot title
-        label: Y-axis label
-        ref_col: Optional reference column to plot in black
-        save_path: If provided, save figure to this path instead of showing
-    """
     fig, ax = plt.subplots(figsize=(12, 6))
 
     sim_cols = [col for col in df.columns if col.startswith(sim_col)]
@@ -91,57 +79,49 @@ def plot_queue_shades(df, sim_col, title, label, ref_col=None, save_path=None):
 
 def generate_all_plots():
     """Generate and save all four analysis plots."""
-    print("Loading data...")
-    path_with, path_without, queue_with, queue_without = load_data()
 
-    print(f"Data loaded: {path_with.shape[1]} simulations, {len(path_with)} time points")
+    path_with, path_without, queue_with, queue_without = load_data()
 
     # Create output directory if needed
     os.makedirs('.', exist_ok=True)
 
     print("\nGenerating plots...")
 
-    # 1. Impact given q (paths_with_us scenario)
     plot_queue_shades(
         path_with,
         sim_col='sim_',
-        title='Conditional Impact I(t) given baseline q',
+        title='Conditional Impact I(t) given base queue q',
         label='Price Impact',
         ref_col=None,
         save_path='impact_given_q.png'
     )
 
-    # 2. Queue bar_q given q
     plot_queue_shades(
         queue_with,
         sim_col='bar_q',
-        title='Counterfactual queue size given baseline q',
+        title='Counterfactual queue size given base queue q',
         label='Queue Size',
         ref_col='q',
         save_path='queue_given_q.png'
     )
 
-    # 3. Impact given bar_q (paths_without_us scenario)
     plot_queue_shades(
         path_without,
         sim_col='sim_',
-        title='Conditional Impact I(t) given baseline q̄',
+        title='Conditional Impact I(t) given impacted queue q̄',
         label='Price Impact',
         ref_col=None,
         save_path='impact_given_qbar.png'
     )
 
-    # 4. Queue q given bar_q
     plot_queue_shades(
         queue_without,
         sim_col='q_sim',
-        title='Counterfactual queue size given baseline q̄',
+        title='Counterfactual queue size given impacted queue q̄',
         label='Queue Size',
         ref_col='bar_q',
         save_path='queue_given_qbar.png'
     )
-
-    print("\nAll plots generated successfully!")
 
 
 if __name__ == '__main__':

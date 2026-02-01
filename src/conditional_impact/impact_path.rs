@@ -6,28 +6,51 @@ pub struct ImpactPath {
 }
 
 impl ImpactPath {
-    // For now, we will get the impact path only at the timestamps where we have events from the market event Hawkes process.
-
-    //Will need to add check logic so that we don't call for queue size when i or j becomes larger than their size, it shouldnt however happen except on the boundary case?
+    /// Compute the impact path at market order times.
+    ///
+    /// For each market order time t, we find the queue sizes q(t-) and q_bar(t-)
+    /// (the queue size just before time t) and compute the cumulative impact.
+    ///
+    /// This version uses a scanning approach that tracks position in both queue paths,
+    /// handling the case where market order times may not align exactly with queue events.
     pub fn new(q: QueuePath, q_bar: QueuePath, tail_impact: &TailImpact) -> Self {
         let mut impact_path = Vec::with_capacity(tail_impact.events.len());
+
         let (mut i, mut j) = (0, 0);
-        let (mut curr_q, mut curr_q_bar) = (q.events[0].queue_size, q_bar.events[0].queue_size);
+        let q_len = q.events.len();
+        let q_bar_len = q_bar.events.len();
+
+        // Initialize with first queue values
+        let (mut curr_q, mut curr_q_bar) = (
+            q.events.first().map(|e| e.queue_size).unwrap_or(0),
+            q_bar.events.first().map(|e| e.queue_size).unwrap_or(0),
+        );
+
         let mut cumulative_term: f64 = 0.0;
-        for (t_index, t) in tail_impact.events.iter().enumerate() {
-            while q.events[i].time < *t {
+
+        for (t_index, &t) in tail_impact.events.iter().enumerate() {
+            // Advance i to find queue value at time t (last event with time <= t)
+            while i + 1 < q_len && q.events[i + 1].time <= t {
                 i += 1;
+            }
+            if i < q_len && q.events[i].time <= t {
                 curr_q = q.events[i].queue_size;
             }
-            while q_bar.events[j].time < *t {
+
+            // Advance j to find q_bar value at time t
+            while j + 1 < q_bar_len && q_bar.events[j + 1].time <= t {
                 j += 1;
+            }
+            if j < q_bar_len && q_bar.events[j].time <= t {
                 curr_q_bar = q_bar.events[j].queue_size;
             }
+
             let diff = curr_q_bar as f64 - curr_q as f64;
             cumulative_term += diff;
             let tail_term = diff * tail_impact.tail_impact_events[t_index];
             impact_path.push(cumulative_term + tail_term);
         }
+
         Self { impact_path }
     }
 }

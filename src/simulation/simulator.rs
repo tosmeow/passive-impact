@@ -1,5 +1,5 @@
 use crate::models::{MultivariateMarkovianIntensity, MultivariateEvent, MultivariateSimulationResult};
-use crate::rng::{create_rng, sample_exponential, sample_uniform};
+use crate::simulation_helpers::{create_rng, sample_exponential, sample_uniform};
 
 pub trait MarkovianProcessSimulator: MultivariateMarkovianIntensity {
     /// Simulate the process using thinning algorithm.
