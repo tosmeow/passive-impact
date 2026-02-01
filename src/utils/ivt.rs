@@ -22,7 +22,7 @@ where
         let len = self.b - self.a;
 
         for i in 1..=max_probes {
-            // Exponentially approach the interior: start at 1/2, then 1/4, 1/8, etc. till we find opposite signs endpoints.
+            // Exponentially approach the boundary: start at .1, then (.1)**2, (.1)**3, etc. till we find opposite signs endpoints.
             let fraction = 0.1_f64.powi(i as i32);
             let x = (self.a + fraction * len, self.b - fraction * len);
 
