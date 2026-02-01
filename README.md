@@ -89,7 +89,9 @@ Markovian state $R^i_t$ enables O(1) intensity updates.
 $$I(t) = c_\kappa \int_0^t (\bar{q}_s - q_s) \, dN_s + c_\kappa (\bar{q}_t - q_t) \cdot \mathcal{I}_t$$
 
 where the following term admits a closed form relying on the propagator operator:
-$$\mathcal{I}_t = \int_t^\infty e^{-c_\lambda(s-t)} \mathbb{E}_t[\lambda_s] ds.$$
+$$
+\mathcal{I}_t = \int_t^\infty e^{-c_\lambda(s-t)} \mathbb{E}_t[\lambda_s] ds
+$$
 
 ## Modules
 
