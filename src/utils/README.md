@@ -36,7 +36,8 @@ Central differences with adaptive step halving:
 
 $$f'(a) \approx \frac{f(a+h) - f(a-h)}{2h}$$
 
-Converges when consecutive estimates agree within tolerance: $|\frac{f(a+h) - f(a-h)}{2h} - \frac{f(a+h') - f(a-h')}{2h'}| < tol$ for two successive choices $h,h'$.
+Converges when consecutive estimates agree within tolerance: $$|\frac{f(a+h) - f(a-h)}{2h} - \frac{f(a+h') - f(a-h')}{2h'}| < tol$$
+for two successive choices $h,h'$.
 
 ```rust
 use simulation_project::utils::FDSolver;

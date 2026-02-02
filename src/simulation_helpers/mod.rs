@@ -1,24 +1,10 @@
-mod events;
 mod rng;
-mod runners;
+mod single_queue;
+mod multi_queue;
 
-pub use events::{
-    hawkes_to_market_orders,
-    events_to_dim,
-    merge_events,
-    merge_all_events,
-    events_for_dim,
-    create_meta_orders,
-};
-
+// Re-export rng utilities
 pub use rng::{create_rng, sample_exponential, sample_uniform};
 
-pub use runners::{
-    SimulationResults,
-    ParallelSimulator,
-    extract_event_type,
-    extract_events_by_dim,
-    sample_queue_at_times,
-    extract_market_orders,
-    write_results,
-};
+// Re-export everything at the simulation_helpers level for flat API
+pub use single_queue::*;
+pub use multi_queue::*;

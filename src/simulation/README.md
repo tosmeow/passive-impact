@@ -6,8 +6,11 @@ Ogata's thinning algorithm for point processes with Markovian intensity.
 
 ```
 simulation/
-├── simulator.rs              # Core thinning algorithm
-└── conditional_simulator.rs  # Conditional path sampling
+├── simulator.rs                      # Core thinning algorithm
+├── conditional_simulator.rs          # Conditional path sampling
+└── conditional_simulator_extensions/
+    ├── efficient.rs                  # Efficient conditional simulation
+    └── multiple.rs                   # Multiple path simulation
 ```
 
 ## Thinning Algorithm
@@ -49,9 +52,22 @@ let result = ctx.simulate(Some(seed));
 
 **Coupling**: Market orders (dim 2) are shared; limits/cancels (dims 0,1) are sampled independently.
 
+## Efficient Simulation
+
+Impact computation requires queue states $(q_t, \bar{q}_t)$ only at market order times $\{T_n\}$.
+
+**Optimization**: Record state values exclusively at these event times, avoiding full path storage.
+
+- Storage: fixed-size vectors indexed by market order sequence (vs. variable-length paths)
+- Logic: streamlined conditional simulation targeting specific observation points
+
 ## Parallelization
 
-Individual simulations are sequential; batch runs parallelize via rayon:
+Individual simulations are sequential; batch runs parallelize via rayon.
+
+See [`simulation_helpers`](../simulation_helpers/) for:
+- `ParallelSimulator`: Single queue batch simulation
+- `BidAskParallelSimulator`: Bid-ask queue batch simulation
 
 ```rust
 use simulation_project::simulation_helpers::ParallelSimulator;

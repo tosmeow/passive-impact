@@ -1,7 +1,7 @@
-use super::markovian_process::{MarkovianProcess};
-use super::multivariate_process::{MultivariateMarkovianIntensity, MultivariateEvent};
+use crate::models::{MarkovianProcess};
+use crate::models::{MultivariateMarkovianIntensity, MultivariateEvent};
 
-/// Multi-exponential Hawkes process built on MarkovianProcess.
+// Multi-exponential Hawkes process built on MarkovianProcess.
 pub struct MultiExponentialHawkes {
     pub mu: f64,
     pub alpha: Vec<f64>,
@@ -41,28 +41,11 @@ impl Clone for MultiExponentialHawkes {
 }
 
 impl MultiExponentialHawkes {
-    /// Create a new multi-exponential Hawkes process.
-    ///
-    /// State starts at 0 for all components. Use `new_with_state` to specify
-    /// a pre-excited initial state.
     pub fn new(mu: f64, alpha: Vec<f64>, beta: Vec<f64>) -> Self {
         let m = alpha.len();
         Self::new_with_state(vec![0.0; m], mu, alpha, beta)
     }
 
-    /// Create a new multi-exponential Hawkes process with a specified initial state.
-    ///
-    /// State format: `[h_0, h_1, ..., h_{m-1}]` where h_i is the excitation for component i.
-    ///
-    /// This allows starting from a pre-excited state, avoiding warmup.
-    /// For example, to start at the stationary mean:
-    /// ```ignore
-    /// // Stationary mean of component i: alpha[i] * mu / (beta[i] * (1 - branching_ratio))
-    /// let branching_ratio: f64 = alpha.iter().zip(&beta).map(|(a, b)| a / b).sum();
-    /// let initial_state: Vec<f64> = alpha.iter().zip(&beta)
-    ///     .map(|(a, b)| a * mu / (b * (1.0 - branching_ratio)))
-    ///     .collect();
-    /// ```
     pub fn new_with_state(initial_state: Vec<f64>, mu: f64, alpha: Vec<f64>, beta: Vec<f64>) -> Self {
         assert!(mu >= 0.0, "mu must be non-negative");
         assert_eq!(alpha.len(), beta.len(), "alpha and beta must have same length");
@@ -99,12 +82,6 @@ impl MultiExponentialHawkes {
         Self { mu, alpha, beta, inner }
     }
 
-    /// Compute the stationary mean of the Hawkes state components.
-    ///
-    /// Returns `[h_0_mean, h_1_mean, ..., h_{m-1}_mean]` where:
-    /// `h_i_mean = alpha[i] * mu / (beta[i] * (1 - branching_ratio))`
-    ///
-    /// Panics if branching_ratio >= 1 (non-stationary process).
     pub fn stationary_state(&self) -> Vec<f64> {
         let branching_ratio: f64 = self.alpha.iter()
             .zip(&self.beta)

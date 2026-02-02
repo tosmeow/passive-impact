@@ -1,13 +1,9 @@
-use super::markovian_process::{MarkovianProcess, QueuePath, QueueEvent};
-use super::multivariate_process::{MultivariateEvent, MultivariateSimulationResult};
+use crate::models::{MarkovianProcess, QueuePath, QueueEvent};
+use crate::models::{MultivariateEvent, MultivariateSimulationResult};
 
 pub struct QueueProcess;
 
 impl QueueProcess {
-    /// Create a queue process as a MarkovianProcess.
-    ///
-    /// The Hawkes components start at 0. Use `new_with_state` to specify
-    /// a pre-excited initial state.
     pub fn new<F, G>(
         q0: f64,
         mu: f64,
@@ -26,11 +22,11 @@ impl QueueProcess {
         Self::new_with_state(initial_state, mu, alpha, beta, lambda_l, lambda_c)
     }
 
-    /// Create a queue process with a specified initial state.
-    ///
-    /// State format: `[q, hawkes_0, hawkes_1, ..., hawkes_{m-1}]`
-    ///
-    /// This allows starting from a pre-excited Hawkes state, avoiding warmup.
+    // Create a queue process with a specified initial state.
+    //
+    // State format: `[q, hawkes_0, hawkes_1, ..., hawkes_{m-1}]`
+    //
+    // This allows starting from a pre-excited Hawkes state, avoiding warmup.
     pub fn new_with_state<F, G>(
         initial_state: Vec<f64>,
         mu: f64,
@@ -142,11 +138,11 @@ impl QueueProcess {
 pub struct AffineQueueProcess;
 
 impl AffineQueueProcess {
-    /// Create an affine queue process with Hawkes-driven market orders.
-    ///
-    /// This is the full coupled process where market order intensity
-    /// is computed from an internal Hawkes state. Hawkes components start at 0.
-    /// Use `new_with_state` to specify a pre-excited initial state.
+    // Create an affine queue process with Hawkes-driven market orders.
+    //
+    // This is the full coupled process where market order intensity
+    // is computed from an internal Hawkes state. Hawkes components start at 0.
+    // Use `new_with_state` to specify a pre-excited initial state.
     pub fn new(
         q0: f64,
         a_l: f64,
@@ -167,20 +163,12 @@ impl AffineQueueProcess {
         )
     }
 
-    /// Create an affine queue process with a specified initial state.
-    ///
-    /// State format: `[q, hawkes_0, hawkes_1, ..., hawkes_{m-1}]`
-    ///
-    /// This allows starting from a pre-excited Hawkes state, avoiding warmup.
-    /// For example, to start with the Hawkes process at its stationary mean:
-    /// ```ignore
-    /// // Stationary mean of Hawkes component i is: alpha[i] * mu / (beta[i] * (1 - branching_ratio))
-    /// let branching_ratio: f64 = alpha.iter().zip(&beta).map(|(a, b)| a / b).sum();
-    /// let hawkes_mean: Vec<f64> = alpha.iter().zip(&beta)
-    ///     .map(|(a, b)| a * mu / (b * (1.0 - branching_ratio)))
-    ///     .collect();
-    /// let initial_state = [vec![q0], hawkes_mean].concat();
-    /// ```
+    // Create an affine queue process with a specified initial state.
+    //
+    // State format: `[q, hawkes_0, hawkes_1, ..., hawkes_{m-1}]`
+    //
+    // This allows starting from a pre-excited Hawkes state, avoiding warmup.
+
     pub fn new_with_state(
         initial_state: Vec<f64>,
         a_l: f64,
@@ -201,13 +189,13 @@ impl AffineQueueProcess {
         )
     }
 
-    /// Create a queue-only process without internal Hawkes state.
-    ///
-    /// Market orders (dim 2) have intensity 0 and must be provided
-    /// as external events. This is more efficient when the Hawkes
-    /// process can be pre-simulated separately.
-    ///
-    /// State is just `[q]` instead of `[q, h0, h1, ..., h_k]`.
+    // Create a queue-only process without internal Hawkes state.
+    //
+    // Market orders (dim 2) have intensity 0 and must be provided
+    // as external events. This is more efficient when the Hawkes
+    // process can be pre-simulated separately.
+    //
+    // State is just `[q]` instead of `[q, h0, h1, ..., h_k]`.
     pub fn new_queue(
         q0: f64,
         a_l: f64,
@@ -254,27 +242,25 @@ impl AffineQueueProcess {
         (a_c + b_c * q).max(0.0)
     }
 
-    /// Compute c_lambda from affine slopes.
-    ///
-    /// For affine intensities λ^L(q) = a_l + b_l*q and λ^C(q) = a_c + b_c*q,
-    /// the parameter c_lambda used in conditional impact is derived from:
-    /// slope_L - slope_C = b_l - b_c = -c_lambda
-    ///
-    /// Therefore: c_lambda = b_c - b_l
+    // Compute c_lambda from affine slopes.
+    //
+    // For affine intensities λ^L(q) = a_l + b_l*q and λ^C(q) = a_c + b_c*q,
+    // the parameter c_lambda used in conditional impact is derived from:
+    // slope_L - slope_C = b_l - b_c = -c_lambda
+    //
+    // Therefore: c_lambda = b_c - b_l
     pub fn c_lambda(b_l: f64, b_c: f64) -> f64 {
         b_c - b_l
     }
 
-    /// Compute the stationary initial state for the coupled queue+Hawkes process.
-    ///
-    /// Returns `[q0, h_0_mean, h_1_mean, ..., h_{m-1}_mean]` where:
-    /// - `q0` is the provided initial queue size
-    /// - `h_i_mean = alpha[i] * mu / (beta[i] * (1 - branching_ratio))`
-    ///
-    /// This allows starting the simulation at the Hawkes stationary distribution,
-    /// avoiding warmup time.
-    ///
-    /// Panics if branching_ratio >= 1 (non-stationary Hawkes process).
+    // Compute the stationary initial state for the coupled queue+Hawkes process.
+    //
+    // Returns `[q0, h_0_mean, h_1_mean, ..., h_{m-1}_mean]` where:
+    // - `q0` is the provided initial queue size
+    // - `h_i_mean = alpha[i] * mu / (beta[i] * (1 - branching_ratio))`
+    //
+    // This allows starting the simulation at the Hawkes stationary distribution,
+    // avoiding warmup time.
     pub fn stationary_state(q0: f64, mu: f64, alpha: &[f64], beta: &[f64]) -> Vec<f64> {
         let branching_ratio: f64 = alpha.iter()
             .zip(beta)
