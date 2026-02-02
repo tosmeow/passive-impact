@@ -1,4 +1,4 @@
-use super::multivariate_process::{MultivariateEvent, MultivariateMarkovianIntensity};
+use crate::models::{MultivariateEvent, MultivariateMarkovianIntensity};
 
 #[derive(Clone)]
 pub struct QueueEvent {
@@ -13,9 +13,6 @@ pub struct QueuePath {
 }
 
 impl QueuePath {
-    /// Get queue size at a given time.
-    ///
-    /// Returns the queue size of the last event with time <= t.
     pub fn queue_at_time(&self, t: f64) -> u32 {
         let mut val = self.events[0].queue_size;
         for event in &self.events {

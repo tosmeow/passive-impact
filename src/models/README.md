@@ -10,10 +10,14 @@ The technical assumption on the processes for correctness of the core simulation
 
 ```
 models/
-├── multivariate_process.rs   # Core trait and data structures
-├── markovian_process.rs      # Generic closure-based implementation
-├── hawkes_processes.rs       # Multi-exponential Hawkes
-└── queue_processes.rs        # Affine queue dynamics
+├── hawkes/
+│   └── hawkes_processes.rs       # Multi-exponential Hawkes
+├── processes/
+│   ├── multivariate_process.rs   # Core trait and data structures
+│   └── markovian_process.rs      # Generic closure-based implementation
+└── queues/
+    ├── queue_processes.rs        # Affine queue dynamics (single queue)
+    └── multiqueue_processes.rs   # Bid-ask queue dynamics (double queue)
 ```
 
 ## Core Trait
@@ -85,6 +89,20 @@ Key constant: $c_\lambda = b_c - b_l$ governs impact decay.
 ```rust
 let c_lambda = AffineQueueProcess::c_lambda(b_l, b_c);
 ```
+
+## Bid-Ask Queue Process
+
+For symmetric bid-ask dynamics with coupled queues:
+
+```rust
+let process = BidAskQueueProcess::new(
+    q0_bid, q0_ask,
+    a_l, b_l, a_c, b_c,
+    mu, alpha, beta,
+);
+```
+
+Five dimensions: bid limits (0), bid cancels (1), ask limits (2), ask cancels (3), markets (4).
 
 ## Queue Path
 

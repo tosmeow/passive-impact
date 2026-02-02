@@ -1,4 +1,4 @@
-use super::impact_factors::{TailImpact};
+use crate::conditional_impact::TailImpact;
 use crate::models::{QueuePath};
 
 pub struct ImpactPath {
@@ -6,13 +6,58 @@ pub struct ImpactPath {
 }
 
 impl ImpactPath {
-    /// Compute the impact path at market order times.
-    ///
-    /// For each market order time t, we find the queue sizes q(t-) and q_bar(t-)
-    /// (the queue size just before time t) and compute the cumulative impact.
-    ///
-    /// This version uses a scanning approach that tracks position in both queue paths,
-    /// handling the case where market order times may not align exactly with queue events.
+    // Memory-efficient impact computation from pre-sampled queue values.
+    //
+    // This takes queue values already sampled at market order times, avoiding the need
+    // to build full `QueuePath` objects and scan through them.
+    //
+    // # Arguments
+    // - `q_samples`: Queue values at each market order time (without our orders)
+    // - `q_bar_samples`: Queue values at each market order time (with our orders)
+    // - `tail_impact`: The tail impact factors
+    //
+    // # Panics
+    // Panics if `q_samples`, `q_bar_samples`, and `tail_impact.events` have different lengths.
+    pub fn from_queue_samples(
+        q_samples: &[u32],
+        q_bar_samples: &[u32],
+        tail_impact: &TailImpact,
+    ) -> Self {
+        assert_eq!(
+            q_samples.len(),
+            tail_impact.events.len(),
+            "q_samples length ({}) must match tail_impact.events length ({})",
+            q_samples.len(),
+            tail_impact.events.len()
+        );
+        assert_eq!(
+            q_bar_samples.len(),
+            tail_impact.events.len(),
+            "q_bar_samples length ({}) must match tail_impact.events length ({})",
+            q_bar_samples.len(),
+            tail_impact.events.len()
+        );
+
+        let mut impact_path = Vec::with_capacity(tail_impact.events.len());
+        let mut cumulative_term: f64 = 0.0;
+
+        for (t_index, (&q, &q_bar)) in q_samples.iter().zip(q_bar_samples.iter()).enumerate() {
+            let diff = q_bar as f64 - q as f64;
+            cumulative_term += diff;
+            let tail_term = diff * tail_impact.tail_impact_events[t_index];
+            impact_path.push(cumulative_term + tail_term);
+        }
+
+        Self { impact_path }
+    }
+
+    // Compute the impact path at market order times.
+    //
+    // For each market order time t, we find the queue sizes q(t-) and q_bar(t-)
+    // (the queue size just before time t) and compute the cumulative impact.
+    //
+    // This version uses a scanning approach that tracks position in both queue paths,
+    // handling the case where market order times may not align exactly with queue events.
     pub fn new(q: QueuePath, q_bar: QueuePath, tail_impact: &TailImpact) -> Self {
         let mut impact_path = Vec::with_capacity(tail_impact.events.len());
 

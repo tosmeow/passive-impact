@@ -2,8 +2,8 @@ use simulation_project::models::{AffineQueueProcess, MultiExponentialHawkes};
 use simulation_project::simulation::{simulate, simulate_with_externals};
 use simulation_project::simulation_helpers::{
     hawkes_to_market_orders, merge_events, create_meta_orders,
-    extract_events_by_dim, sample_queue_at_times, extract_market_orders,
-    ParallelSimulator, write_results,
+    extract_events_by_dim, sample_queue_at_times,
+    ParallelSimulator, write_memory_efficient_results,
 };
 use simulation_project::conditional_impact::TailImpact;
 
@@ -19,7 +19,7 @@ fn main() {
     let n_simulations = 500;
     let initial_queue_size: u32 = 200;
 
-    // Set to true for efficient decoupled simulation
+    // Memory-efficient version only supports decoupled mode
     let decoupled = true;
 
     // Affine queue parameters
@@ -33,79 +33,51 @@ fn main() {
     let alpha = vec![0.065, 0.2, 0.325, 0.65];
     let beta = vec![0.15, 0.60, 2.5, 10.0];
 
+
     // Meta orders configuration
     let n_meta: u32 = 375;
     let meta_start = 1.0;
     let meta_end = 3.0 * time_horizon / 4.0;
 
-    println!("=== Paths WITH Us ({}) ===", if decoupled { "decoupled" } else { "coupled" });
+    println!("=== Paths WITH Us (Memory-Efficient) ===");
     println!("Time horizon: {}, Simulations: {}, Initial queue: {}",
              time_horizon, n_simulations, initial_queue_size);
 
     let _c_lambda = AffineQueueProcess::c_lambda(b_l, b_c);
     println!("c_lambda = {}", _c_lambda);
 
+    assert!(decoupled, "Memory-efficient version requires decoupled mode");
+
     // ==========================================================================
     // Create process and simulate q path (without meta orders)
     // ==========================================================================
     let t0 = Instant::now();
 
-    // Create process based on mode: decoupled only keeps queue states and otherwise keeps queue and Hawkes markovian states.
-    let process = if decoupled {
-        AffineQueueProcess::new_queue(initial_queue_size as f64, a_l, b_l, a_c, b_c)
-    } else {
-        let initial_state = AffineQueueProcess::stationary_state(
-            initial_queue_size as f64, mu, &alpha, &beta
-        );
-        AffineQueueProcess::new_with_state(
-            initial_state, a_l, b_l, a_c, b_c, mu, alpha.clone(), beta.clone(),
-        )
-    };
+    // Create decoupled queue process (state is just [q])
+    let process = AffineQueueProcess::new_queue(initial_queue_size as f64, a_l, b_l, a_c, b_c);
 
-    // For decoupled mode, pre-simulate Hawkes path:
-    let hawkes_as_market = if decoupled {
-        let hawkes = MultiExponentialHawkes::new_with_state(
-            MultiExponentialHawkes::new(mu, alpha.clone(), beta.clone()).stationary_state(),
-            mu, alpha.clone(), beta.clone(),
-        );
-        let hawkes_result = simulate(&hawkes, time_horizon, None);
-        println!("[TIMING] Hawkes pre-simulation: {:?} ({} events)", t0.elapsed(), hawkes_result.events.len());
-        Some(hawkes_to_market_orders(&hawkes_result))
-    } else {
-        None
-    };
+    // Pre-simulate Hawkes path
+    let hawkes = MultiExponentialHawkes::new_with_state(
+        MultiExponentialHawkes::new(mu, alpha.clone(), beta.clone()).stationary_state(),
+        mu, alpha.clone(), beta.clone(),
+    );
+    let hawkes_result = simulate(&hawkes, time_horizon, Some(42));
+    println!("[TIMING] Hawkes pre-simulation: {:?} ({} events)", t0.elapsed(), hawkes_result.events.len());
+    let hawkes_as_market = hawkes_to_market_orders(&hawkes_result);
 
-    // Simulate q path without meta orders.
+    // Simulate q path without meta orders (same seed as original for comparison)
     let t0 = Instant::now();
-    let (q_result, q_result_internal) = if decoupled {
-        // Decoupled: q has only Hawkes as external
-        let q_result_internal = simulate_with_externals(&process, time_horizon, hawkes_as_market.as_ref().unwrap(), None);
-        let q_result = merge_events(&q_result_internal, hawkes_as_market.as_ref().unwrap());
-        (q_result, Some(q_result_internal))
-    } else {
-        // Coupled: q has no external events
-        let q_result = simulate(&process, time_horizon, None);
-        (q_result, None)
-    };
+    let q_result_internal = simulate_with_externals(&process, time_horizon, &hawkes_as_market, Some(42));
+    let q_result = merge_events(&q_result_internal, &hawkes_as_market);
     let q_path = AffineQueueProcess::result_to_queue_path(&q_result, initial_queue_size);
     println!("[TIMING] q simulation: {:?} ({} events)", t0.elapsed(), q_path.events.len());
 
-    // Extract market orders
-    let market_orders: Vec<f64> = if decoupled {
-        hawkes_as_market.as_ref().unwrap().events.iter().map(|e| e.time).collect()
-    } else {
-        extract_market_orders(&q_result)
-    };
+    // Extract market orders (from pre-simulated Hawkes)
+    let market_orders: Vec<f64> = hawkes_as_market.events.iter().map(|e| e.time).collect();
     println!("Generated {} market order events", market_orders.len());
 
-    // Build conditioning events
-    let q_events_by_dim = if decoupled {
-        // Condition only on dims 0,1 (internal) corresponding to limits and cancels: dim 2, corresponding the market orders, is external.
-        extract_events_by_dim(q_result_internal.as_ref().unwrap(), 3, Some(2))
-    } else {
-        // Condition on all dims
-        extract_events_by_dim(&q_result, 3, None)
-    };
+    // Build conditioning events (dims 0,1 only - market orders are external)
+    let q_events_by_dim = extract_events_by_dim(&q_result_internal, 3, Some(2));
 
     // ==========================================================================
     // Setup meta orders and TailImpact
@@ -119,16 +91,11 @@ fn main() {
     println!("[TIMING] TailImpact setup: {:?}", t0.elapsed());
 
     // Build external events for q and bar_q
-    let bar_q_external = if decoupled {
-        Some(merge_events(&meta_orders, hawkes_as_market.as_ref().unwrap()))
-    } else {
-        Some(meta_orders.clone())
-    };
-
-    let q_external = hawkes_as_market.clone();  // q has either the Hawkes path or None.
+    let bar_q_external = merge_events(&meta_orders, &hawkes_as_market);
+    let q_external = hawkes_as_market.clone();
 
     // ==========================================================================
-    // Run parallel conditional simulations
+    // Run parallel conditional simulations (MEMORY-EFFICIENT)
     // ==========================================================================
     let q_at_market_orders = sample_queue_at_times(&q_path, &market_orders);
 
@@ -136,8 +103,8 @@ fn main() {
     let simulator = ParallelSimulator {
         process: &process,
         cond_events_by_dim: &q_events_by_dim,
-        cond_external_events: q_external.as_ref(),
-        new_external_events: bar_q_external.as_ref(),
+        cond_external_events: Some(&q_external),
+        new_external_events: Some(&bar_q_external),
         time_horizon,
         initial_queue_size,
         reference_path: &q_path,
@@ -145,14 +112,14 @@ fn main() {
         market_orders: &market_orders,
         simulating_bar_q: true,
     };
-    let results = simulator.run(n_simulations);
-    println!("[TIMING] Parallel simulations ({}x): {:?}", n_simulations, t0.elapsed());
+    let results = simulator.run_memory_efficient(n_simulations);
+    println!("[TIMING] Parallel simulations ({}x, memory-efficient): {:?}", n_simulations, t0.elapsed());
 
     // ==========================================================================
     // Output
     // ==========================================================================
     let t0 = Instant::now();
-    write_results(&results, &q_at_market_orders, &market_orders, &"").unwrap();
+    write_memory_efficient_results(&results, &q_at_market_orders, &market_orders, "data/single_queue/efficient/with").unwrap();
     println!("[TIMING] Data write: {:?}", t0.elapsed());
     println!("[TIMING] TOTAL: {:?}", t_total.elapsed());
 }

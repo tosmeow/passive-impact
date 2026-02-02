@@ -99,14 +99,20 @@ where the following term admits a closed form relying on the propagator operator
 |--------|-------------|
 | [`models`](src/models/) | Hawkes, queues, Markovian abstractions |
 | [`simulation`](src/simulation/) | Thinning algorithm, conditional simulation |
+| [`simulation_helpers`](src/simulation_helpers/) | Parallel batch simulation, event utilities |
 | [`conditional_impact`](src/conditional_impact/) | Propagator computation, impact analysis |
 | [`utils`](src/utils/) | IVT root-finding, finite differences |
 
 ## Running
 
 ```bash
-cargo run --release --bin paths_with_us
-cargo run --release --bin paths_without_us
+# Single queue simulations
+cargo run --release --bin single_queue_efficient_with_us
+cargo run --release --bin single_queue_efficient_without_us
+
+# Bid-ask (double queue) simulations
+cargo run --release --bin double_queue_efficient_with_us
+cargo run --release --bin double_queue_efficient_without_us
 
 cd python && python plot_utils.py
 ```

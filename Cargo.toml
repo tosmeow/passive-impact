@@ -28,3 +28,37 @@ approx = "0.5"
 [profile.release]
 opt-level = 3
 lto = true
+
+# Single queue binaries
+[[bin]]
+name = "single_queue_general_with_us"
+path = "src/bin/single_queue/general/with_us.rs"
+
+[[bin]]
+name = "single_queue_general_without_us"
+path = "src/bin/single_queue/general/without_us.rs"
+
+[[bin]]
+name = "single_queue_efficient_with_us"
+path = "src/bin/single_queue/efficient/with_us.rs"
+
+[[bin]]
+name = "single_queue_efficient_without_us"
+path = "src/bin/single_queue/efficient/without_us.rs"
+
+# Double queue (bid-ask) binaries
+[[bin]]
+name = "double_queue_general_with_us"
+path = "src/bin/double_queue/general/with_us.rs"
+
+[[bin]]
+name = "double_queue_general_without_us"
+path = "src/bin/double_queue/general/without_us.rs"
+
+[[bin]]
+name = "double_queue_efficient_with_us"
+path = "src/bin/double_queue/efficient/with_us.rs"
+
+[[bin]]
+name = "double_queue_efficient_without_us"
+path = "src/bin/double_queue/efficient/without_us.rs"

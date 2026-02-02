@@ -1,25 +1,35 @@
 use crate::models::{MultivariateMarkovianIntensity, MultivariateEvent, MultivariateSimulationResult};
 use crate::simulation_helpers::{create_rng, sample_exponential, sample_uniform};
 
+pub struct SimulationConfig<'a, S> {
+    // External events for this simulation path, None will use no externals.
+    pub external_events: Option<&'a MultivariateSimulationResult>,
+    // Initial state override, None will use the default process initial state.
+    pub initial_state: Option<S>,
+}
+
+impl<'a, S> SimulationConfig<'a, S> {
+    pub fn new(
+        external_events: Option<&'a MultivariateSimulationResult>,
+        initial_state: Option<S>,
+    ) -> Self {
+        Self { external_events, initial_state }
+    }
+}
+
 pub struct ConditionalSimulationContext<'a, P: MultivariateMarkovianIntensity> {
-    /// The process model
     pub process: &'a P,
 
-    /// Internal events from the conditioning path, by dimension
     pub conditioning_events_by_dim: &'a [Vec<f64>],
 
-    /// External events that were used when generating the conditioning path (None = no externals)
     pub conditioning_external_events: Option<&'a MultivariateSimulationResult>,
 
-    /// External events for the new simulation (None = no externals)
     pub new_external_events: Option<&'a MultivariateSimulationResult>,
 
-    /// Time horizon
     pub t_max: f64,
 }
 
 impl<'a, P: MultivariateMarkovianIntensity> ConditionalSimulationContext<'a, P> {
-    /// Create context with explicit external events for both paths.
     pub fn new(
         process: &'a P,
         conditioning_events_by_dim: &'a [Vec<f64>],
@@ -36,7 +46,6 @@ impl<'a, P: MultivariateMarkovianIntensity> ConditionalSimulationContext<'a, P> 
         }
     }
 
-    /// Create context without any external events.
     pub fn new_without_externals(
         process: &'a P,
         conditioning_events_by_dim: &'a [Vec<f64>],
@@ -51,19 +60,22 @@ impl<'a, P: MultivariateMarkovianIntensity> ConditionalSimulationContext<'a, P> 
         }
     }
 
-    pub fn simulate(&self, seed: Option<u64>) -> MultivariateSimulationResult {
+    pub fn simulate(
+        &self,
+        new_initial_state: Option<P::State>,
+        seed: Option<u64>,
+    ) -> MultivariateSimulationResult {
         let mut rng = create_rng(seed);
         let k = self.process.dim();
 
         let mut result = MultivariateSimulationResult::new(k);
 
         let mut cond_state = self.process.initial_state();
-        let mut new_state = self.process.initial_state();
+        let mut new_state = new_initial_state.unwrap_or_else(|| self.process.initial_state());
 
         let mut t_last_cond = 0.0;
         let mut t_last_new = 0.0;
 
-        // Current simulation time
         let mut t = 0.0;
 
         let mut cond_indices: Vec<usize> = vec![0; k]; // Index of each internal event type over which we condition.
@@ -82,7 +94,7 @@ impl<'a, P: MultivariateMarkovianIntensity> ConditionalSimulationContext<'a, P> 
             // Next external event for conditioning path (updates cond_state)
             let cond_ext_event = self.conditioning_external_events.and_then(|ext| ext.events.get(cond_ext_idx));
             let t_cond_ext = cond_ext_event.map(|e| e.time).unwrap_or(f64::INFINITY);
-                
+
             // Next external event for new simulation (updates new_state)
             let new_ext_event = self.new_external_events.and_then(|ext| ext.events.get(new_ext_idx));
             let t_new_ext = new_ext_event.map(|e| e.time).unwrap_or(f64::INFINITY);
@@ -195,8 +207,6 @@ mod tests {
     use crate::models::{MultiExponentialHawkes, MultivariateMarkovianIntensity};
     use crate::simulation::simulate_with_externals;
 
-    /// Simple Poisson process with constant intensity (no state dependence).
-    /// This is useful for testing the conditional simulator in isolation.
     struct ConstantIntensityProcess {
         lambda: f64,
     }
@@ -219,8 +229,6 @@ mod tests {
         fn update_state(&self, _state: &mut Self::State, _dim: usize, _t: f64, _t_prev: f64) {}
     }
 
-    /// Test with constant intensity (Poisson process) - simplest case.
-    /// With constant intensity, states don't matter, so paths should always match.
     #[test]
     fn test_constant_intensity_identical_path() {
         let process = ConstantIntensityProcess { lambda: 2.0 };
@@ -236,7 +244,7 @@ mod tests {
             t_max,
         );
 
-        let simulated_result = ctx.simulate(Some(999));
+        let simulated_result = ctx.simulate(None, Some(999));
 
         assert_eq!(
             simulated_result.events.len(),
@@ -284,7 +292,7 @@ mod tests {
             t_max,
         );
 
-        let simulated_result = ctx.simulate(Some(999));  // Different seed shouldn't matter
+        let simulated_result = ctx.simulate(None, Some(999));  // Different seed shouldn't matter
 
         // The simulated path must be identical to the conditioning path + externals
         assert_eq!(
@@ -314,7 +322,7 @@ mod tests {
         }
     }
 
-    /// Test without any external events - same principle applies.
+    // Test without any external events - same principle applies.
     #[test]
     fn test_no_externals_identical_path() {
         let mu = 1.5;
@@ -334,7 +342,7 @@ mod tests {
             t_max,
         );
 
-        let simulated_result = ctx.simulate(Some(777));
+        let simulated_result = ctx.simulate(None, Some(777));
 
         assert_eq!(
             simulated_result.events.len(),
@@ -361,9 +369,6 @@ mod tests {
         }
     }
 
-    /// Test Option B: when a dimension has 0 intensity (external-only), the simulator
-    /// should automatically skip the acceptance test for conditioning events in that
-    /// dimension to avoid duplicates with external events.
     #[test]
     fn test_zero_intensity_dimension_skips_acceptance() {
         use crate::models::MarkovianProcess;
@@ -417,7 +422,7 @@ mod tests {
             t_max,
         );
 
-        let sim_result = ctx.simulate(Some(999));
+        let sim_result = ctx.simulate(None, Some(999));
 
         // Count dim 2 events - should NOT be duplicated
         let dim2_count = sim_result.events.iter().filter(|e| e.dim == 2).count();

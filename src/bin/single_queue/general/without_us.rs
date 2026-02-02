@@ -39,7 +39,6 @@ fn main() {
     let meta_end = 3.0 * time_horizon / 4.0;
 
     // Output file suffix
-    let suffix = "_without";
 
     println!("=== Paths WITHOUT Us ===");
     println!("Time horizon: {}, Simulations: {}, Initial queue: {}",
@@ -158,7 +157,7 @@ fn main() {
     // Output
     // ==========================================================================
     let t0 = Instant::now();
-    write_results(&results, &bar_q_at_market_orders, &market_orders, &suffix).unwrap();
+    write_results(&results, &bar_q_at_market_orders, &market_orders, "data/single_queue/general/without").unwrap();
     println!("[TIMING] Data write: {:?}", t0.elapsed());
     println!("[TIMING] TOTAL: {:?}", t_total.elapsed());
 }

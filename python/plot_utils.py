@@ -3,18 +3,22 @@ import pandas as pd
 import numpy as np
 import os
 
+# Data directory - can be 'general' or 'efficient'
+DATA_MODE = 'efficient'  # Change to 'general' for non-memory-efficient data
+DATA_BASE = f'../data/single_queue/{DATA_MODE}'
+
 def load_data():
     """Load simulation results from .npy files into pandas DataFrames."""
     # Load times
-    times = np.load('../times.npy')
-    times_without = np.load('../times_without.npy')
+    times = np.load(f'{DATA_BASE}/with/times.npy')
+    times_without = np.load(f'{DATA_BASE}/without/times.npy')
 
     # Load impact paths (n_times x n_simulations)
-    impact_with = np.load('../impact_paths.npy')
-    impact_without = np.load('../impact_paths_without.npy')
+    impact_with = np.load(f'{DATA_BASE}/with/impact_paths.npy')
+    impact_without = np.load(f'{DATA_BASE}/without/impact_paths.npy')
 
-    queue_with = np.load('../queue_paths.npy')
-    queue_without = np.load('../queue_paths_without.npy')
+    queue_with = np.load(f'{DATA_BASE}/with/queue_paths.npy')
+    queue_without = np.load(f'{DATA_BASE}/without/queue_paths.npy')
 
     n_sims_with = impact_with.shape[1]
     n_sims_without = impact_without.shape[1]
