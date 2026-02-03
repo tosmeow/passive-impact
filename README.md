@@ -5,12 +5,12 @@ Rust library for passive market impact analysis using Markovian limit order book
 ## Output
 
 <p align="center">
-  <img src="python/impact_given_q.png" width="48%" alt="Impact given baseline q"/>
-  <img src="python/queue_given_q.png" width="48%" alt="Queue given baseline q"/>
+  <img src="python/experiments/single_queue_impact/images/impact_given_q.png" width="48%" alt="Impact given baseline q"/>
+  <img src="python/experiments/single_queue_impact/images/queue_given_q.png" width="48%" alt="Queue given baseline q"/>
 </p>
 <p align="center">
-  <img src="python/impact_given_qbar.png" width="48%" alt="Impact given baseline q̄"/>
-  <img src="python/queue_given_qbar.png" width="48%" alt="Queue given baseline q̄"/>
+  <img src="python/experiments/single_queue_impact/images/impact_given_qbar.png" width="48%" alt="Impact given baseline q̄"/>
+  <img src="python/experiments/single_queue_impact/images/queue_given_qbar.png" width="48%" alt="Queue given baseline q̄"/>
 </p>
 
 *Conditional simulation of 500 counterfactual paths (gray) with mean (red) and baseline (black).*
@@ -114,7 +114,7 @@ cargo run --release --bin single_queue_efficient_without_us
 cargo run --release --bin double_queue_efficient_with_us
 cargo run --release --bin double_queue_efficient_without_us
 
-cd python && python plot_utils.py
+cd python/experiments/single_queue_impact && python plot_utils.py
 ```
 
 Outputs: `impact_paths.npy`, `queue_paths.npy`, `times.npy` (and `*_without.npy` variants).

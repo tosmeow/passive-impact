@@ -4,6 +4,9 @@ use crate::simulation_helpers::{create_rng, sample_exponential, sample_uniform};
 
 impl<'a, P: MultivariateMarkovianIntensity> ConditionalSimulationContext<'a, P> {
 
+    /// Simulate multiple paths with shared acceptance random numbers.
+    /// This ensures monotonicity: if initial_state_A > initial_state_B,
+    /// then the queue difference will be monotonically ordered.
     pub fn simulate_multiple(
         &self,
         configs: &[SimulationConfig<'_, P::State>],
@@ -12,25 +15,54 @@ impl<'a, P: MultivariateMarkovianIntensity> ConditionalSimulationContext<'a, P> 
     where
         P::State: Clone,
     {
+        // Pre-generate acceptance random numbers for all conditioning events
+        // These are shared across all simulations to ensure monotonicity
+        let mut rng = create_rng(Some(base_seed));
+
+        // Count total conditioning events across all dimensions
+        let total_cond_events: usize = self.conditioning_events_by_dim.iter().map(|v| v.len()).sum();
+
+        // Pre-generate uniforms for acceptance decisions
+        let acceptance_uniforms: Vec<f64> = (0..total_cond_events)
+            .map(|_| sample_uniform(&mut rng))
+            .collect();
+
+        // Build index mapping: for each (dim, event_idx), get the global index
+        let mut cond_event_global_idx: Vec<Vec<usize>> = Vec::with_capacity(self.conditioning_events_by_dim.len());
+        let mut global_idx = 0;
+        for dim_events in self.conditioning_events_by_dim.iter() {
+            let mut dim_indices = Vec::with_capacity(dim_events.len());
+            for _ in 0..dim_events.len() {
+                dim_indices.push(global_idx);
+                global_idx += 1;
+            }
+            cond_event_global_idx.push(dim_indices);
+        }
+
         configs
             .iter()
-            .map(|config| {
-                self.simulate_with_config(
+            .enumerate()
+            .map(|(sim_idx, config)| {
+                self.simulate_with_shared_randoms(
                     config.external_events,
                     config.initial_state.clone(),
-                    Some(base_seed),
+                    &acceptance_uniforms,
+                    &cond_event_global_idx,
+                    base_seed.wrapping_add(sim_idx as u64 * 1000000), // Different seed for independent events
                 )
             })
             .collect()
     }
 
-    fn simulate_with_config(
+    fn simulate_with_shared_randoms(
         &self,
         new_external_events: Option<&MultivariateSimulationResult>,
         new_initial_state: Option<P::State>,
-        seed: Option<u64>,
+        acceptance_uniforms: &[f64],
+        cond_event_global_idx: &[Vec<usize>],
+        independent_seed: u64,
     ) -> MultivariateSimulationResult {
-        let mut rng = create_rng(seed);
+        let mut rng = create_rng(Some(independent_seed)); // For independent events only
         let k = self.process.dim();
 
         let mut result = MultivariateSimulationResult::new(k);
@@ -129,7 +161,10 @@ impl<'a, P: MultivariateMarkovianIntensity> ConditionalSimulationContext<'a, P> 
                 let cond_int = self.process.intensities_from_state(&cond_state, t, t_last_cond)[next_cond_internal_dim];
 
                 if cond_int > EPSILON {
-                    let u = sample_uniform(&mut rng);
+                    // Use pre-generated uniform for this conditioning event
+                    let event_idx = cond_indices[next_cond_internal_dim];
+                    let u = acceptance_uniforms[cond_event_global_idx[next_cond_internal_dim][event_idx]];
+
                     let new_int = self.process.intensities_from_state(&new_state, t, t_last_new)[next_cond_internal_dim];
                     if u * cond_int <= new_int {
                         self.process.update_state(&mut new_state, next_cond_internal_dim, t, t_last_new);
