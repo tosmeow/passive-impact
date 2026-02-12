@@ -1,5 +1,6 @@
 target/
 .idea/
 *.csv
-*.ipynb
 *.npy
+python/experiments/presentation
+python/experiments/hawkes_example
