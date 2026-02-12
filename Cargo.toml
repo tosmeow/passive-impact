@@ -76,6 +76,10 @@ path = "src/bin/experiments/cancelation_race.rs"
 name = "metaorder_impact"
 path = "src/bin/experiments/metaorder_impact.rs"
 
+[[bin]]
+name = "hawkes_example"
+path = "src/bin/experiments/hawkes_example.rs"
+
 # Presentation
 [[bin]]
 name = "markovian_queue_illustration"
