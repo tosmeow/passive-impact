@@ -109,9 +109,9 @@ $$I^x(t) = c_\kappa \int_0^t (\bar{q}^x_s - q^x_s) \, dN^x_s + c_\kappa \mathcal
 
 To make the tail term more explicit now, we need to discuss the following.
 
-Writing $\bar{q} = (\bar{q}^a, \bar{q}^b)$, $\mathbb{E}_t\lbrack\bar{q}_s - q_s\rbrack = (\bar{q}_t - q_t) - \int_t^s C_{\lambda} \mathbb{E}_t\lbrack\bar{q}_u - q_u\rbrack du$ with
+Writing $\bar{q} = (\bar{q}^a, \bar{q}^b)$, 
 
-$$C_{\lambda} = \begin{pmatrix} a_C - a_L & b_C - b_L \\\\ b_C - b_L & a_C - a_L \end{pmatrix}$$
+$$\mathbb{E}_t[\bar{q}_s - q_s] = (\bar{q}_t - q_t) - \int_t^s C_{\lambda} \mathbb{E}_t[\bar{q}_u - q_u] \, du \text{ with } C_{\lambda} = \begin{pmatrix} a_C - a_L & b_C - b_L \\\\ b_C - b_L & a_C - a_L \end{pmatrix}$$
 
 where $\lambda^L(u,v) = a_L u + b_L v + d_L$ and $\lambda^C(u,v) = a_C u + b_C v + d_C$.
 
