@@ -5,12 +5,12 @@ Rust library for passive market impact analysis using Markovian limit order book
 ## Output
 
 <p align="center">
-  <img src="python/impact_given_q.png" width="48%" alt="Impact given baseline q"/>
-  <img src="python/queue_given_q.png" width="48%" alt="Queue given baseline q"/>
+  <img src="python/experiments/single_queue_impact/images/impact_given_q.png" width="48%" alt="Impact given baseline q"/>
+  <img src="python/experiments/single_queue_impact/images/queue_given_q.png" width="48%" alt="Queue given baseline q"/>
 </p>
 <p align="center">
-  <img src="python/impact_given_qbar.png" width="48%" alt="Impact given baseline q̄"/>
-  <img src="python/queue_given_qbar.png" width="48%" alt="Queue given baseline q̄"/>
+  <img src="python/experiments/single_queue_impact/images/impact_given_qbar.png" width="48%" alt="Impact given baseline q̄"/>
+  <img src="python/experiments/single_queue_impact/images/queue_given_qbar.png" width="48%" alt="Queue given baseline q̄"/>
 </p>
 
 *Conditional simulation of 500 counterfactual paths (gray) with mean (red) and baseline (black).*
@@ -74,17 +74,19 @@ let impact = ImpactPath::new(&q_path, &bar_q_path, &tail_impact);
 
 Conditional intensity with multi-exponential kernel:
 
-$$\lambda_t = \mu + \sum_{i=1}^{k} R^i_t, \quad \varphi(s) = \sum_{i=1}^{k} \alpha_i e^{-\beta_i s}$$
+$$\lambda_t = \mu + \int_0^{t-} \phi(t-s)dN_s = \mu + \sum_{i=1}^{k} R^i_t, \quad \varphi(s) = \sum_{i=1}^{k} \alpha_i e^{-\beta_i s}$$
 
-Markovian state $R^i_t$ enables O(1) intensity updates.
+with Markovian states $R^i_t := \int_0^{t-} \alpha_i e^{-\beta_i(t-s)} dN_s$ enabling O(1) intensity updates.
 
 ### Queue Dynamics
 
-- **Limits**: $\lambda^L(q) = a_l + b_l \cdot q$
-- **Cancels**: $\lambda^C(q) = a_c + b_c \cdot q$
-- **Markets**: Hawkes process
+- **Limits**: $\lambda^L(q) = a_l + b_l \cdot q$, with $b_l < 0$.
+- **Cancels**: $\lambda^C(q) = a_c + b_c \cdot q$ with $b_c > 0$.
+- **Markets**: Hawkes process.
 
 ### Conditional Impact
+
+With $c_\lambda := b_c - b_l$, we implement:
 
 $$I(t) = c_\kappa \int_0^t (\bar{q}_s - q_s) \, dN_s + c_\kappa (\bar{q}_t - q_t) \cdot \mathcal{I}_t$$
 
@@ -114,7 +116,7 @@ cargo run --release --bin single_queue_efficient_without_us
 cargo run --release --bin double_queue_efficient_with_us
 cargo run --release --bin double_queue_efficient_without_us
 
-cd python && python plot_utils.py
+cd python/experiments/single_queue_impact && python plot_utils.py
 ```
 
 Outputs: `impact_paths.npy`, `queue_paths.npy`, `times.npy` (and `*_without.npy` variants).

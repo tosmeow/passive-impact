@@ -9,7 +9,7 @@ COLORS = {'ask': '#2563eb', 'bid': '#ea580c', 'impact': '#16a34a', 'sim': '#9ca3
 
 # Data directory - can be 'general' or 'efficient'
 DATA_MODE = 'efficient'  # Change to 'general' for non-memory-efficient data
-DATA_BASE = f'../data/double_queue/{DATA_MODE}'
+DATA_BASE = f'../../../data/double_queue/{DATA_MODE}'
 
 
 def load_bidask_data():
@@ -309,37 +309,41 @@ def plot_impact_difference(ask_df, bid_df, title, save_path=None):
 
 
 def plot_dashboard(data, save_path=None):
-    """Compact 2x2 dashboard: queues and impact for both scenarios.
+    """3x2 dashboard: queues, individual impacts, and combined impact.
 
     Layout:
-        [Queue given q]     [Queue given q̄]
-        [Impact given q]    [Impact given q̄]
+        [Queue given q]              [Queue given q̄]
+        [Ask & Bid impact given q]   [Ask & Bid impact given q̄]
+        [Impact diff given q]        [Impact diff given q̄]
     """
-    fig, axes = plt.subplots(2, 2, figsize=(16, 10))
+    fig, axes = plt.subplots(3, 2, figsize=(16, 15))
 
-    # ===== Top Left: Queues given q =====
-    ax = axes[0, 0]
-    _plot_queue_panel(ax, data['ask_queue_with'], data['bid_queue_with'],
+    # ===== Row 0: Queues =====
+    _plot_queue_panel(axes[0, 0], data['ask_queue_with'], data['bid_queue_with'],
                       sim_prefix_a='bar_q_a', sim_prefix_b='bar_q_b',
                       ref_col_a='q_a', ref_col_b='q_b',
                       title='Queues given base q')
 
-    # ===== Top Right: Queues given q̄ =====
-    ax = axes[0, 1]
-    _plot_queue_panel(ax, data['ask_queue_without'], data['bid_queue_without'],
+    _plot_queue_panel(axes[0, 1], data['ask_queue_without'], data['bid_queue_without'],
                       sim_prefix_a='q_a_sim', sim_prefix_b='q_b_sim',
                       ref_col_a='bar_q_a', ref_col_b='bar_q_b',
                       title='Queues given impacted q̄')
 
-    # ===== Bottom Left: Impact given q =====
-    ax = axes[1, 0]
-    _plot_impact_panel(ax, data['ask_impact_with'], data['bid_impact_with'],
-                       title='Price Impact given base q')
+    # ===== Row 1: Individual Ask & Bid impacts =====
+    _plot_individual_impact_panel(axes[1, 0],
+                                  data['ask_impact_with'], data['bid_impact_with'],
+                                  title='Ask & Bid Impact given base q')
 
-    # ===== Bottom Right: Impact given q̄ =====
-    ax = axes[1, 1]
-    _plot_impact_panel(ax, data['ask_impact_without'], data['bid_impact_without'],
-                       title='Price Impact given impacted q̄')
+    _plot_individual_impact_panel(axes[1, 1],
+                                  data['ask_impact_without'], data['bid_impact_without'],
+                                  title='Ask & Bid Impact given impacted q̄')
+
+    # ===== Row 2: Combined impact (Ask - Bid) =====
+    _plot_impact_panel(axes[2, 0], data['ask_impact_with'], data['bid_impact_with'],
+                       title='Price Impact (Ask − Bid) given base q')
+
+    _plot_impact_panel(axes[2, 1], data['ask_impact_without'], data['bid_impact_without'],
+                       title='Price Impact (Ask − Bid) given impacted q̄')
 
     plt.tight_layout()
 
@@ -376,6 +380,38 @@ def _plot_queue_panel(ax, ask_df, bid_df, sim_prefix_a, sim_prefix_b,
 
     ax.set_xlabel('Time')
     ax.set_ylabel('Queue Size')
+    ax.set_title(title)
+    ax.legend(loc='best', fontsize=8)
+
+
+def _plot_individual_impact_panel(ax, ask_df, bid_df, title):
+    """Helper: plot ask and bid impacts separately on a single axis."""
+    ask_sim_cols = [c for c in ask_df.columns if c.startswith('sim_')]
+    bid_sim_cols = [c for c in bid_df.columns if c.startswith('sim_')]
+
+    # Simulation paths
+    for col in ask_sim_cols[:20]:
+        ax.plot(ask_df.index, ask_df[col], color=COLORS['ask'], alpha=0.08, lw=0.5)
+    for col in bid_sim_cols[:20]:
+        ax.plot(bid_df.index, bid_df[col], color=COLORS['bid'], alpha=0.08, lw=0.5)
+
+    # Means
+    ask_mean = ask_df[ask_sim_cols].mean(axis=1)
+    bid_mean = bid_df[bid_sim_cols].mean(axis=1)
+    ax.plot(ask_df.index, ask_mean, color=COLORS['ask'], lw=2.5, label='Ask impact (mean)')
+    ax.plot(bid_df.index, bid_mean, color=COLORS['bid'], lw=2.5, label='Bid impact (mean)')
+
+    # Std bands
+    ask_std = ask_df[ask_sim_cols].std(axis=1)
+    bid_std = bid_df[bid_sim_cols].std(axis=1)
+    ax.fill_between(ask_df.index, ask_mean - ask_std, ask_mean + ask_std,
+                    color=COLORS['ask'], alpha=0.15)
+    ax.fill_between(bid_df.index, bid_mean - bid_std, bid_mean + bid_std,
+                    color=COLORS['bid'], alpha=0.15)
+
+    ax.axhline(0, color='black', ls=':', alpha=0.5)
+    ax.set_xlabel('Time')
+    ax.set_ylabel('Impact')
     ax.set_title(title)
     ax.legend(loc='best', fontsize=8)
 

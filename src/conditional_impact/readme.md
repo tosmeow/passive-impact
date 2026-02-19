@@ -2,7 +2,7 @@
 
 Closed-form market impact computation, under the following assumptions:
 
-- The intensity functions $\lambda^L$ (decreasing in $q$) and $\lambda^C$ (increasing in $q$) are such that $\lambda^L - \lambda^C$ is affine in the queue state $q$.
+- The intensity functions $\lambda^L$ (decreasing in $q$) and $\lambda^C$ (increasing in $q$) are such that $\lambda^L - \lambda^C$ is affine in the queue state $q$, with slope $-c_{\lambda}$.
 
 - Underlying price $\mathbb{E}_t[\int_0^\infty \kappa(q^a_s)dN^a_s - \kappa(q^b_s)dN^b_s]$ is built with $\kappa$ affine in the queue state.
 
@@ -109,8 +109,10 @@ $$I^x(t) = c_\kappa \int_0^t (\bar{q}^x_s - q^x_s) \, dN^x_s + c_\kappa \mathcal
 
 To make the tail term more explicit now, we need to discuss the following.
 
-Writing $\bar{q} = (\bar{q}^a, \bar{q}^b)$, $\mathbb{E}_t[\bar{q}_s - q_s] = (\bar{q}_t - q_t) - \int_t^s C_{\lambda} \mathbb{E}_t[\bar{q}_u - q_u] du$ with
-$$C_{\lambda} = \begin{pmatrix} a_C - a_L & b_C - b_L \\ b_C - b_L & a_C - a_L \end{pmatrix}$$
+Writing $\bar{q} = (\bar{q}^a, \bar{q}^b)$, 
+
+$$\mathbb{E}_t[\bar{q}_s - q_s] = (\bar{q}_t - q_t) - \int_t^s C_{\lambda} \mathbb{E}_t[\bar{q}_u - q_u] \, du \text{ with } C_{\lambda} = \begin{pmatrix} a_C - a_L & b_C - b_L \\\\ b_C - b_L & a_C - a_L \end{pmatrix}$$
+
 where $\lambda^L(u,v) = a_L u + b_L v + d_L$ and $\lambda^C(u,v) = a_C u + b_C v + d_C$.
 
 In such a scenario, there are two eigendirections $u_0 = (1,1)$ and $u_1 = (1,-1)$ with corresponding eigenvalues $c_0 = (a_C - a_L) + (b_C - b_L)$ and $c_1 = (a_C - a_L) - (b_C - b_L)$, this implies:

@@ -62,3 +62,25 @@ path = "src/bin/double_queue/efficient/with_us.rs"
 [[bin]]
 name = "double_queue_efficient_without_us"
 path = "src/bin/double_queue/efficient/without_us.rs"
+
+# Experiments
+[[bin]]
+name = "extreme_events"
+path = "src/bin/experiments/extreme_events.rs"
+
+[[bin]]
+name = "cancelation_race"
+path = "src/bin/experiments/cancelation_race.rs"
+
+[[bin]]
+name = "metaorder_impact"
+path = "src/bin/experiments/metaorder_impact.rs"
+
+[[bin]]
+name = "hawkes_example"
+path = "src/bin/experiments/hawkes_example.rs"
+
+# Presentation
+[[bin]]
+name = "markovian_queue_illustration"
+path = "src/bin/presentation/markovian_queue_illustration.rs"

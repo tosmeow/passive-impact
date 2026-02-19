@@ -5,7 +5,7 @@ import os
 
 # Data directory - can be 'general' or 'efficient'
 DATA_MODE = 'efficient'  # Change to 'general' for non-memory-efficient data
-DATA_BASE = f'../data/single_queue/{DATA_MODE}'
+DATA_BASE = f'../../../data/single_queue/{DATA_MODE}'
 
 def load_data():
     """Load simulation results from .npy files into pandas DataFrames."""
@@ -87,7 +87,7 @@ def generate_all_plots():
     path_with, path_without, queue_with, queue_without = load_data()
 
     # Create output directory if needed
-    os.makedirs('.', exist_ok=True)
+    os.makedirs('images', exist_ok=True)
 
     print("\nGenerating plots...")
 
@@ -97,7 +97,7 @@ def generate_all_plots():
         title='Conditional Impact I(t) given base queue q',
         label='Price Impact',
         ref_col=None,
-        save_path='impact_given_q.png'
+        save_path='images/impact_given_q.png'
     )
 
     plot_queue_shades(
@@ -106,7 +106,7 @@ def generate_all_plots():
         title='Counterfactual queue size given base queue q',
         label='Queue Size',
         ref_col='q',
-        save_path='queue_given_q.png'
+        save_path='images/queue_given_q.png'
     )
 
     plot_queue_shades(
@@ -115,7 +115,7 @@ def generate_all_plots():
         title='Conditional Impact I(t) given impacted queue q̄',
         label='Price Impact',
         ref_col=None,
-        save_path='impact_given_qbar.png'
+        save_path='images/impact_given_qbar.png'
     )
 
     plot_queue_shades(
@@ -124,7 +124,7 @@ def generate_all_plots():
         title='Counterfactual queue size given impacted queue q̄',
         label='Queue Size',
         ref_col='bar_q',
-        save_path='queue_given_qbar.png'
+        save_path='images/queue_given_qbar.png'
     )
 
 
