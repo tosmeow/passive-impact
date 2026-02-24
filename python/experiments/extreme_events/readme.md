@@ -45,7 +45,7 @@ This creates a **mean-reverting coupling**: $\bar{q}$ is more likely to miss lim
 
 ![Queue Difference Decay](images/queue_diff_decay.png)
 
-**Left panel**: Time evolution of $\bar{q}(t) - q(t)$ for all initial perturbations Δ₀. The decay is rapid during [0, 1] when L/C events are occurring, then continues more slowly afterward.
+**Left panel**: Time evolution of $\bar{q}(t) - q(t)$ for all initial perturbations Δ₀. The colored lines (viridis) show the L/C-conditioned scenario with rapid decay during [0, 1]. The **red dashed line** shows the baseline scenario without L/C event injection, which decays much more slowly. This directly illustrates the acceleration effect of extreme events.
 
 **Right panel**: Queue difference as a function of initial perturbation at different time snapshots. The relationship remains monotonic (larger Δ₀ → larger difference) but the slope decreases over time, indicating proportional decay.
 
@@ -53,9 +53,13 @@ This creates a **mean-reverting coupling**: $\bar{q}$ is more likely to miss lim
 
 ![Decay Rate Analysis](images/decay_rate_analysis.png)
 
-**Left panel**: Heatmap of ($\bar{q}-q$) / Δ₀ showing uniform decay across all initial perturbations.
+**Left panel**: Heatmap of ($\bar{q}-q$) / Δ₀ showing uniform decay across all initial perturbations in the L/C-conditioned scenario.
 
-**Right panel**: Mean normalized difference drops from 1.0 to approximately 0.2-0.3 by t = 1, demonstrating that ~70-80% of the initial queue difference is eliminated during the extreme event window.
+**Right panel**: **Convergence comparison** — shows both scenarios on the same axes:
+- **Blue curve (with L/C events)**: Mean normalized difference drops from 1.0 to approximately 0.2-0.3 by t = 1, demonstrating that ~70-80% of the initial queue difference is eliminated during the extreme event window.
+- **Red dashed curve (baseline, no L/C events)**: Mean normalized difference remains around 0.7-0.8 at t = 1, showing much slower decay when the extreme events are absent.
+
+The vertical separation between the two curves quantifies the **impact of extreme event-driven convergence speed**.
 
 ---
 

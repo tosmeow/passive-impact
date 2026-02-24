@@ -115,6 +115,9 @@ fn main() {
     // This makes q̄ thin against the L/C events
     let mut q_events_by_dim = extract_events_by_dim(&q_result_internal, 3, Some(2));
 
+    // Save baseline conditioning (q's own events only, no synthetic L/C)
+    let q_events_by_dim_baseline = q_events_by_dim.clone();
+
     // Add synthetic L/C events to conditioning (dim 0 = L, dim 1 = C)
     let lc_times_by_dim = extract_events_by_dim(&lc_events, 3, Some(2));
     for dim in 0..2 {
@@ -171,7 +174,33 @@ fn main() {
     println!("[TIMING] Conditional simulations ({}x): {:?}", p, t0.elapsed());
 
     // ==========================================================================
-    // Compute results for each initial state
+    // Run baseline conditional simulations (without L/C events)
+    // ==========================================================================
+    let t0_baseline = Instant::now();
+
+    let ctx_baseline = ConditionalSimulationContext::new(
+        &process,
+        &q_events_by_dim_baseline,
+        Some(&hawkes_as_market),
+        Some(&hawkes_as_market),
+        time_horizon,
+    );
+
+    let sim_results_baseline = ctx_baseline.simulate_multiple(&configs, 42);
+    println!("[TIMING] Baseline conditional simulations ({}x): {:?}", p, t0_baseline.elapsed());
+
+    // Collect baseline queue samples on the sample grid
+    let mut baseline_queue_samples_grid: Vec<Vec<u32>> = Vec::with_capacity(p as usize);
+
+    for sim_result in sim_results_baseline.iter() {
+        let initial_q_bar = initial_queue_size + (baseline_queue_samples_grid.len() as u32 + 1);
+        let bar_q_path = AffineQueueProcess::result_to_queue_path(sim_result, initial_q_bar);
+        let bar_q_samples_grid = sample_queue_at_times(&bar_q_path, &sample_times);
+        baseline_queue_samples_grid.push(bar_q_samples_grid);
+    }
+
+    // ==========================================================================
+    // Compute results for each initial state (with L/C events)
     // ==========================================================================
     let t0 = Instant::now();
 
@@ -242,6 +271,15 @@ fn main() {
         .collect();
     write_npy_u32(&format!("{}/queue_paths_grid.npy", output_dir), &queue_data_grid, n_sample_times, n_sims + 1).unwrap();
 
+    // Write baseline queue paths at sample grid: [n_sample_times x (1 + n_sims)]
+    let baseline_queue_data_grid: Vec<u32> = (0..n_sample_times)
+        .flat_map(|t_idx| {
+            std::iter::once(q_at_sample_times[t_idx])
+                .chain(baseline_queue_samples_grid.iter().map(move |samples| samples[t_idx]))
+        })
+        .collect();
+    write_npy_u32(&format!("{}/queue_paths_grid_baseline.npy", output_dir), &baseline_queue_data_grid, n_sample_times, n_sims + 1).unwrap();
+
     // Write market order times
     write_npy_f64_1d(&format!("{}/times.npy", output_dir), &market_orders).unwrap();
 
@@ -269,7 +307,8 @@ fn main() {
     println!("Files:");
     println!("  - impact_paths.npy: [{} x {}] impact at market order times", n_market_times, n_sims);
     println!("  - queue_paths.npy: [{} x {}] queues at market order times", n_market_times, n_sims + 1);
-    println!("  - queue_paths_grid.npy: [{} x {}] queues at sample grid (for diff evolution)", n_sample_times, n_sims + 1);
+    println!("  - queue_paths_grid.npy: [{} x {}] queues at sample grid (with L/C events)", n_sample_times, n_sims + 1);
+    println!("  - queue_paths_grid_baseline.npy: [{} x {}] queues at sample grid (baseline, no L/C events)", n_sample_times, n_sims + 1);
     println!("  - times.npy: [{}] market order times", n_market_times);
     println!("  - sample_times.npy: [{}] sample grid times", n_sample_times);
     println!("  - initial_deltas.npy: [{}] initial queue perturbations", n_sims);

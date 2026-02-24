@@ -15,6 +15,7 @@ def load_data():
     # Sample grid times (for queue diff evolution)
     sample_times = np.load(f'{DATA_BASE}/sample_times.npy')
     queue_paths_grid = np.load(f'{DATA_BASE}/queue_paths_grid.npy')  # [n_sample_times x (1 + n_sims)]
+    queue_paths_grid_baseline = np.load(f'{DATA_BASE}/queue_paths_grid_baseline.npy')  # [n_sample_times x (1 + n_sims)]
 
     initial_deltas = np.load(f'{DATA_BASE}/initial_deltas.npy')
     lc_event_times = np.load(f'{DATA_BASE}/lc_event_times.npy')
@@ -28,6 +29,11 @@ def load_data():
     bar_q_all_grid = queue_paths_grid[:, 1:]
     queue_diff_grid = bar_q_all_grid.astype(float) - q_ref_grid[:, np.newaxis].astype(float)
 
+    # Baseline data (no L/C events)
+    q_ref_grid_baseline = queue_paths_grid_baseline[:, 0]
+    bar_q_all_grid_baseline = queue_paths_grid_baseline[:, 1:]
+    queue_diff_grid_baseline = bar_q_all_grid_baseline.astype(float) - q_ref_grid_baseline[:, np.newaxis].astype(float)
+
     return {
         'times': times,
         'sample_times': sample_times,
@@ -37,6 +43,7 @@ def load_data():
         'q_ref_grid': q_ref_grid,
         'bar_q_all_grid': bar_q_all_grid,
         'queue_diff_grid': queue_diff_grid,
+        'queue_diff_grid_baseline': queue_diff_grid_baseline,
         'initial_deltas': initial_deltas,
         'lc_event_times': lc_event_times,
     }
@@ -45,11 +52,12 @@ def load_data():
 def plot_queue_diff_decay(data, save_path=None):
     """
     Plot 1: Decay of q̄ - q during the L/C event window as a function of initial delta.
-    Shows how queue differences decay during extreme events.
+    Shows how queue differences decay during extreme events and comparison to baseline.
     Uses sample grid for fine resolution in [0, 1].
     """
     times = data['sample_times']  # Use sample grid
     queue_diff = data['queue_diff_grid']  # Use grid data
+    queue_diff_baseline = data['queue_diff_grid_baseline']  # Baseline (no L/C events)
     initial_deltas = data['initial_deltas']
     lc_times = data['lc_event_times']
 
@@ -60,9 +68,14 @@ def plot_queue_diff_decay(data, save_path=None):
     n_sims = queue_diff.shape[1]
     colors = plt.cm.viridis(np.linspace(0, 1, n_sims))
 
-    # Plot all lines
+    # Plot all lines for L/C-conditioned scenario
     for idx in range(n_sims):
         ax.plot(times, queue_diff[:, idx], color=colors[idx], linewidth=0.8, alpha=0.8)
+
+    # Overlay baseline mean normalized difference as dashed red line
+    baseline_normalized = queue_diff_baseline / initial_deltas[np.newaxis, :]
+    baseline_mean = baseline_normalized.mean(axis=1)
+    ax.plot(times, baseline_mean, 'r--', linewidth=2.5, label='Baseline mean (no L/C events)', alpha=0.9)
 
     # Mark L/C event window
     ax.axvspan(lc_times.min(), lc_times.max(), alpha=0.15, color='orange')
@@ -70,6 +83,7 @@ def plot_queue_diff_decay(data, save_path=None):
     ax.set_xlabel('Time')
     ax.set_ylabel('q̄ - q')
     ax.set_title('Queue Difference Evolution')
+    ax.legend(loc='upper right', fontsize=9)
     ax.grid(True, alpha=0.3)
 
     # Add colorbar for initial delta
@@ -158,20 +172,22 @@ def plot_impact_staleness(data, save_path=None):
 def plot_decay_rate_analysis(data, save_path=None):
     """
     Plot 3: Analyze decay rate of q̄ - q.
-    Shows the ratio (q̄(t) - q(t)) / Δ₀ over time and as heatmap.
+    Shows the ratio (q̄(t) - q(t)) / Δ₀ over time and as heatmap, comparing L/C events to baseline.
     Uses sample grid for fine resolution in [0, 1].
     """
     times = data['sample_times']  # Use sample grid
     queue_diff = data['queue_diff_grid']  # Use grid data
+    queue_diff_baseline = data['queue_diff_grid_baseline']  # Baseline (no L/C events)
     initial_deltas = data['initial_deltas']
     lc_times = data['lc_event_times']
 
     # Compute normalized difference: (q̄ - q) / Δ₀
     normalized_diff = queue_diff / initial_deltas[np.newaxis, :]
+    normalized_diff_baseline = queue_diff_baseline / initial_deltas[np.newaxis, :]
 
     fig, axes = plt.subplots(1, 2, figsize=(14, 5))
 
-    # Left: Heatmap of normalized difference
+    # Left: Heatmap of normalized difference (with L/C events)
     ax = axes[0]
     im = ax.imshow(normalized_diff.T, aspect='auto', origin='lower',
                    extent=[times.min(), times.max(), initial_deltas.min(), initial_deltas.max()],
@@ -179,25 +195,34 @@ def plot_decay_rate_analysis(data, save_path=None):
     ax.axvline(lc_times.max(), color='orange', linestyle='--', linewidth=2, label='End of L/C events')
     ax.set_xlabel('Time')
     ax.set_ylabel('Initial Δ₀')
-    ax.set_title('(q̄ - q) / Δ₀  (normalized decay)')
+    ax.set_title('(q̄ - q) / Δ₀  (normalized decay, with L/C events)')
     plt.colorbar(im, ax=ax, label='Normalized difference')
     ax.legend()
 
-    # Right: Mean normalized difference over initial deltas
+    # Right: Mean normalized difference over initial deltas (comparing both scenarios)
     ax = axes[1]
     mean_normalized = normalized_diff.mean(axis=1)
     std_normalized = normalized_diff.std(axis=1)
+    mean_normalized_baseline = normalized_diff_baseline.mean(axis=1)
+    std_normalized_baseline = normalized_diff_baseline.std(axis=1)
 
+    # Plot L/C-conditioned scenario (blue)
     ax.fill_between(times, mean_normalized - std_normalized, mean_normalized + std_normalized,
                     alpha=0.3, color='blue')
-    ax.plot(times, mean_normalized, 'b-', linewidth=2, label='Mean ± Std')
+    ax.plot(times, mean_normalized, 'b-', linewidth=2, label='With L/C events ± Std')
+
+    # Plot baseline scenario (red dashed)
+    ax.fill_between(times, mean_normalized_baseline - std_normalized_baseline, mean_normalized_baseline + std_normalized_baseline,
+                    alpha=0.25, color='red')
+    ax.plot(times, mean_normalized_baseline, 'r--', linewidth=2.5, label='Baseline (no L/C events) ± Std')
+
     ax.axhline(1.0, color='k', linestyle='--', alpha=0.5, label='No decay')
     ax.axvspan(lc_times.min(), lc_times.max(), alpha=0.2, color='orange', label='L/C events')
 
     ax.set_xlabel('Time')
     ax.set_ylabel('(q̄ - q) / Δ₀')
-    ax.set_title('Mean Normalized Queue Difference')
-    ax.legend()
+    ax.set_title('Mean Normalized Queue Difference: Convergence Comparison')
+    ax.legend(fontsize=9)
     ax.grid(True, alpha=0.3)
     ax.set_ylim(0, 1.5)
 
