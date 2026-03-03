@@ -15,5 +15,5 @@ jobs:
 
       - name: Push to public repo
         run: |
-          git remote add public https://x-access-token:${{ secrets.PUBLIC_REPO_PAT }}@github.com/youruser/project-public.git
+          git remote add public https://x-access-token:${{ secrets.PUBLIC_REPO_PAT }}@github.com/tosmeow/passive-impact-distribution.git
           git push public main --force
