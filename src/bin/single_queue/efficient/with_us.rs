@@ -29,10 +29,11 @@ fn main() {
     let b_c = 0.125;
 
     // Hawkes parameters for market orders: these parameters are set to be close to a t ** -1.5 power-law for the kernel.
-    let mu = 1.0;
-    let alpha = vec![0.065, 0.2, 0.325, 0.65];
-    let beta = vec![0.15, 0.60, 2.5, 10.0];
-
+    let mu = 6.0; //1.0;
+    //let alpha = vec![0.065, 0.2, 0.325, 0.65];
+    //let beta = vec![0.15, 0.60, 2.5, 10.0];
+    let alpha = vec![0.000939493885, 0.00709728833, 0.0147626864, 0.0345610486, 0.110927373, 0.498447091, 3.52737838, 29.7662263, 523.666117, 1188582440.0];
+    let beta  = vec![0.0083852488, 0.153562388, 0.580891232, 1.93130619, 6.79859487, 24.9704201, 108.954711, 552.110376, 6059.92156, 2592609630.0];
 
     // Meta orders configuration
     let n_meta: u32 = 375;
