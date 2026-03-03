@@ -151,14 +151,6 @@ Outputs: `.npy` files saved to `data/*/` directories, organized by experiment ty
 
 ---
 
-## Paper Reference
-
-This repository is the code companion to an academic paper on conditional simulation of point processes and applications to market impact in financial markets. Each experiment is designed to illustrate concepts from the paper, though the mapping between paper sections and code experiments is still being finalized.
-
-For more details on the mathematical framework, theory of conditional Poisson measures, and derivation of the closed-form impact formulas, see [reference_paper.tex](reference_paper.tex).
-
----
-
 ## Dependencies
 
 - `numpy`, `scipy`: Numerical computing
