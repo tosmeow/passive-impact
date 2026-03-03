@@ -67,7 +67,7 @@ def plot_queue_shades(df, sim_col, title, label, ref_col=None, save_path=None):
     if ref_col is not None:
         ax.plot(df.index, df[ref_col], color='black', linewidth=2.5, label=ref_col)
 
-    ax.set_xlabel('Time')
+    ax.set_xlabel('Time (seconds)')
     ax.set_ylabel(label)
     ax.set_title(title)
     ax.legend()

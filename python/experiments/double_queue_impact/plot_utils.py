@@ -445,7 +445,7 @@ def generate_all_plots():
     print("Loading bid-ask simulation data...")
     data = load_bidask_data()
 
-    os.makedirs('.', exist_ok=True)
+    os.makedirs('images', exist_ok=True)
 
     print("\nGenerating plots...")
 
@@ -460,7 +460,7 @@ def generate_all_plots():
         title='Bid-Ask Queues: Counterfactual given base queue q',
         ask_ref_col='q_a',
         bid_ref_col='q_b',
-        save_path='bidask_queue_given_q.png'
+        save_path='images/bidask_queue_given_q.png'
     )
 
     # Queue plots (without scenario: bar_q is reference, q is counterfactual)
@@ -472,7 +472,7 @@ def generate_all_plots():
         title='Bid-Ask Queues: Counterfactual given impacted queue q̄',
         ask_ref_col='bar_q_a',
         bid_ref_col='bar_q_b',
-        save_path='bidask_queue_given_qbar.png'
+        save_path='images/bidask_queue_given_qbar.png'
     )
 
     # =========================================================================
@@ -482,14 +482,14 @@ def generate_all_plots():
         data['ask_impact_with'],
         data['bid_impact_with'],
         title='Total Price Impact (Ask - Bid) given base queue q',
-        save_path='bidask_impact_given_q.png'
+        save_path='images/bidask_impact_given_q.png'
     )
 
     plot_impact_difference(
         data['ask_impact_without'],
         data['bid_impact_without'],
         title='Total Price Impact (Ask - Bid) given impacted queue q̄',
-        save_path='bidask_impact_given_qbar.png'
+        save_path='images/bidask_impact_given_qbar.png'
     )
 
     # =========================================================================
@@ -499,28 +499,28 @@ def generate_all_plots():
         data['ask_impact_with'],
         title='Ask Side Impact I^a(t) given base queue q',
         color='blue',
-        save_path='ask_impact_given_q.png'
+        save_path='images/ask_impact_given_q.png'
     )
 
     plot_impact_shades(
         data['bid_impact_with'],
         title='Bid Side Impact I^b(t) given base queue q',
         color='orange',
-        save_path='bid_impact_given_q.png'
+        save_path='images/bid_impact_given_q.png'
     )
 
     plot_impact_shades(
         data['ask_impact_without'],
         title='Ask Side Impact I^a(t) given impacted queue q̄',
         color='blue',
-        save_path='ask_impact_given_qbar.png'
+        save_path='images/ask_impact_given_qbar.png'
     )
 
     plot_impact_shades(
         data['bid_impact_without'],
         title='Bid Side Impact I^b(t) given impacted queue q̄',
         color='orange',
-        save_path='bid_impact_given_qbar.png'
+        save_path='images/bid_impact_given_qbar.png'
     )
 
     print("\nAll plots generated!")
