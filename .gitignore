@@ -2,8 +2,15 @@ target/
 .idea/
 *.csv
 *.npy
+*.ipynb
+__pycache__/
+
+# Ignored experiments
 python/experiments/presentation
 python/experiments/hawkes_example
 python/experiments/market_orders
-python/experiments/agressive_impact
 python/experiments/comparative_pricing_models
+python/experiments/cancelation_race
+python/experiments/extreme_events
+src/bin/experiments/
+data/experiments/

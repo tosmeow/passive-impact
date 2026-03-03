@@ -1,12 +1,25 @@
-// For a sum of exponentials kernel $\phi(s) = \sum_{i=1}^N \alpha_i e^{-\beta_i * s}, we compute numerically the coefficients such that (\delta_0 - \phi) = 1 + \psi
-// where \psi is another sum of exponentials whose parameters we specify.
+// Resolvent computation for a sum-of-exponentials Hawkes kernel.
+//
+// For φ(s) = Σᵢ αᵢ e^{-βᵢ s}, we compute the resolvent ψ such that
+// (δ₀ - φ)⁻¹ = δ₀ + ψ, where ψ = Σⱼ cⱼ e^{-λⱼ s}.
+//
+// The roots λⱼ and residues cⱼ are found by solving the characteristic
+// equation 1 - Σᵢ αᵢ/(x + βᵢ) = 0.
+//
+// NOTE: This resolvent is used by the passive (flow imbalance) model to
+// solve the Volterra equation for E_t[λ_s]. It is NOT the propagator kernel
+// G used in the aggressive (propagator) price model. The propagator kernel
+// G(t) = (1 - ‖φ‖₁) + Σᵢ (αᵢ/βᵢ) e^{-βᵢt} is derived from the
+// martingale condition and uses the Hawkes rates βᵢ directly — see
+// propagator_model/mod.rs.
 
 use crate::utils::IVTSolver;
 use crate::utils::FDSolver;
 use crate::models::MultiExponentialHawkes;
 
-// This structure is meant to store the kernel parameters of the propagator (delta_0 - f)^-1 - delta_0 associated to a kernel of type MultiExponentialHawkes.
-
+/// Resolvent of the Hawkes kernel: (δ₀ - φ)⁻¹ = δ₀ + Σⱼ cⱼ e^{-λⱼ ·}
+///
+/// Used by `TailIntensity` (passive model) to compute E_t[λ_s] in closed form.
 pub struct Propagator {
     pub hawkes_params: MultiExponentialHawkes,
     //Decay rate of each exponential component

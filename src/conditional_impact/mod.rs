@@ -1,9 +1,9 @@
 pub mod impact_utils;
-mod single_queue;
-mod multi_queue;
+mod flow_imbalance_model;
+pub mod propagator_model;
 
 pub use impact_utils::propagator;
 pub use impact_utils::tail_intensity;
 pub use impact_utils::TailImpact;
-pub use single_queue::*;
-pub use multi_queue::*;
+pub use flow_imbalance_model::*;
+pub use propagator_model::AggressiveImpactPath;
