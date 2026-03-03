@@ -80,6 +80,16 @@ path = "src/bin/experiments/metaorder_impact.rs"
 name = "hawkes_example"
 path = "src/bin/experiments/hawkes_example.rs"
 
+# Aggressive impact
+[[bin]]
+name = "agressive_impact"
+path = "src/bin/agressive_impact/main.rs"
+
+# Comparative pricing models
+[[bin]]
+name = "comparative_pricing_models"
+path = "src/bin/comparative_pricing_models/main.rs"
+
 # Presentation
 [[bin]]
 name = "markovian_queue_illustration"
