@@ -1,7 +1,5 @@
 # Single Queue Impact
 
-**Paper section**: $\S$4.1 (Conditional queue simulation) and $\S$4.2.1 (Passive market impact)
-
 Passive market impact from a limit-order metaorder in a single-sided queue. We compare 500 counterfactual paths (gray) against the observed baseline (black), with the empirical mean in red.
 
 ## Setup

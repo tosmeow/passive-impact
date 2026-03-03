@@ -1,7 +1,5 @@
 # Double Queue Impact
 
-**Paper section**: $\S$4.1 (Conditional queue simulation) and $\S$4.2.1 (Passive market impact, bid-ask extension)
-
 Extends passive impact to a full bid-ask queue pair. A limit-order metaorder is executed on the ask side only; we observe how impact propagates to both sides and compute the net price impact (ask $-$ bid).
 
 ## Setup
