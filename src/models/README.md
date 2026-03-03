@@ -24,7 +24,7 @@ models/
 
 ```rust
 pub trait MultivariateMarkovianIntensity {
-    fn lambda(&self) -> Vec<f64>;      // Current intensities (λ¹, ..., λᵈ)
+    fn lambda(&self) -> Vec<f64>;      // Current intensities.
     fn lambda_bar(&self) -> f64;       // Upper bound for thinning
     fn update_state(&mut self, event: &MultivariateEvent);
     fn get_state(&self) -> Vec<f64>;   // Markovian factors
@@ -56,7 +56,7 @@ We allow to start the Hawkes simulation from a point where the latent Markovian 
 ```rust
 let hawkes = MultiExponentialHawkes::new(mu, alpha, beta);
 
-// With stationary initial state
+// Initialized with the Hawkes starting from the stationary Markovian factors.
 let hawkes = MultiExponentialHawkes::new_with_state(
     MultiExponentialHawkes::new(mu, alpha.clone(), beta.clone()).stationary_state(),
     mu, alpha, beta,
@@ -77,10 +77,10 @@ The general method for queue generation with ::new simulates the Hawkes process 
 We provide a method ::new_queue that will set the effective market order intensity to zero. It is used when we want to specify a Hawkes path trajectory that will be unchanged in conditional simulations and provide more efficient code.
 
 ```rust
-// Coupled: queue + Hawkes state
+// Coupled version keeping track of the queue and the Hawkes state.
 let process = AffineQueueProcess::new(q0, a_l, b_l, a_c, b_c, mu, alpha, beta);
 
-// Decoupled: queue state only (Hawkes injected externally)
+// Decoupled version keeping track of only the queue state with the Hawkes injected externally.
 let process = AffineQueueProcess::new_queue(q0, a_l, b_l, a_c, b_c);
 ```
 
@@ -117,7 +117,6 @@ pub struct QueuePath {
     pub events: Vec<QueueEvent>,
 }
 
-// Convert simulation result to queue path
 let path = AffineQueueProcess::result_to_queue_path(&result, initial_size);
 let q_at_t = path.queue_at_time(t);
 ```

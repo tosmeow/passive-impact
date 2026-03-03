@@ -34,7 +34,18 @@ let result = simulate_with_externals(&process, t_max, &external_events, Some(see
 
 ## Conditional Simulation
 
-Sample counterfactual paths conditioned on observed baseline.
+Sample counterfactual paths conditioned on observed baseline using coupled thinning.
+
+For conditioning intensities $\lambda^{\text{cond}}_t$ and new intensities $\lambda^{\text{new}}_t$:
+
+1. Maintain two states: conditioning state (follows fixed event sequence) and new state (to be sampled)
+2. At each time step, compute both intensity vectors
+3. **Coupling**: For each dimension $i$, sample from excess intensity $(\lambda^{\text{new}}_i - \lambda^{\text{cond}}_i)^+$
+4. When conditioning event in dimension $i$ occurs:
+   - Accept into new path with probability $\lambda^{\text{new}}_i(t) / \lambda^{\text{cond}}_i(t)$
+   - Always update conditioning state
+   - Update new state only on acceptance
+5. Continue until all external and independent events processed
 
 ```rust
 use simulation_project::simulation::ConditionalSimulationContext;
@@ -47,19 +58,10 @@ let ctx = ConditionalSimulationContext::new(
     time_horizon,
 );
 
-let result = ctx.simulate(Some(seed));
+let result = ctx.simulate(None, Some(seed));
 ```
 
-**Coupling**: Market orders (dim 2) are shared; limits/cancels (dims 0,1) are sampled independently.
-
-## Efficient Simulation
-
-Impact computation requires queue states $(q_t, \bar{q}_t)$ only at market order times $\{T_n\}$.
-
-**Optimization**: Record state values exclusively at these event times, avoiding full path storage.
-
-- Storage: fixed-size vectors indexed by market order sequence (vs. variable-length paths)
-- Logic: streamlined conditional simulation targeting specific observation points
+**Coupling**: Market orders (dim 2) are shared; limits/cancels (dims 0,1) are sampled independently via the independent measure.
 
 ## Parallelization
 
