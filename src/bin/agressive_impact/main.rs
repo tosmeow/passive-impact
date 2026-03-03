@@ -4,72 +4,11 @@ use simulation_project::simulation_helpers::{
     hawkes_to_market_orders, merge_events, create_meta_orders, events_to_dim,
     extract_events_by_dim, sample_queue_at_times,
 };
-use simulation_project::conditional_impact::propagator::Propagator;
+use simulation_project::conditional_impact::AggressiveImpactPath;
 use simulation_project::utils::{write_npy_f64, write_npy_u32, write_npy_f64_1d};
 
 use rayon::prelude::*;
 use std::time::Instant;
-
-/// Compute the aggressive market impact MI(t) using the propagator.
-///
-/// MI(t) = int_0^t [kappa(q_bar_s) - kappa(q_s)] xi(t-s) dN_s
-///       + int_0^t kappa(q_bar_s) xi(t-s) dN^o_s
-///
-/// where xi(u) = delta_0(u) + sum_j c_j e^{-lambda_j u} is the propagator,
-/// and kappa(q) = c_kappa * q + d_kappa.
-fn compute_aggressive_impact(
-    q_samples: &[u32],
-    q_bar_samples: &[u32],
-    eval_times: &[f64],
-    is_market_order: &[bool],
-    propagator_lambda: &[f64],
-    propagator_c: &[f64],
-    c_kappa: f64,
-    d_kappa: f64,
-) -> Vec<f64> {
-    let n = eval_times.len();
-    let n_components = propagator_lambda.len();
-    let mut state = vec![0.0f64; n_components];
-    let mut instantaneous = 0.0f64;
-    let mut impact_path = Vec::with_capacity(n);
-    let mut prev_t = 0.0f64;
-
-    for idx in 0..n {
-        let t = eval_times[idx];
-        let dt = t - prev_t;
-
-        // Decay propagator state
-        for j in 0..n_components {
-            state[j] *= (-propagator_lambda[j] * dt).exp();
-        }
-
-        let q = q_samples[idx] as f64;
-        let q_bar = q_bar_samples[idx] as f64;
-        let kappa_q = c_kappa * q + d_kappa;
-        let kappa_q_bar = c_kappa * q_bar + d_kappa;
-
-        if is_market_order[idx] {
-            // Market order event (dN): contribute kappa(q_bar) - kappa(q)
-            let contribution = kappa_q_bar - kappa_q;
-            instantaneous += contribution;
-            for j in 0..n_components {
-                state[j] += propagator_c[j] * contribution;
-            }
-        } else {
-            // Meta order event (dN^o): contribute kappa(q_bar)
-            instantaneous += kappa_q_bar;
-            for j in 0..n_components {
-                state[j] += propagator_c[j] * kappa_q_bar;
-            }
-        }
-
-        let propagator_term: f64 = state.iter().sum();
-        impact_path.push(instantaneous + propagator_term);
-        prev_t = t;
-    }
-
-    impact_path
-}
 
 fn main() {
     let t_total = Instant::now();
@@ -93,13 +32,13 @@ fn main() {
     let beta = vec![0.15, 0.60, 2.5, 10.0];
 
     // Meta orders configuration (aggressive: dim=2, reduce queue)
-    let n_meta: u32 = 100;
+    let n_meta: u32 = 200;
     let meta_start = 1.0;
     let meta_end = 3.0 * time_horizon / 4.0;
 
     // Kappa function: kappa(q) = c_kappa * q + d_kappa
     // Negative c_kappa: smaller queue means larger impact per order
-    let c_kappa = -0.005;
+    let c_kappa = -0.002;
     let d_kappa = 1.0;
 
     println!("=== Aggressive Impact Experiment ===");
@@ -144,12 +83,9 @@ fn main() {
     let market_order_times: Vec<f64> = hawkes_as_market.events.iter().map(|e| e.time).collect();
     println!("Market orders: {}, Meta orders: {}", market_order_times.len(), meta_order_times.len());
 
-    let t0 = Instant::now();
     let hawkes_model = MultiExponentialHawkes::new(mu, alpha.clone(), beta.clone());
-    let propagator = Propagator::new(hawkes_model);
-    println!("[TIMING] Propagator computation: {:?}", t0.elapsed());
-    println!("Propagator: lambda = {:?}", propagator.lambda);
-    println!("Propagator: c = {:?}", propagator.c);
+    let norm: f64 = alpha.iter().zip(&beta).map(|(a, b)| a / b).sum::<f64>();
+    println!("Propagator: G(0) = {:.4} (mean cluster size), G(∞) = 1 (permanent)", 1.0 / (1.0 - norm));
 
     // ==========================================================================
     // Merge market + meta order times into sorted evaluation times
@@ -205,19 +141,18 @@ fn main() {
                 Some(sim_idx as u64),
             );
 
-            // Compute aggressive impact using propagator
-            let impact = compute_aggressive_impact(
+            // Compute aggressive impact using martingale propagator kernel
+            let impact_path = AggressiveImpactPath::from_queue_samples(
                 &q_at_eval_times,
                 &q_bar_samples,
                 &eval_times,
                 &is_market_order,
-                &propagator.lambda,
-                &propagator.c,
+                &hawkes_model,
                 c_kappa,
                 d_kappa,
             );
 
-            (q_bar_samples, impact)
+            (q_bar_samples, impact_path.impact_path)
         })
         .collect();
 
