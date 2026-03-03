@@ -1,7 +1,5 @@
 # Aggressive Impact
 
-**Paper section**: $\S$4.2.2 (Aggressive market impact)
-
 Market-order impact under the propagator price model. A buy-side metaorder consumes ask liquidity; the price responds through the propagator kernel $G(t) = 1 + \sum_i \frac{\alpha_i/\beta_i}{1-\|\varphi\|_1} e^{-\beta_i t}$.
 
 ## Setup
