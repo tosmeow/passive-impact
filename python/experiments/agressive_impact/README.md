@@ -4,7 +4,7 @@ Market-order impact under the propagator price model. A buy-side metaorder consu
 
 ## Setup
 
-- **Price model**: $P_t = \int_0^t \kappa(q^a_s) G(t-s) \, dN^a_s - \int_0^t \kappa(q^b_s) G(t-s) \, dN^b_s$
+- **Price model**: $P_t = \int_0^t \kappa(q^a_s) G(t-s) dN^a_s - \int_0^t \kappa(q^b_s) G(t-s) dN^b_s$
 - **Impact function**: $\kappa(q) = -0.002q + 1$ (decreasing in queue depth)
 - **Propagator**: $G(0) = 1/(1-\|\varphi\|_1) \approx 26$ (mean cluster size), $G(\infty) = 1$
 - **Metaorder**: 200 market-order events
