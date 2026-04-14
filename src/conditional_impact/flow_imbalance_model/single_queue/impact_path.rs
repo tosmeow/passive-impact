@@ -122,9 +122,13 @@ mod tests {
         }
         let q_path = QueuePath { events: q };
         let tail_impact = TailImpact::new(model.clone(), c_lambda, events);
-        let _impact_path = ImpactPath::new(q_path.clone(), q_path.clone(), &tail_impact);
-        println!("Generated {} events", n);
-        println!("{:?}", _impact_path.impact_path);
+        let impact_path = ImpactPath::new(q_path.clone(), q_path.clone(), &tail_impact);
+        // When q_path == bar_q_path, every diff is 0 → all impact values must be exactly 0.
+        assert!(
+            impact_path.impact_path.iter().all(|&v| v == 0.0),
+            "Expected all-zero impact when q == bar_q, got {:?}",
+            impact_path.impact_path
+        );
     }
 
     #[test]

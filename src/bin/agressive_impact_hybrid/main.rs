@@ -14,7 +14,7 @@ fn main() {
     let t_total = Instant::now();
 
     // ==========================================================================
-    // Configuration (same queue/Hawkes parameters as single_queue)
+    // Configuration (same queue/Hawkes parameters as aggressive_impact)
     // ==========================================================================
     let time_horizon = 100.0;
     let n_simulations = 500;
@@ -26,26 +26,27 @@ fn main() {
     let a_c = 2.0;
     let b_c = 0.125;
 
-    // Hawkes parameters for market orders (close to t^{-1.5} power-law kernel)
+    // Hawkes parameters for market orders
     let mu = 1.0;
     let alpha = vec![0.065, 0.2, 0.325, 0.65];
     let beta = vec![0.15, 0.60, 2.5, 10.0];
 
     // Meta orders configuration (aggressive: dim=2, reduce queue)
-    let n_meta: u32 = 200;
+    let n_meta: u32 = 1000;
     let meta_start = 1.0;
     let meta_end = 3.0 * time_horizon / 4.0;
 
-    // Kappa function from paper: kappa(q) = c1 * sqrt(log(e^{-c2*q} + 1))
-    // This gives kappa(q) ~ c3 * q^{1/2} for large q (decreasing, concave).
-    let c1_kappa = 1000.0_f64;
-    let c2_kappa = 0.01_f64;
-    let kappa = |q: f64| c1_kappa * ((-c2_kappa * q).exp() + 1.0_f64).ln().sqrt();
+    // Kappa function: kappa(q) = -c_kappa * q  (purely linear, no constant)
+    let c_kappa = 0.1_f64;
+    let kappa = |q: f64| -c_kappa * q;
 
-    println!("=== Aggressive Impact Experiment ===");
+    // bar_kappa: constant weight for the propagator term (fixed small value)
+    let bar_kappa = 0.1_f64;
+
+    println!("=== Aggressive Impact Hybrid Experiment ===");
     println!("Time horizon: {}, Simulations: {}, Initial queue: {}",
              time_horizon, n_simulations, initial_queue_size);
-    println!("kappa(q) = {} * sqrt(log(e^(-{}*q) + 1))", c1_kappa, c2_kappa);
+    println!("kappa(q) = -{} * q, bar_kappa = {}", c_kappa, bar_kappa);
 
     let c_lambda = AffineQueueProcess::c_lambda(b_l, b_c);
     println!("c_lambda = {}", c_lambda);
@@ -75,9 +76,8 @@ fn main() {
     println!("[TIMING] q simulation: {:?} ({} events)", t0.elapsed(), q_path.events.len());
 
     // ==========================================================================
-    // Create aggressive meta orders and compute propagator
+    // Create aggressive meta orders
     // ==========================================================================
-    // Meta orders are market orders (dim=2) that reduce the queue
     let meta_orders_raw = create_meta_orders(n_meta, meta_start, meta_end);
     let meta_orders = events_to_dim(&meta_orders_raw, 2, 3);
     let meta_order_times: Vec<f64> = meta_orders.events.iter().map(|e| e.time).collect();
@@ -112,10 +112,7 @@ fn main() {
     // ==========================================================================
     // Build conditioning events and externals
     // ==========================================================================
-    // Condition on dims 0,1 (limit, cancel) - dim 2 (market) is external
     let q_events_by_dim = extract_events_by_dim(&q_result_internal, 3, Some(2));
-
-    // bar_q external events = meta orders + Hawkes market orders
     let bar_q_external = merge_events(&meta_orders, &hawkes_as_market);
 
     // ==========================================================================
@@ -129,12 +126,11 @@ fn main() {
             let ctx = ConditionalSimulationContext::new(
                 &process,
                 &q_events_by_dim,
-                Some(&hawkes_as_market),     // q conditioning externals
-                Some(&bar_q_external),        // bar_q externals (meta + hawkes)
+                Some(&hawkes_as_market),
+                Some(&bar_q_external),
                 time_horizon,
             );
 
-            // Simulate bar_q at evaluation times (memory-efficient)
             let q_bar_samples = ctx.simulate_queue_at_times(
                 &eval_times,
                 initial_queue_size,
@@ -142,14 +138,16 @@ fn main() {
                 Some(sim_idx as u64),
             );
 
-            // Compute aggressive impact using martingale propagator kernel
-            let impact_path = AggressiveImpactPath::from_queue_samples(
+            // Hybrid impact: metaorders through propagator with bar_kappa,
+            // market orders contribute instantaneous queue-dependent correction.
+            let impact_path = AggressiveImpactPath::from_queue_samples_hybrid(
                 &q_at_eval_times,
                 &q_bar_samples,
                 &eval_times,
                 &is_market_order,
                 &hawkes_model,
                 &kappa,
+                bar_kappa,
             );
 
             (q_bar_samples, impact_path.impact_path)
@@ -162,7 +160,7 @@ fn main() {
     // Output
     // ==========================================================================
     let t0 = Instant::now();
-    let output_dir = "data/agressive_impact";
+    let output_dir = "data/agressive_impact_hybrid";
     std::fs::create_dir_all(output_dir).expect("Failed to create output directory");
 
     let n_times = eval_times.len();
@@ -192,6 +190,9 @@ fn main() {
     // Event types: 1.0 for market order, 0.0 for meta order
     let event_types: Vec<f64> = is_market_order.iter().map(|&b| if b { 1.0 } else { 0.0 }).collect();
     write_npy_f64_1d(&format!("{}/event_types.npy", output_dir), &event_types).unwrap();
+
+    // bar_kappa value used (scalar, stored as 1-element array for easy Python loading)
+    write_npy_f64_1d(&format!("{}/bar_kappa.npy", output_dir), &[bar_kappa]).unwrap();
 
     println!("[TIMING] Data write: {:?}", t0.elapsed());
     println!("[TIMING] TOTAL: {:?}", t_total.elapsed());

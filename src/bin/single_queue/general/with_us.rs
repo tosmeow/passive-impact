@@ -37,7 +37,7 @@ fn main() {
     // Meta orders configuration
     let n_meta: u32 = 375;
     let meta_start = 1.0;
-    let meta_end = 3.0 * time_horizon / 4.0;
+    let meta_end = 4.0 * time_horizon / 5.0;
 
     println!("=== Paths WITH Us ({}) ===", if decoupled { "decoupled" } else { "coupled" });
     println!("Time horizon: {}, Simulations: {}, Initial queue: {}",

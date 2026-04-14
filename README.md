@@ -42,17 +42,17 @@ let result = simulate(&hawkes, 100.0, Some(42));
 
 ```rust
 use simulation_project::models::AffineQueueProcess;
-use simulation_project::simulation::simulate;
+use simulation_project::simulation::simulate_with_externals;
 
 // λ^L(q) = a_l + b_l·q,  λ^C(q) = a_c + b_c·q
-let process = AffineQueueProcess::new(
-    200.0,  // initial queue
+// Decoupled mode: market orders are injected as external events (hawkes_result).
+let process = AffineQueueProcess::new_queue(
+    200.0,   // initial queue
     100.0, -0.275,  // a_l, b_l
     2.0, 0.125,     // a_c, b_c
-    mu, alpha, beta,
 );
 
-let result = simulate(&process, 100.0, None);
+let result = simulate_with_externals(&process, 100.0, &hawkes_as_market, None);
 let queue_path = AffineQueueProcess::result_to_queue_path(&result, 200);
 ```
 
@@ -64,7 +64,8 @@ use simulation_project::conditional_impact::{TailImpact, ImpactPath};
 let tail_impact = TailImpact::from_affine_queue(
     mu, alpha, beta, b_l, b_c, market_order_times
 );
-let impact = ImpactPath::new(&q_path, &bar_q_path, &tail_impact);
+// ImpactPath::new takes queue paths by value
+let impact = ImpactPath::new(q_path, bar_q_path, &tail_impact);
 ```
 
 ## Mathematical Background

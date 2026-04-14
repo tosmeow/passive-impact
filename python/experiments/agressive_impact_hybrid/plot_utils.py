@@ -3,15 +3,16 @@ import pandas as pd
 import numpy as np
 import os
 
-DATA_BASE = '../../../data/agressive_impact'
+DATA_BASE = '../../../data/agressive_impact_hybrid'
 
 
 def load_data():
-    """Load aggressive impact simulation results from .npy files."""
+    """Load hybrid aggressive impact simulation results from .npy files."""
     times = np.load(f'{DATA_BASE}/times.npy')
     impact_paths = np.load(f'{DATA_BASE}/impact_paths.npy')
     queue_paths = np.load(f'{DATA_BASE}/queue_paths.npy')
     event_types = np.load(f'{DATA_BASE}/event_types.npy')
+    bar_kappa = float(np.load(f'{DATA_BASE}/bar_kappa.npy')[0])
 
     n_sims = impact_paths.shape[1]
     is_market = event_types == 1.0
@@ -22,18 +23,16 @@ def load_data():
         columns=[f'sim_{i}' for i in range(n_sims)]
     )
 
-    # Queue DataFrame: first col = q (reference), rest = bar_q_sim_i
     queue_df = pd.DataFrame(
         queue_paths,
         index=pd.Index(times, name='time'),
         columns=['q'] + [f'bar_q_sim_{i}' for i in range(n_sims)]
     )
 
-    # Derive metaorder end from the last metaorder event time (event_type == 0)
     meta_mask = ~is_market
     meta_end = times[meta_mask].max() if meta_mask.any() else None
 
-    return impact_df, queue_df, is_market, meta_end
+    return impact_df, queue_df, is_market, meta_end, bar_kappa
 
 
 def plot_shades(df, sim_prefix, title, ylabel, meta_end=None, ref_col=None, save_path=None):
@@ -68,29 +67,30 @@ def plot_shades(df, sim_prefix, title, ylabel, meta_end=None, ref_col=None, save
         plt.show()
 
 
-def plot_impact_by_event_type(impact_df, is_market, meta_end=None, save_path=None):
-    """Plot mean impact separately at market order and meta order times."""
+def plot_impact_decomposition(impact_df, is_market, bar_kappa, meta_end=None, save_path=None):
+    """Plot mean impact at market order vs metaorder times to show the two contributions."""
     fig, ax = plt.subplots(figsize=(12, 6))
 
     sim_cols = [col for col in impact_df.columns if col.startswith('sim_')]
     mean_impact = impact_df[sim_cols].mean(axis=1)
 
     times = impact_df.index.values
-
     market_mask = is_market
     meta_mask = ~is_market
 
     ax.scatter(times[market_mask], mean_impact.values[market_mask],
-               s=1, alpha=0.5, color='blue', label='At market orders (N)')
+               s=1, alpha=0.5, color='blue',
+               label=r'At market orders (instantaneous: $\kappa(\bar{q}) - \kappa(q)$)')
     ax.scatter(times[meta_mask], mean_impact.values[meta_mask],
-               s=3, alpha=0.7, color='red', label='At meta orders (N$^o$)')
+               s=3, alpha=0.7, color='red',
+               label=rf'At meta orders (propagator: $\bar{{\kappa}} G(t-s)$, $\bar{{\kappa}}={bar_kappa:.1f}$)')
 
     if meta_end is not None:
         ax.axvline(x=meta_end, color='green', linestyle='--', label='End of metaorder')
 
     ax.set_xlabel('Time (seconds)')
     ax.set_ylabel('Mean Impact MI(t)')
-    ax.set_title('Aggressive Impact by Event Type')
+    ax.set_title('Hybrid Aggressive Impact by Event Type')
     ax.legend()
     plt.tight_layout()
 
@@ -142,16 +142,16 @@ def plot_queue_diff(queue_df, meta_end=None, save_path=None):
 
 def generate_all_plots():
     """Generate and save all analysis plots."""
-    impact_df, queue_df, is_market, meta_end = load_data()
+    impact_df, queue_df, is_market, meta_end, bar_kappa = load_data()
 
     os.makedirs('images', exist_ok=True)
 
-    print(f"Generating plots (metaorder ends at t={meta_end:.2f})...")
+    print(f"Generating plots (bar_kappa={bar_kappa:.4f}, metaorder ends at t={meta_end:.2f})...")
 
     plot_shades(
         impact_df,
         sim_prefix='sim_',
-        title='Aggressive Market Impact MI(t)',
+        title=r'Hybrid Aggressive Market Impact MI(t)',
         ylabel='Price Impact',
         meta_end=meta_end,
         save_path='images/impact_paths.png'
@@ -167,9 +167,10 @@ def generate_all_plots():
         save_path='images/queue_paths.png'
     )
 
-    plot_impact_by_event_type(
+    plot_impact_decomposition(
         impact_df,
         is_market,
+        bar_kappa,
         meta_end=meta_end,
         save_path='images/impact_by_event_type.png'
     )

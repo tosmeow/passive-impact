@@ -7,7 +7,8 @@ Closed-form market impact computation for Hawkes process-driven limit order book
 Both models assume:
 - Intensity functions $\lambda^L$ (decreasing in $q$) and $\lambda^C$ (increasing in $q$) are affine in queue state $q$.
 - The net intensity difference is $\lambda^L - \lambda^C = d_\lambda - c_{\lambda} \cdot q$ with decay rate $c_{\lambda} > 0$.
-- Impact function $\kappa(q)$ is affine in queue state: $\kappa(q) = c_\kappa q + d_\kappa$.
+- The passive (flow imbalance) model additionally requires $\kappa(q)$ to be affine: $\kappa(q) = c_\kappa q + d_\kappa$, enabling a closed-form impact formula.
+- The aggressive (propagator) model accepts any decreasing $\kappa$; the paper uses $\kappa(q) = c_1\sqrt{\log(e^{-c_2 q}+1)}$.
 
 The module provides closed-form solutions and O(k) efficient computation for multi-exponential Hawkes kernels.
 
@@ -85,14 +86,17 @@ use simulation_project::models::MultiExponentialHawkes;
 let hawkes = MultiExponentialHawkes::new(mu, alpha, beta);
 
 // Compute aggressive impact for given queue samples
+let c1 = 1000.0_f64;
+let c2 = 0.01_f64;
+let kappa = |q: f64| c1 * ((-c2 * q).exp() + 1.0_f64).ln().sqrt();
+
 let impact_path = AggressiveImpactPath::from_queue_samples(
     &q_samples,
     &q_bar_samples,
     &eval_times,
     &is_market_order,
     &hawkes,
-    c_kappa,
-    d_kappa,
+    &kappa,
 );
 
 for (i, val) in impact_path.impact_path.iter().enumerate() {

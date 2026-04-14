@@ -207,3 +207,83 @@ pub fn write_memory_efficient_results(
 
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::models::{AffineQueueProcess, MultiExponentialHawkes};
+    use crate::simulation::{simulate, simulate_with_externals};
+    use crate::simulation_helpers::{hawkes_to_market_orders, merge_events, extract_events_by_dim, create_meta_orders};
+    use crate::conditional_impact::TailImpact;
+
+    /// Verify that `run` and `run_memory_efficient` produce identical queue samples
+    /// for the same seeds.  They use different code paths (full path scan vs.
+    /// point-sampling) so this catches any divergence in the efficient implementation.
+    #[test]
+    fn general_and_efficient_queue_samples_agree() {
+        let mu = 1.0;
+        let alpha = vec![0.3, 0.7];
+        let beta = vec![1.0, 3.0];
+        let a_l = 20.0;
+        let b_l = -0.2;
+        let a_c = 1.0;
+        let b_c = 0.1;
+        let initial_queue_size: u32 = 50;
+        let time_horizon = 10.0;
+        let n_simulations = 4;
+
+        let process = AffineQueueProcess::new_queue(initial_queue_size as f64, a_l, b_l, a_c, b_c);
+
+        let hawkes = MultiExponentialHawkes::new_with_state(
+            MultiExponentialHawkes::new(mu, alpha.clone(), beta.clone()).stationary_state(),
+            mu, alpha.clone(), beta.clone(),
+        );
+        let hawkes_result = simulate(&hawkes, time_horizon, Some(99));
+        let hawkes_as_market = hawkes_to_market_orders(&hawkes_result);
+
+        let n_meta: u32 = 10;
+        let meta_orders = create_meta_orders(n_meta, 1.0, 0.8 * time_horizon);
+
+        let q_result_internal = simulate_with_externals(&process, time_horizon, &hawkes_as_market, Some(99));
+        let q_result = merge_events(&q_result_internal, &hawkes_as_market);
+        let q_path = AffineQueueProcess::result_to_queue_path(&q_result, initial_queue_size);
+
+        let market_orders: Vec<f64> = hawkes_as_market.events.iter().map(|e| e.time).collect();
+        let q_events_by_dim = extract_events_by_dim(&q_result_internal, 3, Some(2));
+
+        let tail_impact = TailImpact::from_affine_queue(
+            mu, alpha.clone(), beta.clone(), b_l, b_c, market_orders.clone(),
+        );
+
+        let bar_q_external = merge_events(&meta_orders, &hawkes_as_market);
+        let q_external = hawkes_as_market.clone();
+
+        let simulator = ParallelSimulator {
+            process: &process,
+            cond_events_by_dim: &q_events_by_dim,
+            cond_external_events: Some(&q_external),
+            new_external_events: Some(&bar_q_external),
+            time_horizon,
+            initial_queue_size,
+            reference_path: &q_path,
+            tail_impact: &tail_impact,
+            market_orders: &market_orders,
+            simulating_bar_q: true,
+        };
+
+        let general_results = simulator.run(n_simulations);
+        let efficient_results = simulator.run_memory_efficient(n_simulations);
+
+        assert_eq!(general_results.queue_samples.len(), n_simulations);
+        assert_eq!(efficient_results.queue_samples.len(), n_simulations);
+
+        for sim_idx in 0..n_simulations {
+            assert_eq!(
+                general_results.queue_samples[sim_idx],
+                efficient_results.queue_samples[sim_idx],
+                "Queue samples differ at simulation {} (general vs memory-efficient)",
+                sim_idx
+            );
+        }
+    }
+}

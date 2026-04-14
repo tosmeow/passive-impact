@@ -34,5 +34,8 @@ Passive market impact from a limit-order metaorder in a single-sided queue. We c
 ```bash
 cargo run --release --bin single_queue_efficient_with_us
 cargo run --release --bin single_queue_efficient_without_us
-python plot_utils.py
+python plot_utils.py [--data-mode {general,efficient}] [--meta-end SECONDS]
 ```
+
+`--data-mode` selects which simulation variant to plot (default: `efficient`).
+`--meta-end` sets the metaorder end time drawn as a vertical line (default: `80.0`).

@@ -1,22 +1,47 @@
-In this case here, I will want to do the agressive market impact experiment under a different price model.
+# Aggressive Impact Binary
 
-Our queues are in the single_queue experiment setup, with L, C and N (last one is a Hawkes).
+Simulates aggressive market impact under the propagator price model.
 
-Now, corresponding to this Hawkes parameter setup as a sum of exponentials, we have a propagator in conditional_impact/impact_utils equal to Id + sum of exponnetials that we get in this propagator.rs
+## What it does
 
-We call xi this operator.
+1. Pre-simulates a Hawkes process (market orders) with a fixed seed.
+2. Simulates a baseline queue path `q` (no metaorder).
+3. Injects a deterministic metaorder `N^o` (aggressive market orders that reduce the queue).
+4. Runs `n_simulations` conditional simulations of the counterfactual queue `bar_q` given the observed `q`, with the metaorder present.
+5. Computes the aggressive market impact path at each simulation using `AggressiveImpactPath`.
+6. Writes results to `data/agressive_impact/`.
 
-Then, our new price model is P_t = \int_0^t kappa(q^a_s) \xi(t-s) dN^a_s - \int_0^t kappa(q^b_s) \xi(t-s) dN^b_s
+## Price model
 
-In terms of market impact, it is now giving: we add a market order N^o, that changes that queues into \bar{q}^a_s = q^a_0 + \bar{L}^a_s - \bar{C}^a_s - N^a_s - N^o_s (only L, C are impacted by us adding the metaorder, not the hawkes).
+$$P_t = P_0 + \int_0^t \kappa(q^a_s)\, G(t-s)\, dN^a_s - \int_0^t \kappa(q^b_s)\, G(t-s)\, dN^b_s$$
 
-Then, the corresponding price impact is:
+where $G$ is the martingale-consistent propagator kernel derived from the Hawkes kernel.
 
-MI_t = \int_0^t (kappa(\bar{q}^a_s) - kappa(q^a_s)) \xi(t-s) dN^a_s + \int_0^t kappa(\bar{q}^a_s) dN^o_s
+## Impact formula
 
-This is what we want to implement now: we pick a series of external events for N^o, generate first a path of q with L, C, N;
-Then, we generate a counterfactual path for L, C impacted by this N^o acting as reducing the queue.
+$$MI_t = \int_0^t [\kappa(\bar{q}^a_s) - \kappa(q^a_s)]\, G(t-s)\, dN^a_s + \int_0^t \kappa(\bar{q}^a_s)\, G(t-s)\, dN^{o,a}_s$$
 
-We then aggregate these on each path to get a path MI_t and store the distributions in data, and in python/experiments, create /agressive_impact and make then inside a notebook to display the corresponding queue dynamic, impact etc.
+## Parameters (matching single queue experiment)
 
-We will choose the same parameters for queues and hawkes as in single_queue, and the kappa function to be kappa(q) = cq + d with d > 0, q < 0.
+- Queue: $\lambda^L(q) = 100 - 0.275q$, $\lambda^C(q) = 2 + 0.125q$
+- Hawkes: $\mu = 1$, $\alpha = [0.065, 0.2, 0.325, 0.65]$, $\beta = [0.15, 0.60, 2.5, 10.0]$
+- Metaorder: 200 events, $t \in [1, 75]$
+- $\kappa(q) = c_1 \sqrt{\log(e^{-c_2 q} + 1)}$ with $c_1 = 1000$, $c_2 = 0.01$
+
+## Output files
+
+Written to `data/agressive_impact/`:
+
+| File | Shape | Contents |
+|---|---|---|
+| `impact_paths.npy` | `(n_times, n_sims)` | $MI(t)$ per simulation |
+| `queue_paths.npy` | `(n_times, n_sims + 1)` | First col = $q$; remaining = $\bar{q}$ per simulation |
+| `times.npy` | `(n_times,)` | Evaluation times (merged market + metaorder times) |
+| `event_types.npy` | `(n_times,)` | 1.0 = market order, 0.0 = metaorder |
+
+## Visualization
+
+```bash
+cd python/experiments/agressive_impact
+python plot_utils.py
+```

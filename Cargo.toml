@@ -67,3 +67,7 @@ path = "src/bin/double_queue/efficient/without_us.rs"
 [[bin]]
 name = "agressive_impact"
 path = "src/bin/agressive_impact/main.rs"
+
+[[bin]]
+name = "agressive_impact_hybrid"
+path = "src/bin/agressive_impact_hybrid/main.rs"

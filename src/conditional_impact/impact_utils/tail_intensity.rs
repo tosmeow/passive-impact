@@ -1,8 +1,15 @@
 use super::propagator::{Propagator};
 use crate::models::MultiExponentialHawkes;
 
-// This structure here will hold the parameters needed to update \int_t^\infty e^{c_lambda (s-t)} E_t[\lambda_s]ds.
-// We will call it TailIntensity
+// TailIntensity computes ∫_t^∞ e^{-c_lambda·(s-t)} E_t[λ_s] ds for a Hawkes intensity λ.
+//
+// Sign convention note (differs from the paper's notation):
+//   In the paper (Assumption A), c_λ = slope(λ^L) - slope(λ^C) = b_l - b_c < 0.
+//   The paper writes the kernel as e^{c_λ·(s-t)} with c_λ < 0 (decaying).
+//   In this codebase, `c_lambda` = b_c - b_l > 0 (see AffineQueueProcess::c_lambda), so:
+//       c_lambda (code) = -(c_λ in paper) > 0.
+//   The kernel written as e^{-c_lambda·(s-t)} here is identical to e^{c_λ·(s-t)} in the paper.
+//   The integral converges in both cases because c_lambda > 0 (equivalently c_λ < 0).
 
 pub struct TailIntensity {
     pub hawkes_params: MultiExponentialHawkes,
