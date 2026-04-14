@@ -114,6 +114,9 @@ All experiments follow the same pattern: (1) run a Rust binary to generate simul
 | **Single Queue Impact** | Passive market impact from limit-order metaorders in a single-sided queue | `cargo run --release --bin single_queue_efficient_{with,without}_us` <br/> [results](python/experiments/single_queue_impact/) |
 | **Double Queue Impact** | Passive impact in a bid-ask queue pair; shows how impact differs across sides | `cargo run --release --bin double_queue_efficient_{with,without}_us` <br/> [results](python/experiments/double_queue_impact/) |
 | **Aggressive Impact** | Market-order impact under the propagator price model | `cargo run --release --bin agressive_impact` <br/> [results](python/experiments/agressive_impact/) |
+| **Hybrid Aggressive Impact** | Market-order impact under the hybrid price model | `cargo run --release --bin agressive_impact_hybrid` <br/> [results](python/experiments/agressive_impact_hybrid/) |
+
+The two aggressive impact experiments use different price models for modeling aggressive (market-order) impact. The **Aggressive Impact** experiment uses a pure propagator model where the per-trade impact function $\kappa(q)$ depends on queue depth. The **Hybrid Aggressive Impact** experiment combines a queue-dependent instantaneous correction ($\kappa(q) = -c_\kappa \cdot q$) with a propagator term weighted by a constant $\bar{\kappa}$.
 
 ### General vs. Efficient Simulator Variants
 
@@ -146,6 +149,7 @@ cargo run --release --bin single_queue_efficient_without_us
 cargo run --release --bin double_queue_efficient_with_us
 cargo run --release --bin double_queue_efficient_without_us
 cargo run --release --bin agressive_impact
+cargo run --release --bin agressive_impact_hybrid
 ```
 
 Outputs: `.npy` files saved to `data/*/` directories, organized by experiment type.
