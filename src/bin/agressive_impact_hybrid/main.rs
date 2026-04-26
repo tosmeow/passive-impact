@@ -34,14 +34,14 @@ fn main() {
     // Meta orders configuration (aggressive: dim=2, reduce queue)
     let n_meta: u32 = 1000;
     let meta_start = 1.0;
-    let meta_end = 3.0 * time_horizon / 4.0;
+    let meta_end = 4.0 * time_horizon / 5.0;
 
     // Kappa function: kappa(q) = -c_kappa * q  (purely linear, no constant)
     let c_kappa = 0.1_f64;
     let kappa = |q: f64| -c_kappa * q;
 
     // bar_kappa: constant weight for the propagator term (fixed small value)
-    let bar_kappa = 0.1_f64;
+    let bar_kappa = 1.0_f64;
 
     println!("=== Aggressive Impact Hybrid Experiment ===");
     println!("Time horizon: {}, Simulations: {}, Initial queue: {}",

@@ -151,7 +151,7 @@ def generate_all_plots():
     plot_shades(
         impact_df,
         sim_prefix='sim_',
-        title=r'Hybrid Aggressive Market Impact MI(t)',
+        title=r'Aggressive Market Impact MI(t)',
         ylabel='Price Impact',
         meta_end=meta_end,
         save_path='images/impact_paths.png'
