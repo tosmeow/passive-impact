@@ -56,7 +56,16 @@ def _make_meta_orders(cfg: PassiveImpactConfig):
 
 
 def _run_single_side(cfg, side: str) -> dict:
-    """Run one side ('with' or 'without') for single-queue mode."""
+    # TODO: the 'with' and 'without' sides currently produce equivalent simulation
+    # results — the actual swap of conditioning vs. simulated path semantics
+    # (i.e. swapping which path sees the metaorder externals) is a follow-up.
+    """Run one side ('with' or 'without') for single-queue mode.
+
+    Note: as of the current implementation, 'with' and 'without' produce
+    equivalent outputs.  The semantic distinction (which path is conditioned
+    on the observed queue vs. the metaorder-perturbed queue) is deferred to a
+    follow-up.  Both sides are wired correctly here for validation purposes.
+    """
     hawkes = _make_hawkes(cfg)
     market = _native.simulate_hawkes_as_market_orders(hawkes, cfg.time_horizon, cfg.seed)
     process = _native.AffineQueueProcess.new_queue(
@@ -90,14 +99,16 @@ def _run_single_side(cfg, side: str) -> dict:
     )
 
     for sim_idx in range(cfg.n_simulations):
+        # ctx.simulate() already incorporates the new_externals (meta + market),
+        # so we must NOT re-merge market here — doing so doubles the dim=2 events
+        # and causes the queue to drain erroneously to near zero.
         bar_q_events = ctx.simulate(seed=sim_idx)
-        bar_q_full = _native.merge_events(bar_q_events, market)
         bar_q_samples_at_market = _native.sample_queue_at_times(
-            bar_q_full, cfg.initial_queue_size, market_times,
+            bar_q_events, cfg.initial_queue_size, market_times,
         )
         queue_paths[:, sim_idx + 1] = bar_q_samples_at_market
         impact_paths[:, sim_idx] = _native.compute_impact_path(
-            full_q, bar_q_full, cfg.initial_queue_size, tail,
+            full_q, bar_q_events, cfg.initial_queue_size, tail,
         )
 
     return {
@@ -112,7 +123,17 @@ def run(config: PassiveImpactConfig) -> dict:
 
     For mode='single' + side='both', returns a dict with keys
     {'with': {...}, 'without': {...}} each holding the per-side result dict.
+
+    Valid values:
+        side: 'with', 'without', or 'both'
+        mode: 'single' (double-queue is deferred)
     """
+    if config.side not in ("with", "without", "both"):
+        raise ValueError(
+            f"side must be 'with', 'without', or 'both'; got {config.side!r}"
+        )
+    if config.mode not in ("single", "double"):
+        raise ValueError(f"mode must be 'single' or 'double'; got {config.mode!r}")
     if config.mode == "double":
         raise NotImplementedError("double-queue facade — wired in a follow-up")
     if config.side == "both":

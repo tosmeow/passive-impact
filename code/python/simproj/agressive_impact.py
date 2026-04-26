@@ -51,6 +51,10 @@ def _make_meta_orders(cfg: AggressiveImpactConfig):
 
 
 def run(cfg: AggressiveImpactConfig) -> dict:
+    if cfg.model not in ("propagator", "hybrid"):
+        raise ValueError(
+            f"model must be 'propagator' or 'hybrid'; got {cfg.model!r}"
+        )
     if cfg.model == "hybrid" and cfg.bar_kappa is None:
         raise ValueError("hybrid model requires bar_kappa")
 
@@ -81,13 +85,13 @@ def run(cfg: AggressiveImpactConfig) -> dict:
     queue_paths[:, 0] = q_at_eval
     impact_paths = np.empty((n_times, cfg.n_simulations), dtype=np.float64)
 
+    ctx = _native.ConditionalSimulationContext(
+        process, cond_by_dim,
+        cfg.time_horizon,
+        cond_externals=market,
+        new_externals=bar_q_external,
+    )
     for sim_idx in range(cfg.n_simulations):
-        ctx = _native.ConditionalSimulationContext(
-            process, cond_by_dim,
-            cfg.time_horizon,
-            cond_externals=market,
-            new_externals=bar_q_external,
-        )
         bar_q = ctx.simulate_queue_at_times(eval_times, cfg.initial_queue_size, seed=sim_idx)
         queue_paths[:, sim_idx + 1] = bar_q
 

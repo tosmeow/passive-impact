@@ -121,7 +121,9 @@ Each `load_experiments/` folder contains the notebook, plot utilities, and a `da
 
     cd code/python && maturin develop --release && cd -
 
-(Python 3.14 environments need `PYO3_USE_ABI3_FORWARD_COMPATIBILITY=1`.)
+(If on Python ≥3.13, prefix with `PYO3_USE_ABI3_FORWARD_COMPATIBILITY=1`.)
+
+> **Note:** `cargo build` from the repo root will also try to build the bindings crate. On Python ≥3.13, set `PYO3_USE_ABI3_FORWARD_COMPATIBILITY=1` for that path too, or build the lib in isolation with `cargo build -p simulation_project`.
 
 ### Regenerate baselines (Rust binaries)
 

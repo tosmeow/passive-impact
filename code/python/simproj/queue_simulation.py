@@ -34,6 +34,8 @@ class QueueSimulationConfig:
 
 
 def run(cfg: QueueSimulationConfig) -> dict:
+    if cfg.mode not in ("single", "double"):
+        raise ValueError(f"mode must be 'single' or 'double'; got {cfg.mode!r}")
     if cfg.mode == "double":
         raise NotImplementedError("double-queue queue_simulation — follow-up")
 
@@ -61,13 +63,13 @@ def run(cfg: QueueSimulationConfig) -> dict:
 
     queue_paths = np.empty((cfg.n_eval_times, cfg.n_simulations + 1), dtype=np.uint32)
     queue_paths[:, 0] = q_at_times
+    ctx = _native.ConditionalSimulationContext(
+        process, cond_by_dim,
+        cfg.time_horizon,
+        cond_externals=market,
+        new_externals=bar_q_external,
+    )
     for sim_idx in range(cfg.n_simulations):
-        ctx = _native.ConditionalSimulationContext(
-            process, cond_by_dim,
-            cfg.time_horizon,
-            cond_externals=market,
-            new_externals=bar_q_external,
-        )
         queue_paths[:, sim_idx + 1] = ctx.simulate_queue_at_times(
             times, cfg.initial_queue_size, seed=sim_idx,
         )

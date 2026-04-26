@@ -361,8 +361,16 @@ fn aggressive_impact_from_queue_samples(
         &hawkes.inner,
         move |q: f64| -> f64 {
             Python::with_gil(|py| {
-                let res = kappa_clone.call1(py, (q,)).unwrap();
-                res.extract::<f64>(py).unwrap()
+                match kappa_clone.call1(py, (q,)) {
+                    Ok(r) => r.extract::<f64>(py).unwrap_or_else(|e| {
+                        eprintln!("kappa(q={}) returned non-f64: {:?}", q, e);
+                        f64::NAN
+                    }),
+                    Err(e) => {
+                        eprintln!("kappa(q={}) raised: {:?}", q, e);
+                        f64::NAN
+                    }
+                }
             })
         },
     );
@@ -370,7 +378,7 @@ fn aggressive_impact_from_queue_samples(
 }
 
 /// Compute aggressive impact path from pre-sampled queues using the hybrid model.
-/// `kappa` is a Python callable f64 -> f64; `bar_kappa` is the scalar kappa for the
+/// `kappa` is a Python callable f64 -> f64; `bar_kappa` is a scalar f64 for the
 /// metaorder component.
 #[pyfunction]
 #[allow(clippy::too_many_arguments)]
@@ -393,8 +401,16 @@ fn aggressive_impact_from_queue_samples_hybrid(
         &hawkes.inner,
         move |q: f64| -> f64 {
             Python::with_gil(|py| {
-                let res = kappa_clone.call1(py, (q,)).unwrap();
-                res.extract::<f64>(py).unwrap()
+                match kappa_clone.call1(py, (q,)) {
+                    Ok(r) => r.extract::<f64>(py).unwrap_or_else(|e| {
+                        eprintln!("kappa(q={}) returned non-f64: {:?}", q, e);
+                        f64::NAN
+                    }),
+                    Err(e) => {
+                        eprintln!("kappa(q={}) raised: {:?}", q, e);
+                        f64::NAN
+                    }
+                }
             })
         },
         bar_kappa,
