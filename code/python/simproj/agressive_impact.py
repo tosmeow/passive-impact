@@ -92,15 +92,18 @@ def run(cfg: AggressiveImpactConfig) -> dict:
         queue_paths[:, sim_idx + 1] = bar_q
 
         if cfg.model == "hybrid":
-            raise NotImplementedError(
-                "hybrid model wiring is added in Task 15; for now use model='propagator'."
+            result = _native.aggressive_impact_from_queue_samples_hybrid(
+                q_samples=q_at_eval, q_bar_samples=bar_q,
+                eval_times=eval_times, is_market_order=is_market_order,
+                hawkes=hawkes, kappa=cfg.kappa,
+                bar_kappa=cfg.bar_kappa,
             )
-
-        result = _native.aggressive_impact_from_queue_samples(
-            q_samples=q_at_eval, q_bar_samples=bar_q,
-            eval_times=eval_times, is_market_order=is_market_order,
-            hawkes=hawkes, kappa=cfg.kappa,
-        )
+        else:
+            result = _native.aggressive_impact_from_queue_samples(
+                q_samples=q_at_eval, q_bar_samples=bar_q,
+                eval_times=eval_times, is_market_order=is_market_order,
+                hawkes=hawkes, kappa=cfg.kappa,
+            )
         impact_paths[:, sim_idx] = result.impact()
 
     return {

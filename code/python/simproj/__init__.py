@@ -19,6 +19,7 @@ ConditionalSimulationContext = _native.ConditionalSimulationContext
 TailImpact = _native.TailImpact
 AggressiveImpactPath = _native.AggressiveImpactPath
 aggressive_impact_from_queue_samples = _native.aggressive_impact_from_queue_samples
+aggressive_impact_from_queue_samples_hybrid = _native.aggressive_impact_from_queue_samples_hybrid
 compute_impact_path = _native.compute_impact_path
 
 __version__ = _native.__version__
