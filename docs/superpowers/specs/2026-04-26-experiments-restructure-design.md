@@ -95,7 +95,12 @@ Each module exposes:
 - `run(config) -> dict[str, np.ndarray]` returning the same arrays the legacy binary writes today (e.g. `times`, `impact_paths`, `queue_paths`, `event_types`).
 - `save(result, dir)` to persist those arrays as `.npy`.
 
-The `metaorder` config field accepts either an `int` (count, evenly spaced inside `metaorder_window`) or an explicit `np.ndarray` of times — that is how custom metaorder shapes flow in.
+The `metaorder` config field accepts:
+
+- an `int` — count of evenly-spaced metaorders inside `metaorder_window`, or
+- a `list[float]` or `np.ndarray` of times — explicit per-order arrival times (in this case `metaorder_window` is ignored).
+
+This is how custom metaorder shapes flow in: the user writes a list of arrival times directly into the config block.
 
 ### Module name
 
@@ -137,9 +142,13 @@ config = pi.PassiveImpactConfig(
     beta=[0.15, 0.60, 2.5, 10.0],
     # Affine queue
     a_l=100.0, b_l=-0.275, a_c=2.0, b_c=0.125,
-    # Metaorder: int → evenly spaced; np.ndarray → explicit times
+    # Metaorder accepts either:
+    #   - int N         → N evenly-spaced orders inside metaorder_window
+    #   - list/ndarray  → explicit list of arrival times (window is ignored)
     metaorder=375,
     metaorder_window=(1.0, 80.0),
+    # Example of the explicit form (commented out):
+    # metaorder=[1.0, 2.5, 4.0, 7.0, 12.0, 30.0, 60.0],
     seed=42,
 )
 # ────────────────────────────────────────
