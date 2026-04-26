@@ -22,51 +22,49 @@ A high-performance Rust library for simulating and analyzing market impact using
 - **Closed-form market impact computation** for Hawkes with kernels as sum of exponentials using resolvant operator methods, enabling efficient impact estimation without nested Monte Carlo.
 - **Flexible architecture** supporting both single-queue and bid-ask queue pair scenarios, with optimized ("efficient") and general simulation variants.
 
-## Quick Start
+## Quick Start (Python)
 
-### Hawkes Process
+Build the bindings once:
 
-```rust
-use simulation_project::models::MultiExponentialHawkes;
-use simulation_project::simulation::simulate;
-
-let mu = 1.0;
-let alpha = vec![0.065, 0.2, 0.325, 0.65];
-let beta = vec![0.15, 0.60, 2.5, 10.0];
-
-let hawkes = MultiExponentialHawkes::new(mu, alpha, beta);
-let result = simulate(&hawkes, 100.0, Some(42));
+```bash
+cd code/python && maturin develop --release && cd -
+# On Python ≥3.13, prefix with PYO3_USE_ABI3_FORWARD_COMPATIBILITY=1
 ```
 
-### Affine Queue
+Then run any of the three experiment categories from Python — each ships a `custom_experiment/main.py` whose top section is a config dataclass. Edit the config, run the file, and `.npy` outputs land in `output/`.
 
-```rust
-use simulation_project::models::AffineQueueProcess;
-use simulation_project::simulation::simulate_with_externals;
+```python
+# experiments/passive_impact/custom_experiment/main.py
+from simproj import passive_impact as pi
 
-// λ^L(q) = a_l + b_l·q,  λ^C(q) = a_c + b_c·q
-// Decoupled mode: market orders are injected as external events (hawkes_result).
-let process = AffineQueueProcess::new_queue(
-    200.0,   // initial queue
-    100.0, -0.275,  // a_l, b_l
-    2.0, 0.125,     // a_c, b_c
-);
+config = pi.PassiveImpactConfig(
+    time_horizon=100.0,
+    n_simulations=500,
+    initial_queue_size=200,
+    mode="single",                 # "single" | "double"
+    side="both",                   # "with" | "without" | "both"
+    mu=1.0,
+    alpha=[0.065, 0.2, 0.325, 0.65],
+    beta=[0.15, 0.60, 2.5, 10.0],
+    a_l=100.0, b_l=-0.275, a_c=2.0, b_c=0.125,
+    # Metaorder accepts: int N (evenly spaced inside metaorder_window)
+    #                    list/ndarray (explicit arrival times — window ignored)
+    metaorder=375,
+    metaorder_window=(1.0, 80.0),
+    seed=42,
+)
 
-let result = simulate_with_externals(&process, 100.0, &hawkes_as_market, None);
-let queue_path = AffineQueueProcess::result_to_queue_path(&result, 200);
+result = pi.run(config)               # dict[str, np.ndarray]
+pi.save(result, "experiments/passive_impact/custom_experiment/output/")
 ```
 
-### Conditional Impact
+Run it:
 
-```rust
-use simulation_project::conditional_impact::{TailImpact, ImpactPath};
-
-let tail_impact = TailImpact::from_affine_queue(
-    mu, alpha, beta, b_l, b_c, market_order_times
-);
-// ImpactPath::new takes queue paths by value
-let impact = ImpactPath::new(q_path, bar_q_path, &tail_impact);
+```bash
+python experiments/passive_impact/custom_experiment/main.py
 ```
+
+The same shape applies to `agressive_impact` and `queue_simulation` — each has its own config dataclass (`AggressiveImpactConfig`, `QueueSimulationConfig`) and `main.py` template. See [Experiments](#experiments) below for the full layout.
 
 ## Mathematical Background
 
@@ -117,15 +115,25 @@ Three top-level experiment categories live under `experiments/`:
 
 Each `load_experiments/` folder contains the notebook, plot utilities, and a `data/` subtree where the Rust binaries write `.npy` files. `.npy` is gitignored — regenerate baselines by running the binaries below. Each `custom_experiment/` folder contains a single `main.py` whose top section is a config dataclass; edit and run.
 
-### Setup
+### Run a custom experiment (Python — primary user path)
 
-    cd code/python && maturin develop --release && cd -
+Edit the config block at the top of the relevant `main.py`, then run it:
 
-(If on Python ≥3.13, prefix with `PYO3_USE_ABI3_FORWARD_COMPATIBILITY=1`.)
+```bash
+python experiments/passive_impact/custom_experiment/main.py
+python experiments/agressive_impact/custom_experiment/main.py
+python experiments/queue_simulation/custom_experiment/main.py
+```
 
-> **Note:** `cargo build` from the repo root will also try to build the bindings crate. On Python ≥3.13, set `PYO3_USE_ABI3_FORWARD_COMPATIBILITY=1` for that path too, or build the lib in isolation with `cargo build -p simulation_project`.
+Outputs (`.npy` arrays) land in each folder's `output/` (gitignored). The Python facades produce the same shapes as the Rust binaries — see each `<Category>Config` dataclass in [`code/python/simproj/`](code/python/simproj/) for the full set of knobs (Hawkes parameters, queue parameters, metaorder shape, propagator vs. hybrid model, etc.).
+
+### Inspect pre-saved baselines (notebooks)
+
+Each category's `load_experiments/analysis.ipynb` loads `.npy` data from its sibling `data/` directory and renders the standard plots. The `.npy` files are gitignored — regenerate them via the Rust binaries below before opening the notebook on a fresh checkout.
 
 ### Regenerate baselines (Rust binaries)
+
+The original Rust binaries still exist for fast batch baseline generation:
 
     cargo run --release --bin single_queue_efficient_with_us
     cargo run --release --bin single_queue_efficient_without_us
@@ -137,10 +145,15 @@ Each `load_experiments/` folder contains the notebook, plot utilities, and a `da
 
 (General variants are also kept for validation: `*_general_with_us`, `*_general_without_us`.)
 
-### Run a custom experiment
+### Setup notes
 
-    python experiments/passive_impact/custom_experiment/main.py
-    # outputs land in experiments/passive_impact/custom_experiment/output/
+The Python facades require the `simproj` bindings package built once via maturin:
+
+    cd code/python && maturin develop --release && cd -
+
+(If on Python ≥3.13, prefix with `PYO3_USE_ABI3_FORWARD_COMPATIBILITY=1`.)
+
+> `cargo build` from the repo root will also try to build the bindings crate. On Python ≥3.13, set `PYO3_USE_ABI3_FORWARD_COMPATIBILITY=1` for that path too, or build the lib in isolation with `cargo build -p simulation_project`.
 
 ---
 
