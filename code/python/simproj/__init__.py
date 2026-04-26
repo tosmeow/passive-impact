@@ -24,3 +24,4 @@ compute_impact_path = _native.compute_impact_path
 __version__ = _native.__version__
 
 from . import passive_impact
+from . import agressive_impact
