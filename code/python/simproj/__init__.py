@@ -26,3 +26,4 @@ __version__ = _native.__version__
 
 from . import passive_impact
 from . import agressive_impact
+from . import queue_simulation
