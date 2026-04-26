@@ -34,8 +34,12 @@ uv venv                             # create .venv/
 source .venv/bin/activate           # activate it
 uv pip install -e ".[dev]"          # installs maturin, pytest, jupyter, ipykernel, nbconvert
 
-# Build the Rust bindings (simproj package)
-cd code/python && maturin develop --release && cd -
+# If your shell auto-activates a conda env (you'll see `(base)` in your prompt),
+# unset CONDA_PREFIX so maturin doesn't see two competing virtual envs:
+unset CONDA_PREFIX
+
+# Build the Rust bindings (simproj package). --manifest-path keeps you at the repo root.
+maturin develop --release --manifest-path code/python/Cargo.toml
 # On Python ≥3.13, prefix the maturin command with PYO3_USE_ABI3_FORWARD_COMPATIBILITY=1
 ```
 
