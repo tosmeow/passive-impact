@@ -15,5 +15,6 @@ create_meta_orders_from_times = _native.create_meta_orders_from_times
 events_to_dim = _native.events_to_dim
 extract_events_by_dim = _native.extract_events_by_dim
 sample_queue_at_times = _native.sample_queue_at_times
+ConditionalSimulationContext = _native.ConditionalSimulationContext
 
 __version__ = _native.__version__

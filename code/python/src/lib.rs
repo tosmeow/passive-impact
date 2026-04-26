@@ -7,6 +7,7 @@ use simulation_project::models::{
 };
 use simulation_project::simulation::simulate as rs_simulate;
 use simulation_project::simulation::simulate_with_externals as rs_simulate_with_externals;
+use simulation_project::simulation::ConditionalSimulationContext;
 use simulation_project::simulation_helpers::{
     hawkes_to_market_orders as rs_hawkes_to_market_orders,
     merge_events as rs_merge_events,
@@ -230,6 +231,81 @@ fn sample_queue_at_times<'py>(
     samples.into_pyarray_bound(py)
 }
 
+/// Conditional simulation context. Owns its inputs (conditioning events + externals + process)
+/// and rebuilds the borrowed Rust context on each call.
+#[pyclass(name = "ConditionalSimulationContext")]
+pub struct PyConditionalSimulationContext {
+    process: Py<PyQueueProcess>,
+    cond_events_by_dim: Vec<Vec<f64>>,
+    cond_externals: Option<MultivariateSimulationResult>,
+    new_externals: Option<MultivariateSimulationResult>,
+    t_max: f64,
+}
+
+#[pymethods]
+impl PyConditionalSimulationContext {
+    #[new]
+    #[pyo3(signature = (process, cond_events_by_dim, t_max, *, cond_externals=None, new_externals=None))]
+    fn new(
+        process: Py<PyQueueProcess>,
+        cond_events_by_dim: Vec<Vec<f64>>,
+        t_max: f64,
+        cond_externals: Option<&PySimulationResult>,
+        new_externals: Option<&PySimulationResult>,
+    ) -> Self {
+        Self {
+            process,
+            cond_events_by_dim,
+            cond_externals: cond_externals.map(|r| r.inner.clone()),
+            new_externals: new_externals.map(|r| r.inner.clone()),
+            t_max,
+        }
+    }
+
+    /// Memory-efficient queue sampling at specified times. Returns a 1-D numpy
+    /// array of u32 queue values aligned with `times`.
+    fn simulate_queue_at_times<'py>(
+        &self,
+        py: Python<'py>,
+        times: PyReadonlyArray1<f64>,
+        initial_queue_size: u32,
+        seed: Option<u64>,
+    ) -> Bound<'py, PyArray1<u32>> {
+        let process_borrow = self.process.borrow(py);
+        let ctx = ConditionalSimulationContext::new(
+            &process_borrow.inner,
+            &self.cond_events_by_dim,
+            self.cond_externals.as_ref(),
+            self.new_externals.as_ref(),
+            self.t_max,
+        );
+        let samples = ctx.simulate_queue_at_times(
+            times.as_slice().unwrap(),
+            initial_queue_size,
+            None,
+            seed,
+        );
+        samples.into_pyarray_bound(py)
+    }
+
+    /// Single-shot conditional simulate; returns the resulting event stream.
+    fn simulate(
+        &self,
+        py: Python,
+        seed: Option<u64>,
+    ) -> PySimulationResult {
+        let process_borrow = self.process.borrow(py);
+        let ctx = ConditionalSimulationContext::new(
+            &process_borrow.inner,
+            &self.cond_events_by_dim,
+            self.cond_externals.as_ref(),
+            self.new_externals.as_ref(),
+            self.t_max,
+        );
+        PySimulationResult { inner: ctx.simulate(None, seed) }
+    }
+}
+
 #[pymodule]
 fn _native(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add("__version__", "0.1.0")?;
@@ -247,5 +323,6 @@ fn _native(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(events_to_dim, m)?)?;
     m.add_function(wrap_pyfunction!(extract_events_by_dim, m)?)?;
     m.add_function(wrap_pyfunction!(sample_queue_at_times, m)?)?;
+    m.add_class::<PyConditionalSimulationContext>()?;
     Ok(())
 }
