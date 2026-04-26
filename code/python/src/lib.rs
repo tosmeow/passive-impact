@@ -16,7 +16,7 @@ use simulation_project::simulation_helpers::{
     extract_events_by_dim as rs_extract_events_by_dim,
     sample_queue_at_times as rs_sample_queue_at_times,
 };
-use simulation_project::conditional_impact::{TailImpact, AggressiveImpactPath};
+use simulation_project::conditional_impact::{TailImpact, AggressiveImpactPath, ImpactPath};
 
 #[pyclass(name = "MultiExponentialHawkes")]
 #[derive(Clone)]
@@ -369,6 +369,25 @@ fn aggressive_impact_from_queue_samples(
     Ok(PyAggressiveImpactPath { impact_path: path.impact_path })
 }
 
+/// Compute the impact path I(t) for a (q, bar_q) pair via the affine-queue model.
+///
+/// q_events / bar_q_events are the full event streams of the two queue processes
+/// (e.g. as returned by merge_events of conditional simulations + market orders).
+/// initial_q is the starting queue size used for both paths.
+#[pyfunction]
+fn compute_impact_path<'py>(
+    py: Python<'py>,
+    q_events: &PySimulationResult,
+    bar_q_events: &PySimulationResult,
+    initial_q: u32,
+    tail_impact: &PyTailImpact,
+) -> Bound<'py, PyArray1<f64>> {
+    let q_path = AffineQueueProcess::result_to_queue_path(&q_events.inner, initial_q);
+    let bar_q_path = AffineQueueProcess::result_to_queue_path(&bar_q_events.inner, initial_q);
+    let impact = ImpactPath::new(q_path, bar_q_path, &tail_impact.inner);
+    impact.impact_path.into_pyarray_bound(py)
+}
+
 #[pymodule]
 fn _native(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add("__version__", "0.1.0")?;
@@ -390,5 +409,6 @@ fn _native(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyTailImpact>()?;
     m.add_class::<PyAggressiveImpactPath>()?;
     m.add_function(wrap_pyfunction!(aggressive_impact_from_queue_samples, m)?)?;
+    m.add_function(wrap_pyfunction!(compute_impact_path, m)?)?;
     Ok(())
 }

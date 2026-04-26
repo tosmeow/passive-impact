@@ -56,11 +56,7 @@ def _make_meta_orders(cfg: PassiveImpactConfig):
 
 
 def _run_single_side(cfg, side: str) -> dict:
-    """Run one side ('with' or 'without') for single-queue mode.
-
-    Note: this initial cut returns impact_paths filled with zeros — the real
-    impact computation is wired in Task 13 (next).
-    """
+    """Run one side ('with' or 'without') for single-queue mode."""
     hawkes = _make_hawkes(cfg)
     market = _native.simulate_hawkes_as_market_orders(hawkes, cfg.time_horizon, cfg.seed)
     process = _native.AffineQueueProcess.new_queue(
@@ -82,19 +78,27 @@ def _run_single_side(cfg, side: str) -> dict:
         new_externals=bar_q_externals,
     )
 
-    # NOTE: the test harness for this task asserts shape only, since impact
-    # is wired in Task 13. Placeholder zeros here.
     n_times = len(market_times)
     queue_paths = np.empty((n_times, cfg.n_simulations + 1), dtype=np.uint32)
     impact_paths = np.zeros((n_times, cfg.n_simulations), dtype=np.float64)
     q_at_market = _native.sample_queue_at_times(full_q, cfg.initial_queue_size, market_times)
     queue_paths[:, 0] = q_at_market
 
+    tail = _native.TailImpact.from_affine_queue(
+        cfg.mu, list(cfg.alpha), list(cfg.beta),
+        cfg.b_l, cfg.b_c, list(market_times),
+    )
+
     for sim_idx in range(cfg.n_simulations):
-        bar_q_samples = ctx.simulate_queue_at_times(
-            market_times, cfg.initial_queue_size, seed=sim_idx,
+        bar_q_events = ctx.simulate(seed=sim_idx)
+        bar_q_full = _native.merge_events(bar_q_events, market)
+        bar_q_samples_at_market = _native.sample_queue_at_times(
+            bar_q_full, cfg.initial_queue_size, market_times,
         )
-        queue_paths[:, sim_idx + 1] = bar_q_samples
+        queue_paths[:, sim_idx + 1] = bar_q_samples_at_market
+        impact_paths[:, sim_idx] = _native.compute_impact_path(
+            full_q, bar_q_full, cfg.initial_queue_size, tail,
+        )
 
     return {
         "times": np.asarray(market_times, dtype=np.float64),

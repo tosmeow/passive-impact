@@ -24,3 +24,6 @@ def test_passive_impact_smoke(tmp_path):
     assert (tmp_path / "times.npy").exists()
     assert (tmp_path / "queue_paths.npy").exists()
     assert (tmp_path / "impact_paths.npy").exists()
+
+    # Impact paths should now be non-trivial (not all zeros)
+    assert np.any(result["impact_paths"] != 0.0)
