@@ -242,6 +242,7 @@ pub fn write_bidask_results(
     bid_market_orders: &[f64],
     output_dir: &str,
 ) -> std::io::Result<()> {
+    std::fs::create_dir_all(output_dir)?;
     let n_ask_times = ask_market_orders.len();
     let n_bid_times = bid_market_orders.len();
     let n_simulations = results.ask_queue_samples.len();
@@ -299,6 +300,7 @@ pub fn write_bidask_memory_efficient_results(
     bid_market_orders: &[f64],
     output_dir: &str,
 ) -> std::io::Result<()> {
+    std::fs::create_dir_all(output_dir)?;
     let n_ask_times = ask_market_orders.len();
     let n_bid_times = bid_market_orders.len();
     let n_simulations = results.ask_queue_samples.len();

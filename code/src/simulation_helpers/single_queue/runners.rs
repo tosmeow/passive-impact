@@ -152,6 +152,7 @@ pub fn write_results(
     market_orders: &[f64],
     output_dir: &str,
 ) -> std::io::Result<()> {
+    std::fs::create_dir_all(output_dir)?;
     let n_times = market_orders.len();
     let n_simulations = results.queue_samples.len();
 
@@ -183,6 +184,7 @@ pub fn write_memory_efficient_results(
     market_orders: &[f64],
     output_dir: &str,
 ) -> std::io::Result<()> {
+    std::fs::create_dir_all(output_dir)?;
     let n_times = market_orders.len();
     let n_simulations = results.queue_samples.len();
 
