@@ -23,3 +23,6 @@ code/python/simproj.egg-info/
 
 # custom experiment outputs
 experiments/*/custom_experiment/output/
+# Internal notes (kept in git history, not in working tree)
+docs/
+.github/
