@@ -22,16 +22,35 @@ A high-performance Rust library for simulating and analyzing market impact using
 - **Closed-form market impact computation** for Hawkes with kernels as sum of exponentials using resolvant operator methods, enabling efficient impact estimation without nested Monte Carlo.
 - **Flexible architecture** supporting both single-queue and bid-ask queue pair scenarios, with optimized ("efficient") and general simulation variants.
 
-## Quick Start (Python)
+## Setup
 
-Build the bindings once:
+Fresh-clone workflow using [`uv`](https://docs.astral.sh/uv/) (recommended):
 
 ```bash
+git clone https://github.com/tosmeow/passive-impact.git
+cd passive-impact
+
+uv venv                             # create .venv/
+source .venv/bin/activate           # activate it
+uv pip install -e ".[dev]"          # installs maturin, pytest, jupyter, ipykernel, nbconvert
+
+# Build the Rust bindings (simproj package)
 cd code/python && maturin develop --release && cd -
-# On Python ≥3.13, prefix with PYO3_USE_ABI3_FORWARD_COMPATIBILITY=1
+# On Python ≥3.13, prefix the maturin command with PYO3_USE_ABI3_FORWARD_COMPATIBILITY=1
 ```
 
-Then run any of the three experiment categories from Python — each ships a `custom_experiment/main.py` whose top section is a config dataclass. Edit the config, run the file, and `.npy` outputs land in `output/`.
+Verify the install:
+
+```bash
+pytest code/python/tests/           # 14 smoke tests
+python -c "import simproj; print(simproj.__version__)"
+```
+
+> **Note:** `cargo build` from the repo root will also try to build the bindings crate. On Python ≥3.13, set `PYO3_USE_ABI3_FORWARD_COMPATIBILITY=1` for that path too, or build the lib in isolation with `cargo build -p simulation_project`.
+
+## Quick Start (Python)
+
+After [Setup](#setup), run any of the three experiment categories from Python — each ships a `custom_experiment/main.py` whose top section is a config dataclass. Edit the config, run the file, and `.npy` outputs land in `output/`.
 
 ```python
 # experiments/passive_impact/custom_experiment/main.py
@@ -144,16 +163,6 @@ The original Rust binaries still exist for fast batch baseline generation:
     cargo run --release --bin queue_simulation_efficient
 
 (General variants are also kept for validation: `*_general_with_us`, `*_general_without_us`.)
-
-### Setup notes
-
-The Python facades require the `simproj` bindings package built once via maturin:
-
-    cd code/python && maturin develop --release && cd -
-
-(If on Python ≥3.13, prefix with `PYO3_USE_ABI3_FORWARD_COMPATIBILITY=1`.)
-
-> `cargo build` from the repo root will also try to build the bindings crate. On Python ≥3.13, set `PYO3_USE_ABI3_FORWARD_COMPATIBILITY=1` for that path too, or build the lib in isolation with `cargo build -p simulation_project`.
 
 ---
 
