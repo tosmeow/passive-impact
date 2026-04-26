@@ -19,6 +19,7 @@ The single-vs-double queue distinction becomes a config knob inside `passive_imp
 - No new analyses inside notebooks. Plots reproduce what they show today.
 - No CI changes.
 - No publication of the new Python package — local `maturin develop` only.
+- No non-linear `reaction_intensity` mode (Python callable overriding the affine intensity for the simulator only, while the affine params still drive the impact closed-form). Deferred to a follow-up; affine intensities are the only simulator path in this refactor.
 
 ## Section 1 — Top-level directory layout
 
