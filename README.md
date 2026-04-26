@@ -5,12 +5,12 @@ A high-performance Rust library for simulating and analyzing market impact using
 ## Visual Overview
 
 <p align="center">
-  <img src="python/experiments/single_queue_impact/images/impact_given_q.png" width="48%" alt="Conditional impact distribution given baseline queue"/>
-  <img src="python/experiments/single_queue_impact/images/queue_given_q.png" width="48%" alt="Conditional queue distribution given baseline"/>
+  <img src="experiments/passive_impact/load_experiments/images/impact_given_q.png" width="48%" alt="Conditional impact distribution given baseline queue"/>
+  <img src="experiments/passive_impact/load_experiments/images/queue_given_q.png" width="48%" alt="Conditional queue distribution given baseline"/>
 </p>
 <p align="center">
-  <img src="python/experiments/single_queue_impact/images/impact_given_qbar.png" width="48%" alt="Impact given shocked queue"/>
-  <img src="python/experiments/single_queue_impact/images/queue_given_qbar.png" width="48%" alt="Queue given shocked queue"/>
+  <img src="experiments/passive_impact/load_experiments/images/impact_given_qbar.png" width="48%" alt="Impact given shocked queue"/>
+  <img src="experiments/passive_impact/load_experiments/images/queue_given_qbar.png" width="48%" alt="Queue given shocked queue"/>
 </p>
 
 *Conditional simulation of 500 counterfactual market paths (gray shading) with empirical mean (red) and observed baseline (black). Each panel shows a different initial queue state.*
@@ -99,60 +99,46 @@ where the following term admits a closed form relying on the resolvent operator 
 
 | Module | Description |
 |--------|-------------|
-| [`models`](src/models/) | Hawkes, queues, Markovian abstractions |
-| [`simulation`](src/simulation/) | Thinning algorithm, conditional simulation |
-| [`simulation_helpers`](src/simulation_helpers/) | Parallel batch simulation, event utilities |
-| [`conditional_impact`](src/conditional_impact/) | Resolvent and propagator impact models |
-| [`utils`](src/utils/) | IVT root-finding, finite differences |
+| [`models`](code/src/models/) | Hawkes, queues, Markovian abstractions |
+| [`simulation`](code/src/simulation/) | Thinning algorithm, conditional simulation |
+| [`simulation_helpers`](code/src/simulation_helpers/) | Parallel batch simulation, event utilities |
+| [`conditional_impact`](code/src/conditional_impact/) | Resolvent and propagator impact models |
+| [`utils`](code/src/utils/) | IVT root-finding, finite differences |
 
 ## Experiments
 
-All experiments follow the same pattern: (1) run a Rust binary to generate simulation data, (2) use the corresponding Python notebook to analyze and visualize. Simulation data is saved as `.npy` files in the `data/` directory.
+Three top-level experiment categories live under `experiments/`:
 
-| Experiment | What it shows | Commands |
-|---|---|---|
-| **Single Queue Impact** | Passive market impact from limit-order metaorders in a single-sided queue | `cargo run --release --bin single_queue_efficient_{with,without}_us` <br/> [results](python/experiments/single_queue_impact/) |
-| **Double Queue Impact** | Passive impact in a bid-ask queue pair; shows how impact differs across sides | `cargo run --release --bin double_queue_efficient_{with,without}_us` <br/> [results](python/experiments/double_queue_impact/) |
-| **Aggressive Impact** | Market-order impact under the propagator price model | `cargo run --release --bin agressive_impact` <br/> [results](python/experiments/agressive_impact/) |
-| **Hybrid Aggressive Impact** | Market-order impact under the hybrid price model | `cargo run --release --bin agressive_impact_hybrid` <br/> [results](python/experiments/agressive_impact_hybrid/) |
+| Category | What it shows | Pre-saved baseline | Custom |
+|---|---|---|---|
+| **Passive Impact** | Conditional impact from limit-order metaorders (single + double queue) | [`experiments/passive_impact/load_experiments/analysis.ipynb`](experiments/passive_impact/load_experiments/analysis.ipynb) | [`experiments/passive_impact/custom_experiment/main.py`](experiments/passive_impact/custom_experiment/main.py) |
+| **Aggressive Impact** | Market-order impact under propagator and hybrid models | [`experiments/agressive_impact/load_experiments/analysis.ipynb`](experiments/agressive_impact/load_experiments/analysis.ipynb) | [`experiments/agressive_impact/custom_experiment/main.py`](experiments/agressive_impact/custom_experiment/main.py) |
+| **Queue Simulation** | Counterfactual queue paths under a metaorder (no impact curve) | [`experiments/queue_simulation/load_experiments/analysis.ipynb`](experiments/queue_simulation/load_experiments/analysis.ipynb) | [`experiments/queue_simulation/custom_experiment/main.py`](experiments/queue_simulation/custom_experiment/main.py) |
 
-The two aggressive impact experiments use different price models for modeling aggressive (market-order) impact. The **Aggressive Impact** experiment uses a pure propagator model where the per-trade impact function $\kappa(q)$ depends on queue depth. The **Hybrid Aggressive Impact** experiment combines a queue-dependent instantaneous correction ($\kappa(q) = -c_\kappa \cdot q$) with a propagator term weighted by a constant $\bar{\kappa}$.
+Each `load_experiments/` folder contains the notebook, plot utilities, and a `data/` subtree where the Rust binaries write `.npy` files. `.npy` is gitignored — regenerate baselines by running the binaries below. Each `custom_experiment/` folder contains a single `main.py` whose top section is a config dataclass; edit and run.
 
-### General vs. Efficient Simulator Variants
+### Setup
 
-For `single_queue_*` and `double_queue_*` experiments, two variants are available:
+    cd code/python && maturin develop --release && cd -
 
-- **General** (`*_general_*`): Full event history simulation, useful for detailed analysis
-- **Efficient** (`*_efficient_*`): Memory-optimized variant that computes impact without storing all queue paths
+(Python 3.14 environments need `PYO3_USE_ABI3_FORWARD_COMPATIBILITY=1`.)
 
-For most use cases, **use the efficient variants** (`*_efficient_*`). The general variants are provided for research and validation purposes.
+### Regenerate baselines (Rust binaries)
 
-### Running the Experiments
+    cargo run --release --bin single_queue_efficient_with_us
+    cargo run --release --bin single_queue_efficient_without_us
+    cargo run --release --bin double_queue_efficient_with_us
+    cargo run --release --bin double_queue_efficient_without_us
+    cargo run --release --bin agressive_impact
+    cargo run --release --bin agressive_impact_hybrid
+    cargo run --release --bin queue_simulation_efficient
 
-#### Option 1: Run a single experiment
-```bash
-# Generate data for single queue impact
-cargo run --release --bin single_queue_efficient_with_us
-cargo run --release --bin single_queue_efficient_without_us
+(General variants are also kept for validation: `*_general_with_us`, `*_general_without_us`.)
 
-# Generate plots
-cd python/experiments/single_queue_impact
-python plot_utils.py
-```
+### Run a custom experiment
 
-#### Option 2: Run all experiments
-```bash
-cargo build --release
-
-cargo run --release --bin single_queue_efficient_with_us
-cargo run --release --bin single_queue_efficient_without_us
-cargo run --release --bin double_queue_efficient_with_us
-cargo run --release --bin double_queue_efficient_without_us
-cargo run --release --bin agressive_impact
-cargo run --release --bin agressive_impact_hybrid
-```
-
-Outputs: `.npy` files saved to `data/*/` directories, organized by experiment type.
+    python experiments/passive_impact/custom_experiment/main.py
+    # outputs land in experiments/passive_impact/custom_experiment/output/
 
 ---
 
