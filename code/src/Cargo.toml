@@ -1,0 +1,74 @@
+[package]
+name = "simulation_project"
+version = "0.1.0"
+edition = "2021"
+authors = ["Joseph Leclere"]
+description = "Refactored Passive Impact Simulation"
+license = "MIT"
+default-run = "simulation_project"
+
+
+[lib]
+name = "simulation_project"
+crate-type = ["cdylib", "rlib"]
+path = "lib.rs"
+
+[dependencies]
+# Core numerics
+ndarray = "0.15"
+rand = "0.8"
+rand_distr = "0.4"
+rand_xoshiro = "0.6"
+
+# Parallelism
+rayon = "1.10"
+
+[dev-dependencies]
+approx = "0.5"
+
+[[bin]]
+name = "simulation_project"
+path = "main.rs"
+
+# Single queue binaries
+[[bin]]
+name = "single_queue_general_with_us"
+path = "bin/single_queue/general/with_us.rs"
+
+[[bin]]
+name = "single_queue_general_without_us"
+path = "bin/single_queue/general/without_us.rs"
+
+[[bin]]
+name = "single_queue_efficient_with_us"
+path = "bin/single_queue/efficient/with_us.rs"
+
+[[bin]]
+name = "single_queue_efficient_without_us"
+path = "bin/single_queue/efficient/without_us.rs"
+
+# Double queue (bid-ask) binaries
+[[bin]]
+name = "double_queue_general_with_us"
+path = "bin/double_queue/general/with_us.rs"
+
+[[bin]]
+name = "double_queue_general_without_us"
+path = "bin/double_queue/general/without_us.rs"
+
+[[bin]]
+name = "double_queue_efficient_with_us"
+path = "bin/double_queue/efficient/with_us.rs"
+
+[[bin]]
+name = "double_queue_efficient_without_us"
+path = "bin/double_queue/efficient/without_us.rs"
+
+# Aggressive impact
+[[bin]]
+name = "agressive_impact"
+path = "bin/agressive_impact/main.rs"
+
+[[bin]]
+name = "agressive_impact_hybrid"
+path = "bin/agressive_impact_hybrid/main.rs"
