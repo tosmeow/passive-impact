@@ -16,6 +16,7 @@ use simulation_project::simulation_helpers::{
     extract_events_by_dim as rs_extract_events_by_dim,
     sample_queue_at_times as rs_sample_queue_at_times,
 };
+use simulation_project::conditional_impact::{TailImpact, AggressiveImpactPath};
 
 #[pyclass(name = "MultiExponentialHawkes")]
 #[derive(Clone)]
@@ -306,6 +307,68 @@ impl PyConditionalSimulationContext {
     }
 }
 
+#[pyclass(name = "TailImpact")]
+pub struct PyTailImpact {
+    pub inner: TailImpact,
+}
+
+#[pymethods]
+impl PyTailImpact {
+    /// Build TailImpact from affine-queue parameters.
+    #[staticmethod]
+    fn from_affine_queue(
+        mu: f64,
+        alpha: Vec<f64>,
+        beta: Vec<f64>,
+        b_l: f64,
+        b_c: f64,
+        events: Vec<f64>,
+    ) -> Self {
+        Self { inner: TailImpact::from_affine_queue(mu, alpha, beta, b_l, b_c, events) }
+    }
+}
+
+#[pyclass(name = "AggressiveImpactPath")]
+pub struct PyAggressiveImpactPath {
+    pub impact_path: Vec<f64>,
+}
+
+#[pymethods]
+impl PyAggressiveImpactPath {
+    fn impact<'py>(&self, py: Python<'py>) -> Bound<'py, PyArray1<f64>> {
+        self.impact_path.clone().into_pyarray_bound(py)
+    }
+}
+
+/// Compute aggressive impact path from pre-sampled queues.
+/// `kappa` is a Python callable f64 -> f64 invoked at each evaluation time.
+#[pyfunction]
+fn aggressive_impact_from_queue_samples(
+    py: Python,
+    q_samples: PyReadonlyArray1<u32>,
+    q_bar_samples: PyReadonlyArray1<u32>,
+    eval_times: PyReadonlyArray1<f64>,
+    is_market_order: Vec<bool>,
+    hawkes: &PyMultiExponentialHawkes,
+    kappa: PyObject,
+) -> PyResult<PyAggressiveImpactPath> {
+    let kappa_clone = kappa.clone_ref(py);
+    let path = AggressiveImpactPath::from_queue_samples(
+        q_samples.as_slice().unwrap(),
+        q_bar_samples.as_slice().unwrap(),
+        eval_times.as_slice().unwrap(),
+        &is_market_order,
+        &hawkes.inner,
+        move |q: f64| -> f64 {
+            Python::with_gil(|py| {
+                let res = kappa_clone.call1(py, (q,)).unwrap();
+                res.extract::<f64>(py).unwrap()
+            })
+        },
+    );
+    Ok(PyAggressiveImpactPath { impact_path: path.impact_path })
+}
+
 #[pymodule]
 fn _native(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add("__version__", "0.1.0")?;
@@ -324,5 +387,8 @@ fn _native(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(extract_events_by_dim, m)?)?;
     m.add_function(wrap_pyfunction!(sample_queue_at_times, m)?)?;
     m.add_class::<PyConditionalSimulationContext>()?;
+    m.add_class::<PyTailImpact>()?;
+    m.add_class::<PyAggressiveImpactPath>()?;
+    m.add_function(wrap_pyfunction!(aggressive_impact_from_queue_samples, m)?)?;
     Ok(())
 }

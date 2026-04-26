@@ -16,5 +16,8 @@ events_to_dim = _native.events_to_dim
 extract_events_by_dim = _native.extract_events_by_dim
 sample_queue_at_times = _native.sample_queue_at_times
 ConditionalSimulationContext = _native.ConditionalSimulationContext
+TailImpact = _native.TailImpact
+AggressiveImpactPath = _native.AggressiveImpactPath
+aggressive_impact_from_queue_samples = _native.aggressive_impact_from_queue_samples
 
 __version__ = _native.__version__
