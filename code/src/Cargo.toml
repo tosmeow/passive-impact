@@ -81,3 +81,8 @@ path = "bin/experiments/cancelation_race.rs"
 [[bin]]
 name = "extreme_events"
 path = "bin/experiments/extreme_events.rs"
+
+# Queue simulation
+[[bin]]
+name = "queue_simulation_efficient"
+path = "bin/queue_simulation/efficient.rs"
