@@ -153,7 +153,7 @@ fn main() {
     // Output
     // ==========================================================================
     let t0 = Instant::now();
-    write_results(&results, &q_at_market_orders, &market_orders, "data/single_queue/general/with").unwrap();
+    write_results(&results, &q_at_market_orders, &market_orders, "experiments/passive_impact/load_experiments/data/single/general/with").unwrap();
     println!("[TIMING] Data write: {:?}", t0.elapsed());
     println!("[TIMING] TOTAL: {:?}", t_total.elapsed());
 }

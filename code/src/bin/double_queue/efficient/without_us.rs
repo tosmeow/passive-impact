@@ -166,7 +166,7 @@ fn main() {
         &bid_at_market,
         &ask_market_orders,
         &bid_market_orders,
-        "data/double_queue/efficient/without",
+        "experiments/passive_impact/load_experiments/data/double/efficient/without",
     ).unwrap();
     println!("[TIMING] Data write: {:?}", t0.elapsed());
     println!("[TIMING] TOTAL: {:?}", t_total.elapsed());

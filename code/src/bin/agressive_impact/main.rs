@@ -162,7 +162,7 @@ fn main() {
     // Output
     // ==========================================================================
     let t0 = Instant::now();
-    let output_dir = "data/agressive_impact";
+    let output_dir = "experiments/agressive_impact/load_experiments/data/propagator";
     std::fs::create_dir_all(output_dir).expect("Failed to create output directory");
 
     let n_times = eval_times.len();
