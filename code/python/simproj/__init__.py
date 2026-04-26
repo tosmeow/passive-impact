@@ -21,3 +21,5 @@ AggressiveImpactPath = _native.AggressiveImpactPath
 aggressive_impact_from_queue_samples = _native.aggressive_impact_from_queue_samples
 
 __version__ = _native.__version__
+
+from . import passive_impact
