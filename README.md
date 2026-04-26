@@ -42,10 +42,10 @@ Notes on the steps:
 - `uv pip install -e ".[dev]"` installs the dev tooling (maturin, pytest, jupyter, ipykernel, nbconvert).
 - On Python ≥3.13, prefix the `maturin develop` command with `PYO3_USE_ABI3_FORWARD_COMPATIBILITY=1`.
 
-Verify the install:
+Verify the install (expects 13 passed + 1 skipped, then prints `0.1.0`):
 
 ```bash
-pytest code/python/tests/           # 14 smoke tests
+pytest code/python/tests/
 python -c "import simproj; print(simproj.__version__)"
 ```
 
