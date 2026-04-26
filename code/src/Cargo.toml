@@ -10,7 +10,7 @@ default-run = "simulation_project"
 
 [lib]
 name = "simulation_project"
-crate-type = ["cdylib", "rlib"]
+crate-type = ["rlib"]
 path = "lib.rs"
 
 [dependencies]

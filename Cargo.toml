@@ -1,6 +1,9 @@
 [workspace]
 resolver = "2"
-members = ["code/src"]
+members = [
+    "code/src",
+    "code/python",
+]
 
 [profile.release]
 opt-level = 3

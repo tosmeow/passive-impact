@@ -14,3 +14,12 @@ python/experiments/cancelation_race
 python/experiments/extreme_events
 src/bin/experiments/
 data/experiments/
+
+# maturin / pyo3 build artifacts
+code/python/target/
+code/python/simproj/_native*.so
+code/python/simproj/_native*.pyd
+code/python/simproj.egg-info/
+
+# custom experiment outputs
+experiments/*/custom_experiment/output/

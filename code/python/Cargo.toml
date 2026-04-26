@@ -1,0 +1,15 @@
+[package]
+name = "simproj_native"
+version = "0.1.0"
+edition = "2021"
+authors = ["Joseph Leclere"]
+license = "MIT"
+
+[lib]
+name = "simproj_native"
+crate-type = ["cdylib"]
+
+[dependencies]
+pyo3 = { version = "0.21", features = ["extension-module"] }
+numpy = "0.21"
+simulation_project = { path = "../src" }
