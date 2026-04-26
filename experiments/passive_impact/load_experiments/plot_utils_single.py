@@ -20,7 +20,7 @@ def parse_args():
 
 def load_data(data_mode):
     """Load simulation results from .npy files into pandas DataFrames."""
-    data_base = f'../../../data/single_queue/{data_mode}'
+    data_base = f'./data/single/{data_mode}'
 
     times = np.load(f'{data_base}/with/times.npy')
     times_without = np.load(f'{data_base}/without/times.npy')

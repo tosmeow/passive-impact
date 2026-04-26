@@ -3,7 +3,7 @@ import pandas as pd
 import numpy as np
 import os
 
-DATA_BASE = '../../../data/agressive_impact'
+DATA_BASE = './data/propagator'
 
 
 def load_data():

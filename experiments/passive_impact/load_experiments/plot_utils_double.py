@@ -9,10 +9,10 @@ COLORS = {'ask': '#2563eb', 'bid': '#ea580c', 'impact': '#16a34a', 'sim': '#9ca3
 
 # Data directory - can be 'general' or 'efficient'
 DATA_MODE = 'efficient'  # Change to 'general' for non-memory-efficient data
-DATA_BASE = f'../../../data/double_queue/{DATA_MODE}'
+DATA_BASE = f'./data/double/{DATA_MODE}'
 
 
-def load_bidask_data():
+def load_bidask_data(data_mode=None):
     """Load bid-ask simulation results from .npy files into pandas DataFrames.
 
     Returns:
@@ -24,23 +24,24 @@ def load_bidask_data():
             - 'ask_times', 'bid_times': Time arrays
             - 'ask_times_without', 'bid_times_without': Time arrays for without scenario
     """
+    data_base = f'./data/double/{data_mode}' if data_mode else DATA_BASE
     # Load times
-    ask_times = np.load(f'{DATA_BASE}/with/ask_times.npy')
-    bid_times = np.load(f'{DATA_BASE}/with/bid_times.npy')
-    ask_times_without = np.load(f'{DATA_BASE}/without/ask_times.npy')
-    bid_times_without = np.load(f'{DATA_BASE}/without/bid_times.npy')
+    ask_times = np.load(f'{data_base}/with/ask_times.npy')
+    bid_times = np.load(f'{data_base}/with/bid_times.npy')
+    ask_times_without = np.load(f'{data_base}/without/ask_times.npy')
+    bid_times_without = np.load(f'{data_base}/without/bid_times.npy')
 
     # Load impact paths (n_times x n_simulations)
-    ask_impact_with = np.load(f'{DATA_BASE}/with/ask_impact_paths.npy')
-    ask_impact_without = np.load(f'{DATA_BASE}/without/ask_impact_paths.npy')
-    bid_impact_with = np.load(f'{DATA_BASE}/with/bid_impact_paths.npy')
-    bid_impact_without = np.load(f'{DATA_BASE}/without/bid_impact_paths.npy')
+    ask_impact_with = np.load(f'{data_base}/with/ask_impact_paths.npy')
+    ask_impact_without = np.load(f'{data_base}/without/ask_impact_paths.npy')
+    bid_impact_with = np.load(f'{data_base}/with/bid_impact_paths.npy')
+    bid_impact_without = np.load(f'{data_base}/without/bid_impact_paths.npy')
 
     # Load queue paths (n_times x (1 + n_simulations))
-    ask_queue_with = np.load(f'{DATA_BASE}/with/ask_queue_paths.npy')
-    ask_queue_without = np.load(f'{DATA_BASE}/without/ask_queue_paths.npy')
-    bid_queue_with = np.load(f'{DATA_BASE}/with/bid_queue_paths.npy')
-    bid_queue_without = np.load(f'{DATA_BASE}/without/bid_queue_paths.npy')
+    ask_queue_with = np.load(f'{data_base}/with/ask_queue_paths.npy')
+    ask_queue_without = np.load(f'{data_base}/without/ask_queue_paths.npy')
+    bid_queue_with = np.load(f'{data_base}/with/bid_queue_paths.npy')
+    bid_queue_without = np.load(f'{data_base}/without/bid_queue_paths.npy')
 
     n_sims_with = ask_impact_with.shape[1]
     n_sims_without = ask_impact_without.shape[1]
@@ -439,11 +440,11 @@ def _plot_impact_panel(ax, ask_df, bid_df, title):
     ax.legend(loc='best', fontsize=8)
 
 
-def generate_all_plots():
+def generate_all_plots(data_mode=None, meta_end=None):
     """Generate and save all bid-ask analysis plots."""
 
     print("Loading bid-ask simulation data...")
-    data = load_bidask_data()
+    data = load_bidask_data(data_mode)
 
     os.makedirs('images', exist_ok=True)
 
