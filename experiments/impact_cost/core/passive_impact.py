@@ -59,7 +59,7 @@ class PassiveImpactModelConfig:
 
 
 def validate_passive_impact_model_config(cfg: PassiveImpactModelConfig) -> None:
-    """Validate the model-choice fields shared by impact-cost pipelines."""
+    """Validate the model-choice fields shared by impact-cost workflows."""
     if cfg.impact_model not in {
         "reduced_form",
         "propagator_tail",

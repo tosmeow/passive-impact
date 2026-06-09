@@ -32,8 +32,14 @@ uses native helpers re-exported from `simproj`:
   execution under first-level queue priority conventions.
 - `passive_flow_impact_from_queue_samples` and
   `passive_tail_propagator_impact_from_queue_samples` — native passive impact
-  primitives used by the Python pipeline layer.
+  primitives used by the Python experiment layer.
 
-Run the pipeline modules with `python -m experiments.impact_cost.pipelines.<name>
---help`; see `experiments/impact_cost/README.md` for the side, quantity, and
-cost conventions.
+Run the canonical lifecycle experiment with:
+
+```bash
+python -m experiments.impact_cost.load_experiments.lifecycle_passive_cost \
+  --config experiments/impact_cost/load_experiments/config.toml
+```
+
+See `experiments/impact_cost/README.md` for the side, quantity, and cost
+conventions.

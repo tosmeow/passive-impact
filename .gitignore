@@ -23,6 +23,7 @@ data/
 experiments/**/data/**
 !experiments/**/data/
 !experiments/**/data/README.md
+!experiments/impact_cost/load_experiments/data/**
 
 # maturin / pyo3 build artifacts
 code/python/target/
@@ -33,14 +34,11 @@ code/python/simproj.egg-info/
 # custom experiment outputs
 experiments/*/custom_experiment/output/
 
-# impact-cost local inputs, references, and generated runs
-experiments/impact_cost/data/**/*.parquet
-experiments/impact_cost/references/*.pdf
-experiments/impact_cost/references/*.jpeg
-experiments/impact_cost/references/*.jpg
-experiments/impact_cost/references/*.png
-experiments/impact_cost/runs/*
-!experiments/impact_cost/runs/README.md
+# impact-cost archived reference materials
+experiments/impact_cost/archive/references/*.pdf
+experiments/impact_cost/archive/references/*.jpeg
+experiments/impact_cost/archive/references/*.jpg
+experiments/impact_cost/archive/references/*.png
 # Internal notes (kept in git history, not in working tree)
 docs/
 .github/

@@ -1,6 +1,6 @@
 # Passive Market Impact Simulation
 
-A high-performance Rust library for simulating and analyzing market impact using point processes. Combines Hawkes processes (for market orders) with queue-reactive Markovian dynamics (for limit orders and cancellations) to compute the price effect of trading strategies through conditional path simulation.
+A high-performance Rust library for simulating and analyzing market impact using point processes. Combines Hawkes processes (for market orders) with queue-reactive Markovian dynamics (for limit orders and cancellations) to compute the price effect of trading strategies through conditional path simulation. The library accompanies the work on conditional simulation of Poisson measures and market impact.
 
 ## Visual Overview
 
@@ -17,11 +17,15 @@ A high-performance Rust library for simulating and analyzing market impact using
 
 ## What This Library Provides
 
-- **Exact conditional simulation** of coupled point processes, enabling pathwise comparison of observed vs. counterfactual market scenarios.
-- **Queue-reactive order dynamics** with affine intensity functions, modeling how limit orders, cancellations, and market orders respond to queue depth.
-- **Closed-form market impact computation** for Hawkes with kernels as sum of exponentials using resolvant operator methods, enabling efficient impact estimation without nested Monte Carlo.
-- **Anchored impact-cost experiments** that replay empirical queue snapshots, simulate no-us passive queues, and sample execution-time cost jumps.
-- **Flexible architecture** supporting both single-queue and bid-ask queue pair scenarios, with optimized ("efficient") and general simulation variants.
+- **Exact conditional simulation of Poisson processes** given an observed trajectory, by adding or removing jump times consistently with the conditioning.
+- **Counterfactual queue simulation** from an observed queue trajectory:
+  - *Removing a metaorder*: start from a trajectory that contains a metaorder and simulate the queue that would have been observed if the metaorder had not been sent.
+  - *Adding a metaorder*: start from a baseline trajectory and inject a hypothetical buy/sell metaorder executed through limit or market orders.
+- **Conditional market impact** from observed and counterfactual queues, covering passive limit-order and aggressive market-order strategies on the same realised trajectory.
+- **Ex-post and alternative-strategy analysis**: recover the conditional distribution of impact for an executed strategy, or compare hypothetical strategies against the same observed market path.
+- **Closed-form market impact computation** under Hawkes market-order flow with sum-of-exponentials kernels, using resolvent methods to avoid nested Monte Carlo.
+- **Anchored impact-cost experiments** that replay empirical queue snapshots and sample execution-time cost jumps for passive lifecycle strategies.
+- **Flexible architecture** supporting both single-queue and bid-ask queue-pair scenarios, with optimized ("efficient") and general simulation variants.
 
 ## Setup
 
@@ -87,34 +91,132 @@ Run it:
 python experiments/passive_impact/custom_experiment/main.py
 ```
 
-The same shape applies to `agressive_impact` and `queue_simulation` — each has its own config dataclass (`AggressiveImpactConfig`, `QueueSimulationConfig`) and `main.py` template. The empirical passive execution-cost workflow lives under [`experiments/impact_cost/`](experiments/impact_cost/) and is driven by CLI pipelines rather than a `custom_experiment/main.py` facade.
+The same shape applies to `agressive_impact` and `queue_simulation` — each has its own config dataclass (`AggressiveImpactConfig`, `QueueSimulationConfig`) and `main.py` template. The empirical passive execution-cost workflow lives under [`experiments/impact_cost/`](experiments/impact_cost/) and is driven by the canonical lifecycle config in `load_experiments/config.toml`.
 
 ## Mathematical Background
 
 ### Hawkes Process
 
-Conditional intensity with multi-exponential kernel:
+A Hawkes process is a self-exciting Poisson process with intensity
 
-$$\lambda_t = \mu + \int_0^{t-} \phi(t-s)dN_s = \mu + \sum_{i=1}^{k} R^i_t, \quad \varphi(s) = \sum_{i=1}^{k} \alpha_i e^{-\beta_i s}$$
+$$\lambda_t = \mu + \int_0^{t-} \varphi(t-s)\,dN_s.$$
 
-with Markovian states $R^i_t := \int_0^{t-} \alpha_i e^{-\beta_i(t-s)} dN_s$ enabling O(1) intensity updates.
+Here $\mu$ is the baseline exogenous intensity and $\varphi$ is the
+self-exciting kernel. In this library we mostly use sum-of-exponentials
+kernels:
 
-### Queue Dynamics
+$$
+\lambda_t = \mu + \sum_{i=1}^{k} R^i_t,
+\qquad
+\varphi(s) = \sum_{i=1}^{k} \alpha_i e^{-\beta_i s}.
+$$
 
-- **Limits**: $\lambda^L(q) = a_l + b_l \cdot q$, with $b_l < 0$.
-- **Cancels**: $\lambda^C(q) = a_c + b_c \cdot q$ with $b_c > 0$.
-- **Markets**: Hawkes process.
+The Markovian states
+$R^i_t := \int_0^{t-} \alpha_i e^{-\beta_i(t-s)} dN_s$
+enable constant-time intensity updates. Power-law kernels can also be
+approximated by sums of exponentials, so this representation remains flexible.
+
+### Aggregate Queue Dynamics
+
+The aggregate ask and bid queues are modeled as
+
+$$
+q^a = L^a - C^a - N^a,
+\qquad
+q^b = L^b - C^b - N^b.
+$$
+
+For $x \in \{a,b\}$, the processes $L^x$ and $C^x$ represent limit orders and
+cancellations with queue-reactive affine intensities:
+
+$$
+\lambda^{L,x}(q) = a_l + b_l q,
+\qquad
+\lambda^{C,x}(q) = a_c + b_c q,
+$$
+
+with $b_l < 0$ and $b_c > 0$. Market-order flows $N^a$ and $N^b$ are modeled
+with Hawkes processes.
+
+### Price Process
+
+The price is the anticipation of future order flow, allowing each market
+order's contribution to depend on available liquidity:
+
+$$
+P_t =
+P_0 + \lim_{T\to\infty}
+\mathbb{E}\left[
+\int_0^T \kappa(q^a_s)\,dN^a_s
+- \int_0^T \kappa(q^b_s)\,dN^b_s
+\middle| \mathcal{F}_t
+\right].
+$$
+
+Here $\kappa$ is the liquidity-dependent impact function.
 
 ### Conditional Impact
 
-With $c_\lambda := b_c - b_l$, we implement:
+For a metaorder $X^o$ executed on the ask side, the observed ask queue and
+price can be written as
 
-$$I(t) = c_\kappa \int_0^t (\bar{q}_s - q_s) \, dN_s + c_\kappa (\bar{q}_t - q_t) \cdot \mathcal{I}_t$$
+$$
+\bar{q}^{a,t}_s
+= q^a_0 + \bar{L}^{a,t}_s - \bar{C}^{a,t}_s - N^a_s + X^{o,t}_s,
+\qquad s \ge 0,
+$$
 
-where the following term admits a closed form relying on the resolvent operator $(\delta_0 - \varphi)^{-1}$:
+with $X^{o,t}_s := X^o_{s \wedge t}$. This covers passive metaorders
+($X^o=L^o$) and aggressive metaorders ($X^o=-N^o$). The market impact is
+
+$$
+MI(t) = \bar{P}_t - P_t.
+$$
+
+Conditional simulation gives a distribution of $MI(t)$ by comparing the
+observed and counterfactual queue paths under the same market history.
+
+### Passive Market Impact
+
+For a passive metaorder executed through limit orders, affine queue
+intensities, affine impact $\kappa(q)=c_\kappa q + d_\kappa$, and a
+sum-of-exponentials Hawkes kernel, the passive impact admits a closed form
+based on the resolvent operator $(\delta_0-\varphi)^{-1}$.
+
+In the single-queue notation used by the implementation, with
+$c_\lambda := b_c - b_l$, the impact has the form
+
+$$
+I(t)
+= c_\kappa \int_0^t (\bar{q}_s - q_s)\,dN_s
++ c_\kappa(\bar{q}_t - q_t)\mathcal{I}_t,
+$$
+
+where
+
 ```math
-\mathcal{I}_t = \int_t^\infty e^{-c_\lambda(s-t)} \mathbb{E}_t[\lambda_s] \, ds
+\mathcal{I}_t =
+\int_t^\infty e^{-c_\lambda(s-t)}\mathbb{E}_t[\lambda_s]\,ds.
 ```
+
+For fitted tail-propagator experiments, this is evaluated at consuming
+market-event times as
+
+```math
+MI_t =
+c_\kappa \int_0^t (\bar{q}^{a,t}_s-q^a_s)\,dN^a_s
++ c_\kappa(\bar{q}^{a,t}_t-q^a_t)
+\left(
+\zeta + \int_0^t \sum_{i=1}^m \gamma_i e^{-\beta_i(t-s)}\,dN^a_s
+\right).
+```
+
+### Aggressive Market Impact
+
+For aggressive metaorders, the strategy consumes liquidity directly through
+market orders. The propagator and hybrid models in `conditional_impact`
+compare the impacted queue path against the no-metaorder counterfactual and
+propagate the resulting order-flow shock through the price kernel.
 
 ## Modules
 
@@ -136,9 +238,15 @@ Four top-level experiment categories live under `experiments/`:
 | **Passive Impact** | Conditional impact from limit-order metaorders (single + double queue) | [`load_experiments/analysis.ipynb`](experiments/passive_impact/load_experiments/analysis.ipynb), [`custom_experiment/main.py`](experiments/passive_impact/custom_experiment/main.py) |
 | **Aggressive Impact** | Market-order impact under propagator and hybrid models | [`load_experiments/analysis.ipynb`](experiments/agressive_impact/load_experiments/analysis.ipynb), [`custom_experiment/main.py`](experiments/agressive_impact/custom_experiment/main.py) |
 | **Queue Simulation** | Counterfactual queue paths under a metaorder (no impact curve) | [`load_experiments/analysis.ipynb`](experiments/queue_simulation/load_experiments/analysis.ipynb), [`custom_experiment/main.py`](experiments/queue_simulation/custom_experiment/main.py) |
-| **Impact Cost** | Empirical passive execution-cost workflow using anchored queue snapshots, passive fill tracking, and reduced-form price impact | [`experiments/impact_cost/README.md`](experiments/impact_cost/README.md), [`COMPONENTS.md`](experiments/impact_cost/COMPONENTS.md), [`pipelines/`](experiments/impact_cost/pipelines/) |
+| **Impact Cost** | Empirical passive lifecycle execution-cost workflow using aggregate queue snapshots and tail-propagator price impact | [`README.md`](experiments/impact_cost/README.md), [`COMPONENTS.md`](experiments/impact_cost/COMPONENTS.md), [`load_experiments/`](experiments/impact_cost/load_experiments/) |
 
-Each `load_experiments/` folder contains the notebook, plot utilities, and a `data/` subtree where the Rust binaries write `.npy` files. `.npy` is gitignored — regenerate baselines by running the binaries below. Each `custom_experiment/` folder contains a single `main.py` whose top section is a config dataclass; edit and run.
+For the older simulation experiments, each `load_experiments/` folder contains
+the notebook, plot utilities, and a `data/` subtree where the Rust binaries
+write `.npy` files. The impact-cost `load_experiments/` folder instead uses a
+single `config.toml`, CSV outputs, and figure utilities. Generated data is
+gitignored unless explicitly promoted. Each `custom_experiment/` folder
+contains a single `main.py` whose top section is a config dataclass; edit and
+run.
 
 ### Run a custom experiment (Python — primary user path)
 
@@ -154,15 +262,21 @@ Outputs (`.npy` arrays) land in each folder's `output/` (gitignored). The Python
 
 ### Run the impact-cost workflow
 
-Impact-cost pipelines consume local parquet inputs under `experiments/impact_cost/data/` and write generated CSV/PNG/JSON outputs under `experiments/impact_cost/runs/`; both are gitignored except for README files. The native pieces are exposed through `simproj` for speed, while the experiment orchestration stays in Python:
+The canonical impact-cost experiment now lives under
+`experiments/impact_cost/load_experiments/`. Edit its `config.toml`, then run
+the lifecycle workflow:
 
 ```bash
-python -m experiments.impact_cost.pipelines.execution_latency_grid --help
-python -m experiments.impact_cost.pipelines.impact_cost_pipeline --help
-python -m experiments.impact_cost.pipelines.lifecycle_passive_cost_pipeline --help
+python -m experiments.impact_cost.load_experiments.lifecycle_passive_cost \
+  --config experiments/impact_cost/load_experiments/config.toml
 ```
 
-Start with [`experiments/impact_cost/README.md`](experiments/impact_cost/README.md) for the queue/price-sign conventions and [`experiments/impact_cost/COMPONENTS.md`](experiments/impact_cost/COMPONENTS.md) for file-by-file pipeline inputs and outputs.
+This lifecycle path is fixed to the tail-propagator impact model. CSV/JSON
+outputs land under `load_experiments/data/`; PNG figures land under
+`load_experiments/images/`. Older raw-fill inference and diagnostic scripts are
+kept under `experiments/impact_cost/archive/diagnostics/`.
+
+Start with [`experiments/impact_cost/README.md`](experiments/impact_cost/README.md) for the queue/price-sign conventions and [`experiments/impact_cost/COMPONENTS.md`](experiments/impact_cost/COMPONENTS.md) for the component map.
 
 ### Inspect pre-saved baselines (notebooks)
 

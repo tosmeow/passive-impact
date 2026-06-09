@@ -20,6 +20,10 @@ from experiments.impact_cost.core.cost_utils import (
     regroup_event_times_by_dim,
     track_passive_fills,
 )
+from experiments.impact_cost.core.experiment_utils import (
+    sample_previous_value,
+    select_limit_sequences,
+)
 from experiments.impact_cost.core.level_execution import (
     first_level_execution_events_from_snapshots,
     market_side_for_queue,
@@ -46,12 +50,10 @@ from experiments.impact_cost.core.reduced_form_impact import (
     passive_reduced_form_impact_from_queue_samples,
     propagator_impact_from_events,
 )
-from experiments.impact_cost.pipelines.impact_series_pipeline import (
+from experiments.impact_cost.core.queue_replay import replay_consistency_report
+from experiments.impact_cost.archive.diagnostics.impact_series_pipeline import (
     ImpactSeriesPipelineConfig,
-    _sample_previous_value,
-    _select_limit_sequences,
 )
-from experiments.impact_cost.pipelines.queue_pipeline import replay_consistency_report
 
 
 def _toy_df():
@@ -135,7 +137,7 @@ def test_impact_series_selector_samples_limit_sequences_with_span_constraint():
         market_side="B",
         seed=3,
     )
-    episodes, orders = _select_limit_sequences(df, cfg)
+    episodes, orders = select_limit_sequences(df, cfg)
 
     assert len(episodes) == 2
     assert set(episodes["selected_source_rows"]) == {"0,1,2", "3,4,5"}
@@ -143,7 +145,7 @@ def test_impact_series_selector_samples_limit_sequences_with_span_constraint():
 
 
 def test_sample_previous_value_aligns_impact_path_to_output_grid():
-    out = _sample_previous_value(
+    out = sample_previous_value(
         event_times=np.asarray([0.2, 0.5, 1.0]),
         event_values=np.asarray([1.0, -2.0, 4.0]),
         output_grid=np.asarray([0.0, 0.2, 0.49, 0.5, 0.9, 1.1]),
