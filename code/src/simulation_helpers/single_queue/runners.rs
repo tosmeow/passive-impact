@@ -1,7 +1,9 @@
-use crate::models::{AffineQueueProcess, MultivariateSimulationResult, QueuePath, MultivariateMarkovianIntensity};
+use crate::conditional_impact::{ImpactPath, TailImpact};
+use crate::models::{
+    AffineQueueProcess, MultivariateMarkovianIntensity, MultivariateSimulationResult, QueuePath,
+};
 use crate::simulation::ConditionalSimulationContext;
-use crate::conditional_impact::{TailImpact, ImpactPath};
-use crate::utils::{write_npy_f64, write_npy_u32, write_npy_f64_1d};
+use crate::utils::{write_npy_f64, write_npy_f64_1d, write_npy_u32};
 
 use rayon::prelude::*;
 
@@ -17,7 +19,9 @@ pub struct MemoryEfficientResults {
 }
 
 pub fn extract_event_type(result: &MultivariateSimulationResult, dim: usize) -> Vec<f64> {
-    result.events.iter()
+    result
+        .events
+        .iter()
         .filter(|e| e.dim == dim)
         .map(|e| e.time)
         .collect()
@@ -75,15 +79,24 @@ impl<'a, P: MultivariateMarkovianIntensity + Sync> ParallelSimulator<'a, P> {
                 );
 
                 let sim_result = ctx.simulate(None, Some(sim_idx as u64));
-                let sim_path = AffineQueueProcess::result_to_queue_path(&sim_result, self.initial_queue_size);
+                let sim_path =
+                    AffineQueueProcess::result_to_queue_path(&sim_result, self.initial_queue_size);
 
                 // ImpactPath::new takes (q_path, bar_q_path)
                 let impact_path = if self.simulating_bar_q {
                     // with_us: reference is q, simulated is bar_q
-                    ImpactPath::new(self.reference_path.clone(), sim_path.clone(), self.tail_impact)
+                    ImpactPath::new(
+                        self.reference_path.clone(),
+                        sim_path.clone(),
+                        self.tail_impact,
+                    )
                 } else {
                     // without_us: simulated is q, reference is bar_q
-                    ImpactPath::new(sim_path.clone(), self.reference_path.clone(), self.tail_impact)
+                    ImpactPath::new(
+                        sim_path.clone(),
+                        self.reference_path.clone(),
+                        self.tail_impact,
+                    )
                 };
 
                 let sim_samples = sample_queue_at_times(&sim_path, self.market_orders);
@@ -105,7 +118,8 @@ impl<'a, P: MultivariateMarkovianIntensity + Sync> ParallelSimulator<'a, P> {
         P::State: AsRef<[f64]> + Send,
     {
         // Compute reference samples once (shared across all simulations)
-        let reference_samples: Vec<u32> = sample_queue_at_times(self.reference_path, self.market_orders);
+        let reference_samples: Vec<u32> =
+            sample_queue_at_times(self.reference_path, self.market_orders);
 
         let results: Vec<(Vec<u32>, Vec<f64>)> = (0..n_simulations)
             .into_par_iter()
@@ -122,17 +136,25 @@ impl<'a, P: MultivariateMarkovianIntensity + Sync> ParallelSimulator<'a, P> {
                 let sim_samples = ctx.simulate_queue_at_times(
                     self.market_orders,
                     self.initial_queue_size,
-                    None,  // Use default initial state
+                    None, // Use default initial state
                     Some(sim_idx as u64),
                 );
 
                 // Memory-efficient: compute impact from pre-sampled queues
                 let impact_path = if self.simulating_bar_q {
                     // with_us: reference is q, simulated is bar_q
-                    ImpactPath::from_queue_samples(&reference_samples, &sim_samples, self.tail_impact)
+                    ImpactPath::from_queue_samples(
+                        &reference_samples,
+                        &sim_samples,
+                        self.tail_impact,
+                    )
                 } else {
                     // without_us: simulated is q, reference is bar_q
-                    ImpactPath::from_queue_samples(&sim_samples, &reference_samples, self.tail_impact)
+                    ImpactPath::from_queue_samples(
+                        &sim_samples,
+                        &reference_samples,
+                        self.tail_impact,
+                    )
                 };
 
                 (sim_samples, impact_path.impact_path)
@@ -158,20 +180,35 @@ pub fn write_results(
 
     let impact_data: Vec<f64> = (0..n_times)
         .flat_map(|t_idx| {
-            results.impact_paths.iter().map(move |path| {
-                path.get(t_idx).copied().unwrap_or(f64::NAN)
-            })
+            results
+                .impact_paths
+                .iter()
+                .map(move |path| path.get(t_idx).copied().unwrap_or(f64::NAN))
         })
         .collect();
-    write_npy_f64(&format!("{}/impact_paths.npy", output_dir), &impact_data, n_times, n_simulations)?;
+    write_npy_f64(
+        &format!("{}/impact_paths.npy", output_dir),
+        &impact_data,
+        n_times,
+        n_simulations,
+    )?;
 
     let queue_data: Vec<u32> = (0..n_times)
         .flat_map(|t_idx| {
-            std::iter::once(reference_queue_samples[t_idx])
-                .chain(results.queue_samples.iter().map(move |samples| samples[t_idx]))
+            std::iter::once(reference_queue_samples[t_idx]).chain(
+                results
+                    .queue_samples
+                    .iter()
+                    .map(move |samples| samples[t_idx]),
+            )
         })
         .collect();
-    write_npy_u32(&format!("{}/queue_paths.npy", output_dir), &queue_data, n_times, n_simulations + 1)?;
+    write_npy_u32(
+        &format!("{}/queue_paths.npy", output_dir),
+        &queue_data,
+        n_times,
+        n_simulations + 1,
+    )?;
 
     write_npy_f64_1d(&format!("{}/times.npy", output_dir), market_orders)?;
 
@@ -190,20 +227,35 @@ pub fn write_memory_efficient_results(
 
     let impact_data: Vec<f64> = (0..n_times)
         .flat_map(|t_idx| {
-            results.impact_paths.iter().map(move |path| {
-                path.get(t_idx).copied().unwrap_or(f64::NAN)
-            })
+            results
+                .impact_paths
+                .iter()
+                .map(move |path| path.get(t_idx).copied().unwrap_or(f64::NAN))
         })
         .collect();
-    write_npy_f64(&format!("{}/impact_paths.npy", output_dir), &impact_data, n_times, n_simulations)?;
+    write_npy_f64(
+        &format!("{}/impact_paths.npy", output_dir),
+        &impact_data,
+        n_times,
+        n_simulations,
+    )?;
 
     let queue_data: Vec<u32> = (0..n_times)
         .flat_map(|t_idx| {
-            std::iter::once(reference_queue_samples[t_idx])
-                .chain(results.queue_samples.iter().map(move |samples| samples[t_idx]))
+            std::iter::once(reference_queue_samples[t_idx]).chain(
+                results
+                    .queue_samples
+                    .iter()
+                    .map(move |samples| samples[t_idx]),
+            )
         })
         .collect();
-    write_npy_u32(&format!("{}/queue_paths.npy", output_dir), &queue_data, n_times, n_simulations + 1)?;
+    write_npy_u32(
+        &format!("{}/queue_paths.npy", output_dir),
+        &queue_data,
+        n_times,
+        n_simulations + 1,
+    )?;
 
     write_npy_f64_1d(&format!("{}/times.npy", output_dir), market_orders)?;
 
@@ -213,10 +265,12 @@ pub fn write_memory_efficient_results(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::conditional_impact::TailImpact;
     use crate::models::{AffineQueueProcess, MultiExponentialHawkes};
     use crate::simulation::{simulate, simulate_with_externals};
-    use crate::simulation_helpers::{hawkes_to_market_orders, merge_events, extract_events_by_dim, create_meta_orders};
-    use crate::conditional_impact::TailImpact;
+    use crate::simulation_helpers::{
+        create_meta_orders, extract_events_by_dim, hawkes_to_market_orders, merge_events,
+    };
 
     /// Verify that `run` and `run_memory_efficient` produce identical queue samples
     /// for the same seeds.  They use different code paths (full path scan vs.
@@ -238,7 +292,9 @@ mod tests {
 
         let hawkes = MultiExponentialHawkes::new_with_state(
             MultiExponentialHawkes::new(mu, alpha.clone(), beta.clone()).stationary_state(),
-            mu, alpha.clone(), beta.clone(),
+            mu,
+            alpha.clone(),
+            beta.clone(),
         );
         let hawkes_result = simulate(&hawkes, time_horizon, Some(99));
         let hawkes_as_market = hawkes_to_market_orders(&hawkes_result);
@@ -246,7 +302,8 @@ mod tests {
         let n_meta: u32 = 10;
         let meta_orders = create_meta_orders(n_meta, 1.0, 0.8 * time_horizon);
 
-        let q_result_internal = simulate_with_externals(&process, time_horizon, &hawkes_as_market, Some(99));
+        let q_result_internal =
+            simulate_with_externals(&process, time_horizon, &hawkes_as_market, Some(99));
         let q_result = merge_events(&q_result_internal, &hawkes_as_market);
         let q_path = AffineQueueProcess::result_to_queue_path(&q_result, initial_queue_size);
 
@@ -254,7 +311,12 @@ mod tests {
         let q_events_by_dim = extract_events_by_dim(&q_result_internal, 3, Some(2));
 
         let tail_impact = TailImpact::from_affine_queue(
-            mu, alpha.clone(), beta.clone(), b_l, b_c, market_orders.clone(),
+            mu,
+            alpha.clone(),
+            beta.clone(),
+            b_l,
+            b_c,
+            market_orders.clone(),
         );
 
         let bar_q_external = merge_events(&meta_orders, &hawkes_as_market);
@@ -281,8 +343,7 @@ mod tests {
 
         for sim_idx in 0..n_simulations {
             assert_eq!(
-                general_results.queue_samples[sim_idx],
-                efficient_results.queue_samples[sim_idx],
+                general_results.queue_samples[sim_idx], efficient_results.queue_samples[sim_idx],
                 "Queue samples differ at simulation {} (general vs memory-efficient)",
                 sim_idx
             );

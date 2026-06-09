@@ -34,12 +34,7 @@ pub struct MarkovianProcess {
 }
 
 impl MarkovianProcess {
-    pub fn new<F, G>(
-        dim: usize,
-        initial_state: Vec<f64>,
-        lambda: F,
-        state_constr: G,
-    ) -> Self
+    pub fn new<F, G>(dim: usize, initial_state: Vec<f64>, lambda: F, state_constr: G) -> Self
     where
         F: Fn(&[f64], f64, f64) -> Vec<f64> + Send + Sync + 'static,
         G: Fn(&[f64], &MultivariateEvent, f64, f64) -> Vec<f64> + Send + Sync + 'static,
@@ -77,8 +72,8 @@ impl MultivariateMarkovianIntensity for MarkovianProcess {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::simulation::simulate;
     use crate::models::MultiExponentialHawkes;
+    use crate::simulation::simulate;
 
     #[test]
     fn test_hawkes_simulate() {
@@ -128,9 +123,21 @@ mod tests {
     #[test]
     fn test_queue_path_creation() {
         let events = vec![
-            QueueEvent { queue_event: 0, queue_size: 10, time: 0.0 },
-            QueueEvent { queue_event: 1, queue_size: 11, time: 0.5 },
-            QueueEvent { queue_event: 3, queue_size: 10, time: 1.2 },
+            QueueEvent {
+                queue_event: 0,
+                queue_size: 10,
+                time: 0.0,
+            },
+            QueueEvent {
+                queue_event: 1,
+                queue_size: 11,
+                time: 0.5,
+            },
+            QueueEvent {
+                queue_event: 3,
+                queue_size: 10,
+                time: 1.2,
+            },
         ];
         let path = QueuePath { events };
         assert_eq!(path.events.len(), 3);
@@ -141,9 +148,11 @@ mod tests {
     #[test]
     fn test_queue_path_clone() {
         let path = QueuePath {
-            events: vec![
-                QueueEvent { queue_event: 0, queue_size: 5, time: 0.0 },
-            ],
+            events: vec![QueueEvent {
+                queue_event: 0,
+                queue_size: 5,
+                time: 0.0,
+            }],
         };
         let cloned = path.clone();
         assert_eq!(cloned.events.len(), 1);

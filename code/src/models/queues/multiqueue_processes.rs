@@ -1,4 +1,4 @@
-use crate::models::{MarkovianProcess, QueuePath, QueueEvent};
+use crate::models::{MarkovianProcess, QueueEvent, QueuePath};
 use crate::models::{MultivariateEvent, MultivariateSimulationResult};
 pub struct BidAskQueueProcess;
 
@@ -63,11 +63,16 @@ impl BidAskQueueProcess {
 
         Self::new_with_state(
             initial_state,
-            mu_a, mu_b,
-            alpha_a, beta_a,
-            alpha_b, beta_b,
-            lambda_l_a, lambda_c_a,
-            lambda_l_b, lambda_c_b,
+            mu_a,
+            mu_b,
+            alpha_a,
+            beta_a,
+            alpha_b,
+            beta_b,
+            lambda_l_a,
+            lambda_c_a,
+            lambda_l_b,
+            lambda_c_b,
         )
     }
 
@@ -93,12 +98,29 @@ impl BidAskQueueProcess {
         let m_a = alpha_a.len();
         let m_b = alpha_b.len();
 
-        assert_eq!(initial_state.len(), 2 + m_a + m_b,
-            "initial_state must have length 2 + alpha_a.len() + alpha_b.len()");
-        assert!(initial_state[0] >= 0.0, "initial ask queue must be non-negative");
-        assert!(initial_state[1] >= 0.0, "initial bid queue must be non-negative");
-        assert_eq!(alpha_a.len(), beta_a.len(), "alpha_a and beta_a must have same length");
-        assert_eq!(alpha_b.len(), beta_b.len(), "alpha_b and beta_b must have same length");
+        assert_eq!(
+            initial_state.len(),
+            2 + m_a + m_b,
+            "initial_state must have length 2 + alpha_a.len() + alpha_b.len()"
+        );
+        assert!(
+            initial_state[0] >= 0.0,
+            "initial ask queue must be non-negative"
+        );
+        assert!(
+            initial_state[1] >= 0.0,
+            "initial bid queue must be non-negative"
+        );
+        assert_eq!(
+            alpha_a.len(),
+            beta_a.len(),
+            "alpha_a and beta_a must have same length"
+        );
+        assert_eq!(
+            alpha_b.len(),
+            beta_b.len(),
+            "alpha_b and beta_b must have same length"
+        );
 
         let beta_a_lambda = beta_a.clone();
         let beta_b_lambda = beta_b.clone();
@@ -319,10 +341,14 @@ impl AffineBidAskQueueProcess {
         let c_b = params.lambda_c_b.clone();
 
         BidAskQueueProcess::new(
-            q0_a, q0_b,
-            mu_a, mu_b,
-            alpha_a, beta_a,
-            alpha_b, beta_b,
+            q0_a,
+            q0_b,
+            mu_a,
+            mu_b,
+            alpha_a,
+            beta_a,
+            alpha_b,
+            beta_b,
             move |q_a, q_b| l_a.compute(q_a, q_b),
             move |q_a, q_b| c_a.compute(q_a, q_b),
             move |q_a, q_b| l_b.compute(q_a, q_b),
@@ -353,11 +379,15 @@ impl AffineBidAskQueueProcess {
         };
 
         Self::new(
-            q0_a, q0_b,
+            q0_a,
+            q0_b,
             params,
-            mu, mu,
-            alpha.clone(), beta.clone(),
-            alpha, beta,
+            mu,
+            mu,
+            alpha.clone(),
+            beta.clone(),
+            alpha,
+            beta,
         )
     }
 
@@ -380,11 +410,7 @@ impl AffineBidAskQueueProcess {
         Self::new_queue(q0_a, q0_b, params)
     }
 
-    pub fn new_queue(
-        q0_a: f64,
-        q0_b: f64,
-        params: BidAskAffineParams,
-    ) -> MarkovianProcess {
+    pub fn new_queue(q0_a: f64, q0_b: f64, params: BidAskAffineParams) -> MarkovianProcess {
         let l_a = params.lambda_l_a.clone();
         let c_a = params.lambda_c_a.clone();
         let l_b = params.lambda_l_b.clone();
@@ -464,21 +490,29 @@ impl AffineBidAskQueueProcess {
         let branching_a: f64 = alpha_a.iter().zip(beta_a).map(|(a, b)| a / b).sum();
         let branching_b: f64 = alpha_b.iter().zip(beta_b).map(|(a, b)| a / b).sum();
 
-        assert!(branching_a < 1.0, "Ask Hawkes is not stationary (branching >= 1)");
-        assert!(branching_b < 1.0, "Bid Hawkes is not stationary (branching >= 1)");
+        assert!(
+            branching_a < 1.0,
+            "Ask Hawkes is not stationary (branching >= 1)"
+        );
+        assert!(
+            branching_b < 1.0,
+            "Bid Hawkes is not stationary (branching >= 1)"
+        );
 
         let mut state = vec![q0_a, q0_b];
 
         state.extend(
-            alpha_a.iter()
+            alpha_a
+                .iter()
                 .zip(beta_a)
-                .map(|(a, b)| a * mu_a / (b * (1.0 - branching_a)))
+                .map(|(a, b)| a * mu_a / (b * (1.0 - branching_a))),
         );
 
         state.extend(
-            alpha_b.iter()
+            alpha_b
+                .iter()
                 .zip(beta_b)
-                .map(|(a, b)| a * mu_b / (b * (1.0 - branching_b)))
+                .map(|(a, b)| a * mu_b / (b * (1.0 - branching_b))),
         );
 
         state
@@ -493,9 +527,14 @@ mod tests {
     #[test]
     fn test_bidask_symmetric_creation() {
         let process = AffineBidAskQueueProcess::new_symmetric(
-            10.0, 10.0,
-            5.0, -0.1, 0.0,
-            1.0, 0.2, 0.0,
+            10.0,
+            10.0,
+            5.0,
+            -0.1,
+            0.0,
+            1.0,
+            0.2,
+            0.0,
             1.0,
             vec![0.3],
             vec![1.0],
@@ -508,9 +547,14 @@ mod tests {
     #[test]
     fn test_bidask_queue_paths() {
         let process = AffineBidAskQueueProcess::new_symmetric(
-            10.0, 10.0,
-            5.0, -0.1, 0.0,
-            1.0, 0.2, 0.0,
+            10.0,
+            10.0,
+            5.0,
+            -0.1,
+            0.0,
+            1.0,
+            0.2,
+            0.0,
             1.0,
             vec![0.3],
             vec![1.0],
@@ -543,19 +587,32 @@ mod tests {
 
     #[test]
     fn test_dimension_enum() {
-        assert_eq!(BidAskDimension::from_usize(0), Some(BidAskDimension::LimitAsk));
-        assert_eq!(BidAskDimension::from_usize(2), Some(BidAskDimension::MarketAsk));
-        assert_eq!(BidAskDimension::from_usize(5), Some(BidAskDimension::MarketBid));
+        assert_eq!(
+            BidAskDimension::from_usize(0),
+            Some(BidAskDimension::LimitAsk)
+        );
+        assert_eq!(
+            BidAskDimension::from_usize(2),
+            Some(BidAskDimension::MarketAsk)
+        );
+        assert_eq!(
+            BidAskDimension::from_usize(5),
+            Some(BidAskDimension::MarketBid)
+        );
         assert_eq!(BidAskDimension::from_usize(6), None);
     }
 
     #[test]
     fn test_stationary_state() {
         let state = AffineBidAskQueueProcess::stationary_state(
-            10.0, 15.0,
-            1.0, 2.0,
-            &[0.3, 0.2], &[1.0, 2.0],
-            &[0.4], &[1.5],
+            10.0,
+            15.0,
+            1.0,
+            2.0,
+            &[0.3, 0.2],
+            &[1.0, 2.0],
+            &[0.4],
+            &[1.5],
         );
 
         assert_eq!(state.len(), 5);

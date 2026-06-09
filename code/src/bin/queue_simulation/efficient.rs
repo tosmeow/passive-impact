@@ -4,10 +4,12 @@
 //! computing the impact curve.
 
 use simulation_project::models::{AffineQueueProcess, MultiExponentialHawkes};
-use simulation_project::simulation::{simulate, simulate_with_externals, ConditionalSimulationContext};
+use simulation_project::simulation::{
+    simulate, simulate_with_externals, ConditionalSimulationContext,
+};
 use simulation_project::simulation_helpers::{
-    hawkes_to_market_orders, merge_events, create_meta_orders,
-    extract_events_by_dim, sample_queue_at_times,
+    create_meta_orders, extract_events_by_dim, hawkes_to_market_orders, merge_events,
+    sample_queue_at_times,
 };
 use simulation_project::utils::{write_npy_f64_1d, write_npy_u32};
 
@@ -40,14 +42,17 @@ fn main() {
     // ===== Pre-simulate Hawkes =====
     let hawkes = MultiExponentialHawkes::new_with_state(
         MultiExponentialHawkes::new(mu, alpha.clone(), beta.clone()).stationary_state(),
-        mu, alpha.clone(), beta.clone(),
+        mu,
+        alpha.clone(),
+        beta.clone(),
     );
     let hawkes_result = simulate(&hawkes, time_horizon, Some(42));
     let hawkes_as_market = hawkes_to_market_orders(&hawkes_result);
 
     // ===== Simulate baseline q =====
     let process = AffineQueueProcess::new_queue(initial_queue_size as f64, a_l, b_l, a_c, b_c);
-    let q_result_internal = simulate_with_externals(&process, time_horizon, &hawkes_as_market, Some(42));
+    let q_result_internal =
+        simulate_with_externals(&process, time_horizon, &hawkes_as_market, Some(42));
     let q_result = merge_events(&q_result_internal, &hawkes_as_market);
     let q_path = AffineQueueProcess::result_to_queue_path(&q_result, initial_queue_size);
 
@@ -66,28 +71,43 @@ fn main() {
     let q_at_times = sample_queue_at_times(&q_path, &times);
 
     let t0 = Instant::now();
-    let bar_q_paths: Vec<Vec<u32>> = (0..n_simulations).into_par_iter().map(|sim_idx| {
-        let ctx = ConditionalSimulationContext::new(
-            &process,
-            &q_events_by_dim,
-            Some(&hawkes_as_market),
-            Some(&bar_q_external),
-            time_horizon,
-        );
-        ctx.simulate_queue_at_times(&times, initial_queue_size, None, Some(sim_idx as u64))
-    }).collect();
-    println!("[TIMING] {} parallel simulations: {:?}", n_simulations, t0.elapsed());
+    let bar_q_paths: Vec<Vec<u32>> = (0..n_simulations)
+        .into_par_iter()
+        .map(|sim_idx| {
+            let ctx = ConditionalSimulationContext::new(
+                &process,
+                &q_events_by_dim,
+                Some(&hawkes_as_market),
+                Some(&bar_q_external),
+                time_horizon,
+            );
+            ctx.simulate_queue_at_times(&times, initial_queue_size, None, Some(sim_idx as u64))
+        })
+        .collect();
+    println!(
+        "[TIMING] {} parallel simulations: {:?}",
+        n_simulations,
+        t0.elapsed()
+    );
 
     // ===== Output =====
     let output_dir = "experiments/queue_simulation/load_experiments/data/single/efficient";
     std::fs::create_dir_all(output_dir).unwrap();
 
     // Queue paths: (n_times, n_simulations + 1) — first column = q, rest = bar_q_sim_i
-    let queue_data: Vec<u32> = (0..n_times).flat_map(|t_idx| {
-        std::iter::once(q_at_times[t_idx])
-            .chain(bar_q_paths.iter().map(move |bar_q| bar_q[t_idx]))
-    }).collect();
-    write_npy_u32(&format!("{}/queue_paths.npy", output_dir), &queue_data, n_times, n_simulations + 1).unwrap();
+    let queue_data: Vec<u32> = (0..n_times)
+        .flat_map(|t_idx| {
+            std::iter::once(q_at_times[t_idx])
+                .chain(bar_q_paths.iter().map(move |bar_q| bar_q[t_idx]))
+        })
+        .collect();
+    write_npy_u32(
+        &format!("{}/queue_paths.npy", output_dir),
+        &queue_data,
+        n_times,
+        n_simulations + 1,
+    )
+    .unwrap();
     write_npy_f64_1d(&format!("{}/times.npy", output_dir), &times).unwrap();
 
     println!("[TIMING] TOTAL: {:?}", t_total.elapsed());

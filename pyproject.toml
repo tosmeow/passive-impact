@@ -11,6 +11,7 @@ dev = [
     "jupyter>=1",
     "ipykernel>=6",
     "nbconvert>=7",
+    "pyarrow>=14",
 ]
 
 [build-system]

@@ -1,13 +1,13 @@
+use simulation_project::conditional_impact::{BidAskTailImpact, SymmetricCMatrix};
 use simulation_project::models::{
-    AffineBidAskQueueProcess, MultiExponentialHawkes, BidAskAffineParams, AffineIntensityParams,
+    AffineBidAskQueueProcess, AffineIntensityParams, BidAskAffineParams, MultiExponentialHawkes,
 };
 use simulation_project::simulation::{simulate, simulate_with_externals};
 use simulation_project::simulation_helpers::{
-    hawkes_pair_to_market_orders, merge_bidask_events, create_bidask_meta_orders, Side,
-    extract_bidask_events_by_dim, sample_ask_queue_at_times, sample_bid_queue_at_times,
-    BidAskParallelSimulator, write_bidask_memory_efficient_results,
+    create_bidask_meta_orders, extract_bidask_events_by_dim, hawkes_pair_to_market_orders,
+    merge_bidask_events, sample_ask_queue_at_times, sample_bid_queue_at_times,
+    write_bidask_memory_efficient_results, BidAskParallelSimulator, Side,
 };
-use simulation_project::conditional_impact::{BidAskTailImpact, SymmetricCMatrix};
 
 use std::time::Instant;
 
@@ -46,10 +46,16 @@ fn main() {
     let meta_side = Side::Ask;
 
     println!("=== Bid-Ask Paths WITH Us (Memory-Efficient) ===");
-    println!("Time horizon: {}, Simulations: {}", time_horizon, n_simulations);
+    println!(
+        "Time horizon: {}, Simulations: {}",
+        time_horizon, n_simulations
+    );
     println!("Initial queues: ask={}, bid={}", initial_q_a, initial_q_b);
 
-    assert!(decoupled, "Memory-efficient version requires decoupled mode");
+    assert!(
+        decoupled,
+        "Memory-efficient version requires decoupled mode"
+    );
 
     // Build C matrix for impact computation
     let c_matrix = SymmetricCMatrix::from_affine_symmetric(b_l_own, b_l_cross, b_c_own, b_c_cross);
@@ -67,44 +73,57 @@ fn main() {
         lambda_c_b: AffineIntensityParams::new(a_c, b_c_cross, b_c_own),
     };
 
-    let process = AffineBidAskQueueProcess::new_queue(
-        initial_q_a as f64, initial_q_b as f64, params.clone()
-    );
+    let process =
+        AffineBidAskQueueProcess::new_queue(initial_q_a as f64, initial_q_b as f64, params.clone());
 
     // Pre-simulate both Hawkes paths (same seeds as original for comparison)
     let hawkes_a = MultiExponentialHawkes::new_with_state(
         MultiExponentialHawkes::new(mu, alpha.clone(), beta.clone()).stationary_state(),
-        mu, alpha.clone(), beta.clone(),
+        mu,
+        alpha.clone(),
+        beta.clone(),
     );
     let hawkes_b = MultiExponentialHawkes::new_with_state(
         MultiExponentialHawkes::new(mu, alpha.clone(), beta.clone()).stationary_state(),
-        mu, alpha.clone(), beta.clone(),
+        mu,
+        alpha.clone(),
+        beta.clone(),
     );
 
     let hawkes_a_result = simulate(&hawkes_a, time_horizon, Some(42));
     let hawkes_b_result = simulate(&hawkes_b, time_horizon, Some(43));
 
-    println!("[TIMING] Hawkes pre-simulation: {:?} (ask: {} events, bid: {} events)",
-        t0.elapsed(), hawkes_a_result.events.len(), hawkes_b_result.events.len());
+    println!(
+        "[TIMING] Hawkes pre-simulation: {:?} (ask: {} events, bid: {} events)",
+        t0.elapsed(),
+        hawkes_a_result.events.len(),
+        hawkes_b_result.events.len()
+    );
 
     let hawkes_as_market = hawkes_pair_to_market_orders(&hawkes_a_result, &hawkes_b_result);
 
     // Simulate q paths without meta orders
     let t0 = Instant::now();
-    let q_result_internal = simulate_with_externals(
-        &process, time_horizon, &hawkes_as_market, Some(42)
-    );
+    let q_result_internal =
+        simulate_with_externals(&process, time_horizon, &hawkes_as_market, Some(42));
     let q_result = merge_bidask_events(&q_result_internal, &hawkes_as_market);
-    let q_paths = AffineBidAskQueueProcess::result_to_queue_paths(
-        &q_result, initial_q_a, initial_q_b
+    let q_paths =
+        AffineBidAskQueueProcess::result_to_queue_paths(&q_result, initial_q_a, initial_q_b);
+    println!(
+        "[TIMING] q simulation: {:?} (ask: {} events, bid: {} events)",
+        t0.elapsed(),
+        q_paths.ask.events.len(),
+        q_paths.bid.events.len()
     );
-    println!("[TIMING] q simulation: {:?} (ask: {} events, bid: {} events)",
-        t0.elapsed(), q_paths.ask.events.len(), q_paths.bid.events.len());
 
     // Extract market orders
     let ask_market_orders: Vec<f64> = hawkes_a_result.events.iter().map(|e| e.time).collect();
     let bid_market_orders: Vec<f64> = hawkes_b_result.events.iter().map(|e| e.time).collect();
-    println!("Market orders: ask={}, bid={}", ask_market_orders.len(), bid_market_orders.len());
+    println!(
+        "Market orders: ask={}, bid={}",
+        ask_market_orders.len(),
+        bid_market_orders.len()
+    );
 
     // Build conditioning events (exclude dims 2 and 5 - market orders are external)
     let q_events_by_dim = extract_bidask_events_by_dim(&q_result_internal, Some(&[2, 5]));
@@ -117,7 +136,9 @@ fn main() {
 
     let t0 = Instant::now();
     let tail_impact = BidAskTailImpact::new_symmetric_hawkes(
-        mu, alpha.clone(), beta.clone(),
+        mu,
+        alpha.clone(),
+        beta.clone(),
         c_matrix.clone(),
         ask_market_orders.clone(),
         bid_market_orders.clone(),
@@ -150,7 +171,11 @@ fn main() {
         simulating_bar_q: true,
     };
     let results = simulator.run_memory_efficient(n_simulations);
-    println!("[TIMING] Parallel simulations ({}x, memory-efficient): {:?}", n_simulations, t0.elapsed());
+    println!(
+        "[TIMING] Parallel simulations ({}x, memory-efficient): {:?}",
+        n_simulations,
+        t0.elapsed()
+    );
 
     // ==========================================================================
     // Output
@@ -163,7 +188,8 @@ fn main() {
         &ask_market_orders,
         &bid_market_orders,
         "experiments/passive_impact/load_experiments/data/double/efficient/with",
-    ).unwrap();
+    )
+    .unwrap();
     println!("[TIMING] Data write: {:?}", t0.elapsed());
     println!("[TIMING] TOTAL: {:?}", t_total.elapsed());
 }

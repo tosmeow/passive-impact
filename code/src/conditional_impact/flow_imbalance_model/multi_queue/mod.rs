@@ -1,5 +1,3 @@
 mod bidask_impact;
 
-pub use bidask_impact::{
-    SymmetricCMatrix, ModeTailImpact, BidAskTailImpact, BidAskImpactPath,
-};
+pub use bidask_impact::{BidAskImpactPath, BidAskTailImpact, ModeTailImpact, SymmetricCMatrix};

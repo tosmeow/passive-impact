@@ -1,4 +1,6 @@
-use crate::models::{MultivariateMarkovianIntensity, MultivariateEvent, MultivariateSimulationResult};
+use crate::models::{
+    MultivariateEvent, MultivariateMarkovianIntensity, MultivariateSimulationResult,
+};
 use crate::simulation_helpers::{create_rng, sample_exponential, sample_uniform};
 
 pub trait MarkovianProcessSimulator: MultivariateMarkovianIntensity {
@@ -33,7 +35,8 @@ impl<P: MultivariateMarkovianIntensity> MarkovianProcessSimulator for P {
         let mut ext_idx = 0;
 
         while t < t_max {
-            let t_ext = external_trajectory.events
+            let t_ext = external_trajectory
+                .events
                 .get(ext_idx)
                 .map(|e| e.time)
                 .unwrap_or(f64::INFINITY);
@@ -194,9 +197,7 @@ mod tests {
     #[test]
     fn test_simulate_equals_simulate_with_empty_externals() {
         // Test k=1 case (single dimension)
-        let model_k1 = IndependentPoissons {
-            lambdas: vec![2.0],
-        };
+        let model_k1 = IndependentPoissons { lambdas: vec![2.0] };
 
         let empty = MultivariateSimulationResult::new(1);
         let result1 = model_k1.simulate(50.0, Some(42));
@@ -255,7 +256,10 @@ mod tests {
             assert!(
                 (mean - expected).abs() < tol,
                 "dim {} mean {:.2} vs expected {:.2} (tol {:.2})",
-                d, mean, expected, tol,
+                d,
+                mean,
+                expected,
+                tol,
             );
         }
     }
@@ -288,7 +292,9 @@ mod tests {
         assert!(
             (mean - expected).abs() < tol,
             "Hawkes mean {:.2} vs expected {:.2} (tol {:.2})",
-            mean, expected, tol,
+            mean,
+            expected,
+            tol,
         );
     }
 
@@ -300,10 +306,19 @@ mod tests {
         impl MultivariateMarkovianIntensity for DecayingProcess {
             type State = f64;
 
-            fn dim(&self) -> usize { 3 }
-            fn initial_state(&self) -> Self::State { 0.0 }
+            fn dim(&self) -> usize {
+                3
+            }
+            fn initial_state(&self) -> Self::State {
+                0.0
+            }
 
-            fn intensities_from_state(&self, &t_last_event: &Self::State, t: f64, _t_last: f64) -> Vec<f64> {
+            fn intensities_from_state(
+                &self,
+                &t_last_event: &Self::State,
+                t: f64,
+                _t_last: f64,
+            ) -> Vec<f64> {
                 let decay = (-0.5 * (t - t_last_event)).exp();
                 vec![2.0 * decay, 1.0 * decay, 0.5 * decay]
             }
@@ -336,7 +351,9 @@ mod tests {
             assert!(
                 (frac - expected_fracs[d]).abs() < 0.05,
                 "dim {} fraction {:.4} vs expected {:.4}",
-                d, frac, expected_fracs[d],
+                d,
+                frac,
+                expected_fracs[d],
             );
         }
     }
@@ -355,10 +372,15 @@ mod tests {
         let mut counts = vec![0usize; n_runs];
         for i in 0..n_runs {
             let ext = simulate(&external_hawkes, t_max, Some(i as u64 + 2_000_000));
-            counts[i] = simulate_with_externals(&hawkes, t_max, &ext, Some(i as u64)).events.len();
+            counts[i] = simulate_with_externals(&hawkes, t_max, &ext, Some(i as u64))
+                .events
+                .len();
         }
 
         let mean: f64 = counts.iter().sum::<usize>() as f64 / n_runs as f64;
-        assert!(mean > 0.0, "Expected non-zero mean event count with externals");
+        assert!(
+            mean > 0.0,
+            "Expected non-zero mean event count with externals"
+        );
     }
 }

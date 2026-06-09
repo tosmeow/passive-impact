@@ -1,5 +1,5 @@
-use crate::models::{MarkovianProcess};
-use crate::models::{MultivariateMarkovianIntensity, MultivariateEvent};
+use crate::models::MarkovianProcess;
+use crate::models::{MultivariateEvent, MultivariateMarkovianIntensity};
 
 // Multi-exponential Hawkes process built on MarkovianProcess.
 pub struct MultiExponentialHawkes {
@@ -46,13 +46,29 @@ impl MultiExponentialHawkes {
         Self::new_with_state(vec![0.0; m], mu, alpha, beta)
     }
 
-    pub fn new_with_state(initial_state: Vec<f64>, mu: f64, alpha: Vec<f64>, beta: Vec<f64>) -> Self {
+    pub fn new_with_state(
+        initial_state: Vec<f64>,
+        mu: f64,
+        alpha: Vec<f64>,
+        beta: Vec<f64>,
+    ) -> Self {
         assert!(mu >= 0.0, "mu must be non-negative");
-        assert_eq!(alpha.len(), beta.len(), "alpha and beta must have same length");
+        assert_eq!(
+            alpha.len(),
+            beta.len(),
+            "alpha and beta must have same length"
+        );
         assert!(!alpha.is_empty(), "must have at least one component");
-        assert!(alpha.iter().all(|&a| a >= 0.0), "all alpha must be non-negative");
+        assert!(
+            alpha.iter().all(|&a| a >= 0.0),
+            "all alpha must be non-negative"
+        );
         assert!(beta.iter().all(|&b| b > 0.0), "all beta must be positive");
-        assert_eq!(initial_state.len(), alpha.len(), "initial_state must have length alpha.len()");
+        assert_eq!(
+            initial_state.len(),
+            alpha.len(),
+            "initial_state must have length alpha.len()"
+        );
 
         let beta_lambda = beta.to_vec();
         let alpha_state = alpha.to_vec();
@@ -77,19 +93,26 @@ impl MultiExponentialHawkes {
                     .zip(alpha_state.iter().zip(beta_state.iter()))
                     .map(|(&s, (&a, &b))| s * (-b * dt).exp() + a)
                     .collect()
-            });
+            },
+        );
 
-        Self { mu, alpha, beta, inner }
+        Self {
+            mu,
+            alpha,
+            beta,
+            inner,
+        }
     }
 
     pub fn stationary_state(&self) -> Vec<f64> {
-        let branching_ratio: f64 = self.alpha.iter()
-            .zip(&self.beta)
-            .map(|(a, b)| a / b)
-            .sum();
-        assert!(branching_ratio < 1.0, "process is not stationary (branching_ratio >= 1)");
+        let branching_ratio: f64 = self.alpha.iter().zip(&self.beta).map(|(a, b)| a / b).sum();
+        assert!(
+            branching_ratio < 1.0,
+            "process is not stationary (branching_ratio >= 1)"
+        );
 
-        self.alpha.iter()
+        self.alpha
+            .iter()
             .zip(&self.beta)
             .map(|(a, b)| a * self.mu / (b * (1.0 - branching_ratio)))
             .collect()

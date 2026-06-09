@@ -15,12 +15,22 @@ create_meta_orders_from_times = _native.create_meta_orders_from_times
 events_to_dim = _native.events_to_dim
 extract_events_by_dim = _native.extract_events_by_dim
 sample_queue_at_times = _native.sample_queue_at_times
+simulate_anchored_affine_queue = _native.simulate_anchored_affine_queue
+select_limit_flags_first_every = _native.select_limit_flags_first_every
+select_limit_flags_indices = _native.select_limit_flags_indices
+select_limit_flags_random_fraction = _native.select_limit_flags_random_fraction
+track_passive_fills = _native.track_passive_fills
+simulate_execution_latency_grid = _native.simulate_execution_latency_grid
 ConditionalSimulationContext = _native.ConditionalSimulationContext
 TailImpact = _native.TailImpact
 AggressiveImpactPath = _native.AggressiveImpactPath
 aggressive_impact_from_queue_samples = _native.aggressive_impact_from_queue_samples
 aggressive_impact_from_queue_samples_hybrid = _native.aggressive_impact_from_queue_samples_hybrid
 compute_impact_path = _native.compute_impact_path
+passive_flow_impact_from_queue_samples = _native.passive_flow_impact_from_queue_samples
+passive_tail_propagator_impact_from_queue_samples = (
+    _native.passive_tail_propagator_impact_from_queue_samples
+)
 
 __version__ = _native.__version__
 

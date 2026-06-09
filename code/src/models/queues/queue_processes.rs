@@ -1,4 +1,4 @@
-use crate::models::{MarkovianProcess, QueuePath, QueueEvent};
+use crate::models::{MarkovianProcess, QueueEvent, QueuePath};
 use crate::models::{MultivariateEvent, MultivariateSimulationResult};
 
 pub struct QueueProcess;
@@ -40,10 +40,20 @@ impl QueueProcess {
         G: Fn(f64) -> f64 + Send + Sync + 'static,
     {
         let m = alpha.len();
-        assert!(initial_state.len() == 1 + m, "initial_state must have length 1 + alpha.len()");
-        assert!(initial_state[0] >= 0.0, "initial queue must be non-negative");
+        assert!(
+            initial_state.len() == 1 + m,
+            "initial_state must have length 1 + alpha.len()"
+        );
+        assert!(
+            initial_state[0] >= 0.0,
+            "initial queue must be non-negative"
+        );
         assert!(mu >= 0.0, "mu must be non-negative");
-        assert_eq!(alpha.len(), beta.len(), "alpha and beta must have same length");
+        assert_eq!(
+            alpha.len(),
+            beta.len(),
+            "alpha and beta must have same length"
+        );
         assert!(!alpha.is_empty(), "must have at least one Hawkes component");
 
         let beta_lambda = beta.clone();
@@ -65,9 +75,9 @@ impl QueueProcess {
                 let lambda_n = mu + hawkes_excitation;
 
                 vec![
-                    lambda_l(q).max(0.0),  // dim 0: limit orders
-                    lambda_c(q).max(0.0),  // dim 1: cancel orders
-                    lambda_n,               // dim 2: market orders (Hawkes)
+                    lambda_l(q).max(0.0), // dim 0: limit orders
+                    lambda_c(q).max(0.0), // dim 1: cancel orders
+                    lambda_n,             // dim 2: market orders (Hawkes)
                 ]
             },
             move |state: &[f64], event: &MultivariateEvent, t: f64, t_prev: f64| {
@@ -109,7 +119,10 @@ impl QueueProcess {
         state[0]
     }
 
-    pub fn result_to_queue_path(result: &MultivariateSimulationResult, initial_q: u32) -> QueuePath {
+    pub fn result_to_queue_path(
+        result: &MultivariateSimulationResult,
+        initial_q: u32,
+    ) -> QueuePath {
         let mut events = vec![QueueEvent {
             queue_event: 0,
             queue_size: initial_q,
@@ -119,9 +132,9 @@ impl QueueProcess {
         let mut q = initial_q as i64;
         for event in &result.events {
             match event.dim {
-                0 => q += 1,              // Limit order: q += 1
-                1 => q = (q - 1).max(0),  // Cancel order: q -= 1
-                2 => q = (q - 1).max(0),  // Market order: q -= 1
+                0 => q += 1,             // Limit order: q += 1
+                1 => q = (q - 1).max(0), // Cancel order: q -= 1
+                2 => q = (q - 1).max(0), // Market order: q -= 1
                 _ => {}
             }
             events.push(QueueEvent {
@@ -196,30 +209,24 @@ impl AffineQueueProcess {
     // process can be pre-simulated separately.
     //
     // State is just `[q]` instead of `[q, h0, h1, ..., h_k]`.
-    pub fn new_queue(
-        q0: f64,
-        a_l: f64,
-        b_l: f64,
-        a_c: f64,
-        b_c: f64,
-    ) -> MarkovianProcess {
+    pub fn new_queue(q0: f64, a_l: f64, b_l: f64, a_c: f64, b_c: f64) -> MarkovianProcess {
         MarkovianProcess::new(
-            3,  // Still 3 dimensions: limit (0), cancel (1), market (2)
-            vec![q0],  // State is just queue size
+            3,        // Still 3 dimensions: limit (0), cancel (1), market (2)
+            vec![q0], // State is just queue size
             move |state: &[f64], _t: f64, _t_last: f64| {
                 let q = state[0];
                 vec![
-                    (a_l + b_l * q).max(0.0),  // dim 0: limit orders
-                    (a_c + b_c * q).max(0.0),  // dim 1: cancel orders
-                    0.0,                        // dim 2: market orders (external)
+                    (a_l + b_l * q).max(0.0), // dim 0: limit orders
+                    (a_c + b_c * q).max(0.0), // dim 1: cancel orders
+                    0.0,                      // dim 2: market orders (external)
                 ]
             },
             move |state: &[f64], event: &MultivariateEvent, _t: f64, _t_prev: f64| {
                 let q = state[0];
                 let new_q = match event.dim {
-                    0 => q + 1.0,              // Limit order: q += 1
-                    1 => (q - 1.0).max(0.0),   // Cancel order: q -= 1
-                    2 => (q - 1.0).max(0.0),   // Market order: q -= 1
+                    0 => q + 1.0,            // Limit order: q += 1
+                    1 => (q - 1.0).max(0.0), // Cancel order: q -= 1
+                    2 => (q - 1.0).max(0.0), // Market order: q -= 1
                     _ => q,
                 };
                 vec![new_q]
@@ -262,23 +269,27 @@ impl AffineQueueProcess {
     // This allows starting the simulation at the Hawkes stationary distribution,
     // avoiding warmup time.
     pub fn stationary_state(q0: f64, mu: f64, alpha: &[f64], beta: &[f64]) -> Vec<f64> {
-        let branching_ratio: f64 = alpha.iter()
-            .zip(beta)
-            .map(|(a, b)| a / b)
-            .sum();
-        assert!(branching_ratio < 1.0, "Hawkes process is not stationary (branching_ratio >= 1)");
+        let branching_ratio: f64 = alpha.iter().zip(beta).map(|(a, b)| a / b).sum();
+        assert!(
+            branching_ratio < 1.0,
+            "Hawkes process is not stationary (branching_ratio >= 1)"
+        );
 
         let mut state = vec![q0];
         state.extend(
-            alpha.iter()
+            alpha
+                .iter()
                 .zip(beta)
-                .map(|(a, b)| a * mu / (b * (1.0 - branching_ratio)))
+                .map(|(a, b)| a * mu / (b * (1.0 - branching_ratio))),
         );
         state
     }
 
     /// Convert a MultivariateSimulationResult to a QueuePath.
-    pub fn result_to_queue_path(result: &MultivariateSimulationResult, initial_q: u32) -> QueuePath {
+    pub fn result_to_queue_path(
+        result: &MultivariateSimulationResult,
+        initial_q: u32,
+    ) -> QueuePath {
         QueueProcess::result_to_queue_path(result, initial_q)
     }
 }

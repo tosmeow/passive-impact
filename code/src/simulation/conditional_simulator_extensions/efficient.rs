@@ -33,19 +33,28 @@ impl<'a, P: MultivariateMarkovianIntensity> ConditionalSimulationContext<'a, P> 
         let mut cond_ext_idx = 0;
         let mut new_ext_idx = 0;
 
-        let mut next_cond_times: Vec<f64> = self.conditioning_events_by_dim
+        let mut next_cond_times: Vec<f64> = self
+            .conditioning_events_by_dim
             .iter()
             .map(|events| events.first().copied().unwrap_or(f64::INFINITY))
             .collect();
 
         while t < self.t_max {
-            let cond_intensities = self.process.intensities_from_state(&cond_state, t, t_last_cond);
-            let new_intensities = self.process.intensities_from_state(&new_state, t, t_last_new);
+            let cond_intensities = self
+                .process
+                .intensities_from_state(&cond_state, t, t_last_cond);
+            let new_intensities = self
+                .process
+                .intensities_from_state(&new_state, t, t_last_new);
 
-            let cond_ext_event = self.conditioning_external_events.and_then(|ext| ext.events.get(cond_ext_idx));
+            let cond_ext_event = self
+                .conditioning_external_events
+                .and_then(|ext| ext.events.get(cond_ext_idx));
             let t_cond_ext = cond_ext_event.map(|e| e.time).unwrap_or(f64::INFINITY);
 
-            let new_ext_event = self.new_external_events.and_then(|ext| ext.events.get(new_ext_idx));
+            let new_ext_event = self
+                .new_external_events
+                .and_then(|ext| ext.events.get(new_ext_idx));
             let t_new_ext = new_ext_event.map(|e| e.time).unwrap_or(f64::INFINITY);
 
             let (next_cond_internal_dim, next_cond_internal_time) = next_cond_times
@@ -83,7 +92,8 @@ impl<'a, P: MultivariateMarkovianIntensity> ConditionalSimulationContext<'a, P> 
                 independent_tau,
             ];
 
-            let (_argmin, &tau_min) = taus.iter()
+            let (_argmin, &tau_min) = taus
+                .iter()
                 .enumerate()
                 .min_by(|a, b| a.1.partial_cmp(b.1).unwrap())
                 .unwrap();
@@ -105,7 +115,8 @@ impl<'a, P: MultivariateMarkovianIntensity> ConditionalSimulationContext<'a, P> 
 
             if taus[0] == tau_min {
                 if let Some(ext_event) = cond_ext_event {
-                    self.process.update_state(&mut cond_state, ext_event.dim, t, t_last_cond);
+                    self.process
+                        .update_state(&mut cond_state, ext_event.dim, t, t_last_cond);
                     t_last_cond = t;
                     cond_ext_idx += 1;
                 }
@@ -113,7 +124,8 @@ impl<'a, P: MultivariateMarkovianIntensity> ConditionalSimulationContext<'a, P> 
 
             if taus[1] == tau_min {
                 if let Some(ext_event) = new_ext_event {
-                    self.process.update_state(&mut new_state, ext_event.dim, t, t_last_new);
+                    self.process
+                        .update_state(&mut new_state, ext_event.dim, t, t_last_new);
                     t_last_new = t;
                     new_ext_idx += 1;
                     // Update queue from state
@@ -123,29 +135,41 @@ impl<'a, P: MultivariateMarkovianIntensity> ConditionalSimulationContext<'a, P> 
             }
 
             if taus[2] == tau_min {
-                let cond_int = self.process.intensities_from_state(&cond_state, t, t_last_cond)[next_cond_internal_dim];
+                let cond_int = self
+                    .process
+                    .intensities_from_state(&cond_state, t, t_last_cond)[next_cond_internal_dim];
 
                 if cond_int > EPSILON {
                     let u = sample_uniform(&mut rng);
-                    let new_int = self.process.intensities_from_state(&new_state, t, t_last_new)[next_cond_internal_dim];
+                    let new_int = self
+                        .process
+                        .intensities_from_state(&new_state, t, t_last_new)[next_cond_internal_dim];
                     if u * cond_int <= new_int {
-                        self.process.update_state(&mut new_state, next_cond_internal_dim, t, t_last_new);
+                        self.process.update_state(
+                            &mut new_state,
+                            next_cond_internal_dim,
+                            t,
+                            t_last_new,
+                        );
                         t_last_new = t;
                         current_queue = new_state.as_ref()[0].max(0.0) as u32;
                         queue_updated = true;
                     }
                 }
 
-                self.process.update_state(&mut cond_state, next_cond_internal_dim, t, t_last_cond);
+                self.process
+                    .update_state(&mut cond_state, next_cond_internal_dim, t, t_last_cond);
                 t_last_cond = t;
 
                 cond_indices[next_cond_internal_dim] += 1;
-                next_cond_times[next_cond_internal_dim] = self.conditioning_events_by_dim[next_cond_internal_dim]
+                next_cond_times[next_cond_internal_dim] = self.conditioning_events_by_dim
+                    [next_cond_internal_dim]
                     .get(cond_indices[next_cond_internal_dim])
                     .copied()
                     .unwrap_or(f64::INFINITY);
             } else if taus[3] == tau_min {
-                self.process.update_state(&mut new_state, independent_dim, t, t_last_new);
+                self.process
+                    .update_state(&mut new_state, independent_dim, t, t_last_new);
                 t_last_new = t;
                 current_queue = new_state.as_ref()[0].max(0.0) as u32;
                 queue_updated = true;
@@ -202,19 +226,28 @@ impl<'a, P: MultivariateMarkovianIntensity> ConditionalSimulationContext<'a, P> 
         let mut cond_ext_idx = 0;
         let mut new_ext_idx = 0;
 
-        let mut next_cond_times: Vec<f64> = self.conditioning_events_by_dim
+        let mut next_cond_times: Vec<f64> = self
+            .conditioning_events_by_dim
             .iter()
             .map(|events| events.first().copied().unwrap_or(f64::INFINITY))
             .collect();
 
         while t < self.t_max {
-            let cond_intensities = self.process.intensities_from_state(&cond_state, t, t_last_cond);
-            let new_intensities = self.process.intensities_from_state(&new_state, t, t_last_new);
+            let cond_intensities = self
+                .process
+                .intensities_from_state(&cond_state, t, t_last_cond);
+            let new_intensities = self
+                .process
+                .intensities_from_state(&new_state, t, t_last_new);
 
-            let cond_ext_event = self.conditioning_external_events.and_then(|ext| ext.events.get(cond_ext_idx));
+            let cond_ext_event = self
+                .conditioning_external_events
+                .and_then(|ext| ext.events.get(cond_ext_idx));
             let t_cond_ext = cond_ext_event.map(|e| e.time).unwrap_or(f64::INFINITY);
 
-            let new_ext_event = self.new_external_events.and_then(|ext| ext.events.get(new_ext_idx));
+            let new_ext_event = self
+                .new_external_events
+                .and_then(|ext| ext.events.get(new_ext_idx));
             let t_new_ext = new_ext_event.map(|e| e.time).unwrap_or(f64::INFINITY);
 
             let (next_cond_internal_dim, next_cond_internal_time) = next_cond_times
@@ -252,7 +285,8 @@ impl<'a, P: MultivariateMarkovianIntensity> ConditionalSimulationContext<'a, P> 
                 independent_tau,
             ];
 
-            let (_argmin, &tau_min) = taus.iter()
+            let (_argmin, &tau_min) = taus
+                .iter()
                 .enumerate()
                 .min_by(|a, b| a.1.partial_cmp(b.1).unwrap())
                 .unwrap();
@@ -275,7 +309,8 @@ impl<'a, P: MultivariateMarkovianIntensity> ConditionalSimulationContext<'a, P> 
 
             if taus[0] == tau_min {
                 if let Some(ext_event) = cond_ext_event {
-                    self.process.update_state(&mut cond_state, ext_event.dim, t, t_last_cond);
+                    self.process
+                        .update_state(&mut cond_state, ext_event.dim, t, t_last_cond);
                     t_last_cond = t;
                     cond_ext_idx += 1;
                 }
@@ -283,7 +318,8 @@ impl<'a, P: MultivariateMarkovianIntensity> ConditionalSimulationContext<'a, P> 
 
             if taus[1] == tau_min {
                 if let Some(ext_event) = new_ext_event {
-                    self.process.update_state(&mut new_state, ext_event.dim, t, t_last_new);
+                    self.process
+                        .update_state(&mut new_state, ext_event.dim, t, t_last_new);
                     t_last_new = t;
                     new_ext_idx += 1;
                     // Update queues from state
@@ -295,13 +331,22 @@ impl<'a, P: MultivariateMarkovianIntensity> ConditionalSimulationContext<'a, P> 
             }
 
             if taus[2] == tau_min {
-                let cond_int = self.process.intensities_from_state(&cond_state, t, t_last_cond)[next_cond_internal_dim];
+                let cond_int = self
+                    .process
+                    .intensities_from_state(&cond_state, t, t_last_cond)[next_cond_internal_dim];
 
                 if cond_int > EPSILON {
                     let u = sample_uniform(&mut rng);
-                    let new_int = self.process.intensities_from_state(&new_state, t, t_last_new)[next_cond_internal_dim];
+                    let new_int = self
+                        .process
+                        .intensities_from_state(&new_state, t, t_last_new)[next_cond_internal_dim];
                     if u * cond_int <= new_int {
-                        self.process.update_state(&mut new_state, next_cond_internal_dim, t, t_last_new);
+                        self.process.update_state(
+                            &mut new_state,
+                            next_cond_internal_dim,
+                            t,
+                            t_last_new,
+                        );
                         t_last_new = t;
                         let state_ref = new_state.as_ref();
                         current_q_a = state_ref[0].max(0.0) as u32;
@@ -310,16 +355,19 @@ impl<'a, P: MultivariateMarkovianIntensity> ConditionalSimulationContext<'a, P> 
                     }
                 }
 
-                self.process.update_state(&mut cond_state, next_cond_internal_dim, t, t_last_cond);
+                self.process
+                    .update_state(&mut cond_state, next_cond_internal_dim, t, t_last_cond);
                 t_last_cond = t;
 
                 cond_indices[next_cond_internal_dim] += 1;
-                next_cond_times[next_cond_internal_dim] = self.conditioning_events_by_dim[next_cond_internal_dim]
+                next_cond_times[next_cond_internal_dim] = self.conditioning_events_by_dim
+                    [next_cond_internal_dim]
                     .get(cond_indices[next_cond_internal_dim])
                     .copied()
                     .unwrap_or(f64::INFINITY);
             } else if taus[3] == tau_min {
-                self.process.update_state(&mut new_state, independent_dim, t, t_last_new);
+                self.process
+                    .update_state(&mut new_state, independent_dim, t, t_last_new);
                 t_last_new = t;
                 let state_ref = new_state.as_ref();
                 current_q_a = state_ref[0].max(0.0) as u32;
@@ -351,10 +399,10 @@ impl<'a, P: MultivariateMarkovianIntensity> ConditionalSimulationContext<'a, P> 
 #[cfg(test)]
 mod tests {
     use crate::models::AffineQueueProcess;
-    use crate::simulation::{ConditionalSimulationContext, simulate_with_externals};
+    use crate::models::{MultivariateEvent, MultivariateSimulationResult};
+    use crate::simulation::{simulate_with_externals, ConditionalSimulationContext};
     use crate::simulation_helpers::sample_queue_at_times;
-    use crate::models::{MultivariateSimulationResult, MultivariateEvent};
-    
+
     #[test]
     fn test_simulate_queue_at_times_matches_regular_pipeline() {
         // Create a queue process
@@ -382,7 +430,14 @@ mod tests {
         // Simulate conditioning path
         let cond_result = simulate_with_externals(&process, t_max, &external_events, Some(123));
         let cond_events_by_dim: Vec<Vec<f64>> = (0..3)
-            .map(|dim| cond_result.events.iter().filter(|e| e.dim == dim).map(|e| e.time).collect())
+            .map(|dim| {
+                cond_result
+                    .events
+                    .iter()
+                    .filter(|e| e.dim == dim)
+                    .map(|e| e.time)
+                    .collect()
+            })
             .collect();
 
         // Create conditional simulation context
@@ -400,7 +455,8 @@ mod tests {
         let regular_samples = sample_queue_at_times(&sim_path, &market_order_times);
 
         // Method 2: Memory-efficient
-        let efficient_samples = ctx.simulate_queue_at_times(&market_order_times, initial_q, None, Some(999));
+        let efficient_samples =
+            ctx.simulate_queue_at_times(&market_order_times, initial_q, None, Some(999));
 
         // Both should produce identical results (same seed)
         assert_eq!(
@@ -411,7 +467,11 @@ mod tests {
             efficient_samples.len()
         );
 
-        for (i, (&r, &e)) in regular_samples.iter().zip(efficient_samples.iter()).enumerate() {
+        for (i, (&r, &e)) in regular_samples
+            .iter()
+            .zip(efficient_samples.iter())
+            .enumerate()
+        {
             assert_eq!(
                 r, e,
                 "Queue sample mismatch at index {}: regular {} vs efficient {}",

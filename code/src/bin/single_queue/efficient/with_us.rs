@@ -1,11 +1,10 @@
+use simulation_project::conditional_impact::TailImpact;
 use simulation_project::models::{AffineQueueProcess, MultiExponentialHawkes};
 use simulation_project::simulation::{simulate, simulate_with_externals};
 use simulation_project::simulation_helpers::{
-    hawkes_to_market_orders, merge_events, create_meta_orders,
-    extract_events_by_dim, sample_queue_at_times,
-    ParallelSimulator, write_memory_efficient_results,
+    create_meta_orders, extract_events_by_dim, hawkes_to_market_orders, merge_events,
+    sample_queue_at_times, write_memory_efficient_results, ParallelSimulator,
 };
-use simulation_project::conditional_impact::TailImpact;
 
 use std::time::Instant;
 
@@ -23,9 +22,9 @@ fn main() {
     let decoupled = true;
 
     // Affine queue parameters
-    let a_l = 100.0;   // λ^L(q) = a_l + b_l * q
+    let a_l = 100.0; // λ^L(q) = a_l + b_l * q
     let b_l = -0.275;
-    let a_c = 2.0;     // λ^C(q) = a_c + b_c * q
+    let a_c = 2.0; // λ^C(q) = a_c + b_c * q
     let b_c = 0.125;
 
     // Hawkes parameters for market orders
@@ -39,13 +38,18 @@ fn main() {
     let meta_end = 4.0 * time_horizon / 5.0;
 
     println!("=== Paths WITH Us (Memory-Efficient) ===");
-    println!("Time horizon: {}, Simulations: {}, Initial queue: {}",
-             time_horizon, n_simulations, initial_queue_size);
+    println!(
+        "Time horizon: {}, Simulations: {}, Initial queue: {}",
+        time_horizon, n_simulations, initial_queue_size
+    );
 
     let _c_lambda = AffineQueueProcess::c_lambda(b_l, b_c);
     println!("c_lambda = {}", _c_lambda);
 
-    assert!(decoupled, "Memory-efficient version requires decoupled mode");
+    assert!(
+        decoupled,
+        "Memory-efficient version requires decoupled mode"
+    );
 
     // ==========================================================================
     // Create process and simulate q path (without meta orders)
@@ -58,18 +62,29 @@ fn main() {
     // Pre-simulate Hawkes path
     let hawkes = MultiExponentialHawkes::new_with_state(
         MultiExponentialHawkes::new(mu, alpha.clone(), beta.clone()).stationary_state(),
-        mu, alpha.clone(), beta.clone(),
+        mu,
+        alpha.clone(),
+        beta.clone(),
     );
     let hawkes_result = simulate(&hawkes, time_horizon, Some(42));
-    println!("[TIMING] Hawkes pre-simulation: {:?} ({} events)", t0.elapsed(), hawkes_result.events.len());
+    println!(
+        "[TIMING] Hawkes pre-simulation: {:?} ({} events)",
+        t0.elapsed(),
+        hawkes_result.events.len()
+    );
     let hawkes_as_market = hawkes_to_market_orders(&hawkes_result);
 
     // Simulate q path without meta orders (same seed as original for comparison)
     let t0 = Instant::now();
-    let q_result_internal = simulate_with_externals(&process, time_horizon, &hawkes_as_market, Some(42));
+    let q_result_internal =
+        simulate_with_externals(&process, time_horizon, &hawkes_as_market, Some(42));
     let q_result = merge_events(&q_result_internal, &hawkes_as_market);
     let q_path = AffineQueueProcess::result_to_queue_path(&q_result, initial_queue_size);
-    println!("[TIMING] q simulation: {:?} ({} events)", t0.elapsed(), q_path.events.len());
+    println!(
+        "[TIMING] q simulation: {:?} ({} events)",
+        t0.elapsed(),
+        q_path.events.len()
+    );
 
     // Extract market orders (from pre-simulated Hawkes)
     let market_orders: Vec<f64> = hawkes_as_market.events.iter().map(|e| e.time).collect();
@@ -85,7 +100,12 @@ fn main() {
 
     let t0 = Instant::now();
     let tail_impact = TailImpact::from_affine_queue(
-        mu, alpha.clone(), beta.clone(), b_l, b_c, market_orders.clone()
+        mu,
+        alpha.clone(),
+        beta.clone(),
+        b_l,
+        b_c,
+        market_orders.clone(),
     );
     println!("[TIMING] TailImpact setup: {:?}", t0.elapsed());
 
@@ -112,13 +132,23 @@ fn main() {
         simulating_bar_q: true,
     };
     let results = simulator.run_memory_efficient(n_simulations);
-    println!("[TIMING] Parallel simulations ({}x, memory-efficient): {:?}", n_simulations, t0.elapsed());
+    println!(
+        "[TIMING] Parallel simulations ({}x, memory-efficient): {:?}",
+        n_simulations,
+        t0.elapsed()
+    );
 
     // ==========================================================================
     // Output
     // ==========================================================================
     let t0 = Instant::now();
-    write_memory_efficient_results(&results, &q_at_market_orders, &market_orders, "experiments/passive_impact/load_experiments/data/single/efficient/with").unwrap();
+    write_memory_efficient_results(
+        &results,
+        &q_at_market_orders,
+        &market_orders,
+        "experiments/passive_impact/load_experiments/data/single/efficient/with",
+    )
+    .unwrap();
     println!("[TIMING] Data write: {:?}", t0.elapsed());
     println!("[TIMING] TOTAL: {:?}", t_total.elapsed());
 }

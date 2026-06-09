@@ -74,11 +74,7 @@ mod tests {
     fn test_singular_endpoints() {
         // f(x) = 1/(x-1) - 1/(2-x), undefined at x=1 and x=2
         // Has a root at x = 1.5
-        let solver = IVTSolver::new(
-            |x| 1.0 / (x - 1.0) - 1.0 / (2.0 - x),
-            1.0,
-            2.0,
-        );
+        let solver = IVTSolver::new(|x| 1.0 / (x - 1.0) - 1.0 / (2.0 - x), 1.0, 2.0);
         let root = solver.find_zero(1e-10, 100).unwrap();
         assert!((root - 1.5).abs() < 1e-9);
     }
@@ -88,11 +84,7 @@ mod tests {
         // f(x) = 1/x - 1/(1-x), undefined at 0 and 1
         // At x→0: f→+∞, at x→1: f→-∞ (opposite signs!)
         // Root at x = 0.5
-        let solver = IVTSolver::new(
-            |x| 1.0 / x - 1.0 / (1.0 - x),
-            0.0,
-            1.0,
-        );
+        let solver = IVTSolver::new(|x| 1.0 / x - 1.0 / (1.0 - x), 0.0, 1.0);
         let root = solver.find_zero(1e-10, 100).unwrap();
         assert!((root - 0.5).abs() < 1e-9);
     }
@@ -101,11 +93,7 @@ mod tests {
     fn test_laplace_inverse() {
         // f(x) = 1 - 1/(x+2), undefined at -2 with positive value at 0
         // Root at x = -1.
-        let solver = IVTSolver::new(
-            |x| 1.0 - 1.0 / (x + 2.0),
-            -2.0,
-            0.0,
-        );
+        let solver = IVTSolver::new(|x| 1.0 - 1.0 / (x + 2.0), -2.0, 0.0);
         let root = solver.find_zero(1e-10, 100).unwrap();
         assert!((root + 1.0).abs() < 1e-9);
     }
@@ -113,11 +101,7 @@ mod tests {
     fn test_same_sign_limits() {
         // f(x) = 1/x² + 1/(1-x)², both endpoints → +∞
         // No sign change possible, so find_zero should return None
-        let solver = IVTSolver::new(
-            |x| 1.0 / (x * x) + 1.0 / ((1.0 - x) * (1.0 - x)),
-            0.0,
-            1.0,
-        );
+        let solver = IVTSolver::new(|x| 1.0 / (x * x) + 1.0 / ((1.0 - x) * (1.0 - x)), 0.0, 1.0);
         assert!(solver.find_zero(1e-10, 100).is_none());
     }
 }

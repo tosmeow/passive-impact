@@ -1,4 +1,4 @@
-use super::propagator::{Propagator};
+use super::propagator::Propagator;
 use crate::models::MultiExponentialHawkes;
 
 // TailIntensity computes ∫_t^∞ e^{-c_lambda·(s-t)} E_t[λ_s] ds for a Hawkes intensity λ.
@@ -30,14 +30,42 @@ impl TailIntensity {
         let mut factors = Vec::with_capacity(n);
         for i in 0..n {
             let beta = hawkes_params.beta[i];
-            let factor = propagator_params.lambda.iter().zip(&propagator_params.c).map(|(lambda, c)|  c / (lambda - beta) * ((1.0 / (c_lambda + beta)) - (1.0 / (c_lambda + lambda)))).sum::<f64>() + 1.0 / (c_lambda + beta);
+            let factor = propagator_params
+                .lambda
+                .iter()
+                .zip(&propagator_params.c)
+                .map(|(lambda, c)| {
+                    c / (lambda - beta) * ((1.0 / (c_lambda + beta)) - (1.0 / (c_lambda + lambda)))
+                })
+                .sum::<f64>()
+                + 1.0 / (c_lambda + beta);
             factors.push(factor);
         }
-        Self {hawkes_params, c_lambda, factors, lambda: propagator_params.lambda.clone(), c: propagator_params.c.clone()}
+        Self {
+            hawkes_params,
+            c_lambda,
+            factors,
+            lambda: propagator_params.lambda.clone(),
+            c: propagator_params.c.clone(),
+        }
     }
 
     pub fn compute(&self, state: &[f64]) -> f64 {
-        self.factors.iter().zip(state).map(|(f, r)| r * f).sum::<f64>() + self.hawkes_params.mu * (1.0 / self.c_lambda + self.lambda.iter().zip(&self.c).map(|(lbd, c)| ((1.0 / self.c_lambda) - (1.0 / (self.c_lambda + lbd))) * c / lbd).sum::<f64>())
+        self.factors
+            .iter()
+            .zip(state)
+            .map(|(f, r)| r * f)
+            .sum::<f64>()
+            + self.hawkes_params.mu
+                * (1.0 / self.c_lambda
+                    + self
+                        .lambda
+                        .iter()
+                        .zip(&self.c)
+                        .map(|(lbd, c)| {
+                            ((1.0 / self.c_lambda) - (1.0 / (self.c_lambda + lbd))) * c / lbd
+                        })
+                        .sum::<f64>())
     }
 }
 

@@ -1,19 +1,23 @@
-
-
 use crate::models::{MultivariateEvent, MultivariateSimulationResult};
 
-pub fn hawkes_to_market_orders(hawkes_result: &MultivariateSimulationResult) -> MultivariateSimulationResult {
+pub fn hawkes_to_market_orders(
+    hawkes_result: &MultivariateSimulationResult,
+) -> MultivariateSimulationResult {
     let mut result = MultivariateSimulationResult::new(3);
     for event in &hawkes_result.events {
         result.push(MultivariateEvent {
             time: event.time,
-            dim: 2,  // Market orders are dimension 2 in the queue process
+            dim: 2, // Market orders are dimension 2 in the queue process
         });
     }
     result
 }
 
-pub fn events_to_dim(events: &MultivariateSimulationResult, target_dim: usize, total_dims: usize) -> MultivariateSimulationResult {
+pub fn events_to_dim(
+    events: &MultivariateSimulationResult,
+    target_dim: usize,
+    total_dims: usize,
+) -> MultivariateSimulationResult {
     let mut result = MultivariateSimulationResult::new(total_dims);
     for event in &events.events {
         result.push(MultivariateEvent {
@@ -61,7 +65,9 @@ pub fn merge_all_events(streams: &[&MultivariateSimulationResult]) -> Multivaria
 }
 
 pub fn events_for_dim(result: &MultivariateSimulationResult, dim: usize) -> Vec<f64> {
-    result.events.iter()
+    result
+        .events
+        .iter()
         .filter(|e| e.dim == dim)
         .map(|e| e.time)
         .collect()

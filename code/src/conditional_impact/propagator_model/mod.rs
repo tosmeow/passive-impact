@@ -62,13 +62,21 @@ impl AggressiveImpactPath {
         let n_components = hawkes.alpha.len();
 
         // Hawkes kernel norm: ‖φ‖₁ = Σᵢ αᵢ/βᵢ
-        let norm: f64 = hawkes.alpha.iter().zip(&hawkes.beta)
-            .map(|(a, b)| a / b).sum();
+        let norm: f64 = hawkes
+            .alpha
+            .iter()
+            .zip(&hawkes.beta)
+            .map(|(a, b)| a / b)
+            .sum();
         // G(0) = 1/(1-‖φ‖₁) = mean cluster size
         let g0 = 1.0 / (1.0 - norm);
         // Propagator weights: G(0) · αᵢ/βᵢ for each exponential component
-        let weights: Vec<f64> = hawkes.alpha.iter().zip(&hawkes.beta)
-            .map(|(a, b)| g0 * a / b).collect();
+        let weights: Vec<f64> = hawkes
+            .alpha
+            .iter()
+            .zip(&hawkes.beta)
+            .map(|(a, b)| g0 * a / b)
+            .collect();
         let mut state = vec![0.0f64; n_components];
         let mut permanent_acc = 0.0f64; // G(∞) = 1, so permanent weight is 1
         let mut impact_path = Vec::with_capacity(n);
@@ -137,7 +145,7 @@ impl AggressiveImpactPath {
     /// * `is_market_order` — true = ordinary market order (dN), false = metaorder (dn)
     /// * `hawkes` — the Hawkes model whose kernel defines the propagator G
     /// * `kappa` — impact function κ(q); must be decreasing in q
-    /// * `bar_kappa` — constant weight κ̄ for the propagator term (e.g. κ(E[q]))
+    /// * `bar_kappa` — constant weight κ̄ for the propagator term (e.g. κ(E\[q\]))
     pub fn from_queue_samples_hybrid(
         q_samples: &[u32],
         q_bar_samples: &[u32],
@@ -151,13 +159,21 @@ impl AggressiveImpactPath {
         let n_components = hawkes.alpha.len();
 
         // Hawkes kernel norm: ‖φ‖₁ = Σᵢ αᵢ/βᵢ
-        let norm: f64 = hawkes.alpha.iter().zip(&hawkes.beta)
-            .map(|(a, b)| a / b).sum();
+        let norm: f64 = hawkes
+            .alpha
+            .iter()
+            .zip(&hawkes.beta)
+            .map(|(a, b)| a / b)
+            .sum();
         // G(0) = 1/(1-‖φ‖₁)
         let g0 = 1.0 / (1.0 - norm);
         // Propagator weights for the decaying components
-        let weights: Vec<f64> = hawkes.alpha.iter().zip(&hawkes.beta)
-            .map(|(a, b)| g0 * a / b).collect();
+        let weights: Vec<f64> = hawkes
+            .alpha
+            .iter()
+            .zip(&hawkes.beta)
+            .map(|(a, b)| g0 * a / b)
+            .collect();
 
         // Propagator state: decaying part of κ̄·G(t-s) summed over metaorder events
         let mut prop_state = vec![0.0f64; n_components];

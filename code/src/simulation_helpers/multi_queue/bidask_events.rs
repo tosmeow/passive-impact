@@ -1,22 +1,26 @@
 use crate::models::{MultivariateEvent, MultivariateSimulationResult};
 
-pub fn hawkes_to_ask_market_orders(hawkes_result: &MultivariateSimulationResult) -> MultivariateSimulationResult {
+pub fn hawkes_to_ask_market_orders(
+    hawkes_result: &MultivariateSimulationResult,
+) -> MultivariateSimulationResult {
     let mut result = MultivariateSimulationResult::new(6);
     for event in &hawkes_result.events {
         result.push(MultivariateEvent {
             time: event.time,
-            dim: 2,  // N^a (ask market orders)
+            dim: 2, // N^a (ask market orders)
         });
     }
     result
 }
 
-pub fn hawkes_to_bid_market_orders(hawkes_result: &MultivariateSimulationResult) -> MultivariateSimulationResult {
+pub fn hawkes_to_bid_market_orders(
+    hawkes_result: &MultivariateSimulationResult,
+) -> MultivariateSimulationResult {
     let mut result = MultivariateSimulationResult::new(6);
     for event in &hawkes_result.events {
         result.push(MultivariateEvent {
             time: event.time,
-            dim: 5,  // N^b (bid market orders)
+            dim: 5, // N^b (bid market orders)
         });
     }
     result
@@ -54,7 +58,9 @@ pub fn merge_bidask_events(
     result
 }
 
-pub fn merge_all_bidask_events(streams: &[&MultivariateSimulationResult]) -> MultivariateSimulationResult {
+pub fn merge_all_bidask_events(
+    streams: &[&MultivariateSimulationResult],
+) -> MultivariateSimulationResult {
     if streams.is_empty() {
         return MultivariateSimulationResult::new(6);
     }
@@ -79,8 +85,8 @@ pub fn create_bidask_meta_orders(
     side: Side,
 ) -> MultivariateSimulationResult {
     let dim = match side {
-        Side::Ask => 0,  // L^a (ask limit orders)
-        Side::Bid => 3,  // L^b (bid limit orders)
+        Side::Ask => 0, // L^a (ask limit orders)
+        Side::Bid => 3, // L^b (bid limit orders)
     };
 
     let mut result = MultivariateSimulationResult::new(6);
@@ -94,7 +100,6 @@ pub fn create_bidask_meta_orders(
     }
     result
 }
-
 
 pub fn create_symmetric_meta_orders(
     n: u32,
@@ -156,9 +161,9 @@ mod tests {
 
         let combined = hawkes_pair_to_market_orders(&hawkes_a, &hawkes_b);
         assert_eq!(combined.events.len(), 4);
-        assert_eq!(combined.events[0].dim, 2);  // ask at t=1
-        assert_eq!(combined.events[1].dim, 5);  // bid at t=2
-        assert_eq!(combined.events[2].dim, 2);  // ask at t=3
-        assert_eq!(combined.events[3].dim, 5);  // bid at t=4
+        assert_eq!(combined.events[0].dim, 2); // ask at t=1
+        assert_eq!(combined.events[1].dim, 5); // bid at t=2
+        assert_eq!(combined.events[2].dim, 2); // ask at t=3
+        assert_eq!(combined.events[3].dim, 5); // bid at t=4
     }
 }

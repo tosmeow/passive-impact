@@ -20,6 +20,7 @@ A high-performance Rust library for simulating and analyzing market impact using
 - **Exact conditional simulation** of coupled point processes, enabling pathwise comparison of observed vs. counterfactual market scenarios.
 - **Queue-reactive order dynamics** with affine intensity functions, modeling how limit orders, cancellations, and market orders respond to queue depth.
 - **Closed-form market impact computation** for Hawkes with kernels as sum of exponentials using resolvant operator methods, enabling efficient impact estimation without nested Monte Carlo.
+- **Anchored impact-cost experiments** that replay empirical queue snapshots, simulate no-us passive queues, and sample execution-time cost jumps.
 - **Flexible architecture** supporting both single-queue and bid-ask queue pair scenarios, with optimized ("efficient") and general simulation variants.
 
 ## Setup
@@ -42,7 +43,7 @@ Notes on the steps:
 - `uv pip install -e ".[dev]"` installs the dev tooling (maturin, pytest, jupyter, ipykernel, nbconvert).
 - On Python ≥3.13, prefix the `maturin develop` command with `PYO3_USE_ABI3_FORWARD_COMPATIBILITY=1`.
 
-Verify the install (expects 13 passed + 1 skipped, then prints `0.1.0`):
+Verify the install (the full Python suite should pass, then prints `0.1.0`):
 
 ```bash
 pytest code/python/tests/
@@ -53,7 +54,7 @@ python -c "import simproj; print(simproj.__version__)"
 
 ## Quick Start (Python)
 
-After [Setup](#setup), run any of the three experiment categories from Python — each ships a `custom_experiment/main.py` whose top section is a config dataclass. Edit the config, run the file, and `.npy` outputs land in `output/`.
+After [Setup](#setup), run any of the three simulation demo categories from Python — each ships a `custom_experiment/main.py` whose top section is a config dataclass. Edit the config, run the file, and `.npy` outputs land in `output/`.
 
 ```python
 # experiments/passive_impact/custom_experiment/main.py
@@ -86,7 +87,7 @@ Run it:
 python experiments/passive_impact/custom_experiment/main.py
 ```
 
-The same shape applies to `agressive_impact` and `queue_simulation` — each has its own config dataclass (`AggressiveImpactConfig`, `QueueSimulationConfig`) and `main.py` template. See [Experiments](#experiments) below for the full layout.
+The same shape applies to `agressive_impact` and `queue_simulation` — each has its own config dataclass (`AggressiveImpactConfig`, `QueueSimulationConfig`) and `main.py` template. The empirical passive execution-cost workflow lives under [`experiments/impact_cost/`](experiments/impact_cost/) and is driven by CLI pipelines rather than a `custom_experiment/main.py` facade.
 
 ## Mathematical Background
 
@@ -123,17 +124,19 @@ where the following term admits a closed form relying on the resolvent operator 
 | [`simulation`](code/src/simulation/) | Thinning algorithm, conditional simulation |
 | [`simulation_helpers`](code/src/simulation_helpers/) | Parallel batch simulation, event utilities |
 | [`conditional_impact`](code/src/conditional_impact/) | Resolvent and propagator impact models |
+| [`experiments::impact_cost`](code/src/experiments/impact_cost/) | Experiment-scoped native helpers for anchored empirical queues and passive execution fills |
 | [`utils`](code/src/utils/) | IVT root-finding, finite differences |
 
 ## Experiments
 
-Three top-level experiment categories live under `experiments/`:
+Four top-level experiment categories live under `experiments/`:
 
-| Category | What it shows | Pre-saved baseline | Custom |
-|---|---|---|---|
-| **Passive Impact** | Conditional impact from limit-order metaorders (single + double queue) | [`experiments/passive_impact/load_experiments/analysis.ipynb`](experiments/passive_impact/load_experiments/analysis.ipynb) | [`experiments/passive_impact/custom_experiment/main.py`](experiments/passive_impact/custom_experiment/main.py) |
-| **Aggressive Impact** | Market-order impact under propagator and hybrid models | [`experiments/agressive_impact/load_experiments/analysis.ipynb`](experiments/agressive_impact/load_experiments/analysis.ipynb) | [`experiments/agressive_impact/custom_experiment/main.py`](experiments/agressive_impact/custom_experiment/main.py) |
-| **Queue Simulation** | Counterfactual queue paths under a metaorder (no impact curve) | [`experiments/queue_simulation/load_experiments/analysis.ipynb`](experiments/queue_simulation/load_experiments/analysis.ipynb) | [`experiments/queue_simulation/custom_experiment/main.py`](experiments/queue_simulation/custom_experiment/main.py) |
+| Category | What it shows | Entry points |
+|---|---|---|
+| **Passive Impact** | Conditional impact from limit-order metaorders (single + double queue) | [`load_experiments/analysis.ipynb`](experiments/passive_impact/load_experiments/analysis.ipynb), [`custom_experiment/main.py`](experiments/passive_impact/custom_experiment/main.py) |
+| **Aggressive Impact** | Market-order impact under propagator and hybrid models | [`load_experiments/analysis.ipynb`](experiments/agressive_impact/load_experiments/analysis.ipynb), [`custom_experiment/main.py`](experiments/agressive_impact/custom_experiment/main.py) |
+| **Queue Simulation** | Counterfactual queue paths under a metaorder (no impact curve) | [`load_experiments/analysis.ipynb`](experiments/queue_simulation/load_experiments/analysis.ipynb), [`custom_experiment/main.py`](experiments/queue_simulation/custom_experiment/main.py) |
+| **Impact Cost** | Empirical passive execution-cost workflow using anchored queue snapshots, passive fill tracking, and reduced-form price impact | [`experiments/impact_cost/README.md`](experiments/impact_cost/README.md), [`COMPONENTS.md`](experiments/impact_cost/COMPONENTS.md), [`pipelines/`](experiments/impact_cost/pipelines/) |
 
 Each `load_experiments/` folder contains the notebook, plot utilities, and a `data/` subtree where the Rust binaries write `.npy` files. `.npy` is gitignored — regenerate baselines by running the binaries below. Each `custom_experiment/` folder contains a single `main.py` whose top section is a config dataclass; edit and run.
 
@@ -148,6 +151,18 @@ python experiments/queue_simulation/custom_experiment/main.py
 ```
 
 Outputs (`.npy` arrays) land in each folder's `output/` (gitignored). The Python facades produce the same shapes as the Rust binaries — see each `<Category>Config` dataclass in [`code/python/simproj/`](code/python/simproj/) for the full set of knobs (Hawkes parameters, queue parameters, metaorder shape, propagator vs. hybrid model, etc.).
+
+### Run the impact-cost workflow
+
+Impact-cost pipelines consume local parquet inputs under `experiments/impact_cost/data/` and write generated CSV/PNG/JSON outputs under `experiments/impact_cost/runs/`; both are gitignored except for README files. The native pieces are exposed through `simproj` for speed, while the experiment orchestration stays in Python:
+
+```bash
+python -m experiments.impact_cost.pipelines.execution_latency_grid --help
+python -m experiments.impact_cost.pipelines.impact_cost_pipeline --help
+python -m experiments.impact_cost.pipelines.lifecycle_passive_cost_pipeline --help
+```
+
+Start with [`experiments/impact_cost/README.md`](experiments/impact_cost/README.md) for the queue/price-sign conventions and [`experiments/impact_cost/COMPONENTS.md`](experiments/impact_cost/COMPONENTS.md) for file-by-file pipeline inputs and outputs.
 
 ### Inspect pre-saved baselines (notebooks)
 
@@ -171,7 +186,6 @@ The original Rust binaries still exist for fast batch baseline generation:
 
 ## Dependencies
 
-- `numpy`, `scipy`: Numerical computing
-- `numba`: JIT compilation for performance-critical Python code
+- `numpy`, `pandas`, `matplotlib`, `pyarrow`: Python facades, plotting, and parquet-backed experiment inputs
 - `maturin`, `pyo3`: Rust-to-Python bindings (development only)
 - `pytest`: Testing framework

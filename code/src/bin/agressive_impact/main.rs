@@ -1,11 +1,13 @@
-use simulation_project::models::{AffineQueueProcess, MultiExponentialHawkes};
-use simulation_project::simulation::{simulate, simulate_with_externals, ConditionalSimulationContext};
-use simulation_project::simulation_helpers::{
-    hawkes_to_market_orders, merge_events, create_meta_orders, events_to_dim,
-    extract_events_by_dim, sample_queue_at_times,
-};
 use simulation_project::conditional_impact::AggressiveImpactPath;
-use simulation_project::utils::{write_npy_f64, write_npy_u32, write_npy_f64_1d};
+use simulation_project::models::{AffineQueueProcess, MultiExponentialHawkes};
+use simulation_project::simulation::{
+    simulate, simulate_with_externals, ConditionalSimulationContext,
+};
+use simulation_project::simulation_helpers::{
+    create_meta_orders, events_to_dim, extract_events_by_dim, hawkes_to_market_orders,
+    merge_events, sample_queue_at_times,
+};
+use simulation_project::utils::{write_npy_f64, write_npy_f64_1d, write_npy_u32};
 
 use rayon::prelude::*;
 use std::time::Instant;
@@ -43,9 +45,14 @@ fn main() {
     let kappa = |q: f64| c1_kappa * ((-c2_kappa * q).exp() + 1.0_f64).ln().sqrt();
 
     println!("=== Aggressive Impact Experiment ===");
-    println!("Time horizon: {}, Simulations: {}, Initial queue: {}",
-             time_horizon, n_simulations, initial_queue_size);
-    println!("kappa(q) = {} * sqrt(log(e^(-{}*q) + 1))", c1_kappa, c2_kappa);
+    println!(
+        "Time horizon: {}, Simulations: {}, Initial queue: {}",
+        time_horizon, n_simulations, initial_queue_size
+    );
+    println!(
+        "kappa(q) = {} * sqrt(log(e^(-{}*q) + 1))",
+        c1_kappa, c2_kappa
+    );
 
     let c_lambda = AffineQueueProcess::c_lambda(b_l, b_c);
     println!("c_lambda = {}", c_lambda);
@@ -57,11 +64,17 @@ fn main() {
 
     let hawkes = MultiExponentialHawkes::new_with_state(
         MultiExponentialHawkes::new(mu, alpha.clone(), beta.clone()).stationary_state(),
-        mu, alpha.clone(), beta.clone(),
+        mu,
+        alpha.clone(),
+        beta.clone(),
     );
     let hawkes_result = simulate(&hawkes, time_horizon, Some(42));
     let hawkes_as_market = hawkes_to_market_orders(&hawkes_result);
-    println!("[TIMING] Hawkes pre-simulation: {:?} ({} events)", t0.elapsed(), hawkes_result.events.len());
+    println!(
+        "[TIMING] Hawkes pre-simulation: {:?} ({} events)",
+        t0.elapsed(),
+        hawkes_result.events.len()
+    );
 
     // ==========================================================================
     // Simulate q path (base queue, no meta orders)
@@ -69,10 +82,15 @@ fn main() {
     let t0 = Instant::now();
 
     let process = AffineQueueProcess::new_queue(initial_queue_size as f64, a_l, b_l, a_c, b_c);
-    let q_result_internal = simulate_with_externals(&process, time_horizon, &hawkes_as_market, Some(42));
+    let q_result_internal =
+        simulate_with_externals(&process, time_horizon, &hawkes_as_market, Some(42));
     let q_result = merge_events(&q_result_internal, &hawkes_as_market);
     let q_path = AffineQueueProcess::result_to_queue_path(&q_result, initial_queue_size);
-    println!("[TIMING] q simulation: {:?} ({} events)", t0.elapsed(), q_path.events.len());
+    println!(
+        "[TIMING] q simulation: {:?} ({} events)",
+        t0.elapsed(),
+        q_path.events.len()
+    );
 
     // ==========================================================================
     // Create aggressive meta orders and compute propagator
@@ -82,21 +100,28 @@ fn main() {
     let meta_orders = events_to_dim(&meta_orders_raw, 2, 3);
     let meta_order_times: Vec<f64> = meta_orders.events.iter().map(|e| e.time).collect();
     let market_order_times: Vec<f64> = hawkes_as_market.events.iter().map(|e| e.time).collect();
-    println!("Market orders: {}, Meta orders: {}", market_order_times.len(), meta_order_times.len());
+    println!(
+        "Market orders: {}, Meta orders: {}",
+        market_order_times.len(),
+        meta_order_times.len()
+    );
 
     let hawkes_model = MultiExponentialHawkes::new(mu, alpha.clone(), beta.clone());
     let norm: f64 = alpha.iter().zip(&beta).map(|(a, b)| a / b).sum::<f64>();
-    println!("Propagator: G(0) = {:.4} (mean cluster size), G(∞) = 1 (permanent)", 1.0 / (1.0 - norm));
+    println!(
+        "Propagator: G(0) = {:.4} (mean cluster size), G(∞) = 1 (permanent)",
+        1.0 / (1.0 - norm)
+    );
 
     // ==========================================================================
     // Merge market + meta order times into sorted evaluation times
     // ==========================================================================
     let mut eval_entries: Vec<(f64, bool)> = Vec::new();
     for &t in &market_order_times {
-        eval_entries.push((t, true));   // is_market_order = true
+        eval_entries.push((t, true)); // is_market_order = true
     }
     for &t in &meta_order_times {
-        eval_entries.push((t, false));  // is_market_order = false (meta order)
+        eval_entries.push((t, false)); // is_market_order = false (meta order)
     }
     eval_entries.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
 
@@ -129,8 +154,8 @@ fn main() {
             let ctx = ConditionalSimulationContext::new(
                 &process,
                 &q_events_by_dim,
-                Some(&hawkes_as_market),     // q conditioning externals
-                Some(&bar_q_external),        // bar_q externals (meta + hawkes)
+                Some(&hawkes_as_market), // q conditioning externals
+                Some(&bar_q_external),   // bar_q externals (meta + hawkes)
                 time_horizon,
             );
 
@@ -156,7 +181,11 @@ fn main() {
         })
         .collect();
 
-    println!("[TIMING] Parallel simulations ({}x): {:?}", n_simulations, t0.elapsed());
+    println!(
+        "[TIMING] Parallel simulations ({}x): {:?}",
+        n_simulations,
+        t0.elapsed()
+    );
 
     // ==========================================================================
     // Output
@@ -170,12 +199,18 @@ fn main() {
     // Impact paths: (n_times, n_simulations)
     let impact_data: Vec<f64> = (0..n_times)
         .flat_map(|t_idx| {
-            results.iter().map(move |(_, impact)| {
-                impact.get(t_idx).copied().unwrap_or(f64::NAN)
-            })
+            results
+                .iter()
+                .map(move |(_, impact)| impact.get(t_idx).copied().unwrap_or(f64::NAN))
         })
         .collect();
-    write_npy_f64(&format!("{}/impact_paths.npy", output_dir), &impact_data, n_times, n_simulations).unwrap();
+    write_npy_f64(
+        &format!("{}/impact_paths.npy", output_dir),
+        &impact_data,
+        n_times,
+        n_simulations,
+    )
+    .unwrap();
 
     // Queue paths: (n_times, n_simulations + 1) [first col = q, rest = bar_q_sim_i]
     let queue_data: Vec<u32> = (0..n_times)
@@ -184,13 +219,22 @@ fn main() {
                 .chain(results.iter().map(move |(q_bar, _)| q_bar[t_idx]))
         })
         .collect();
-    write_npy_u32(&format!("{}/queue_paths.npy", output_dir), &queue_data, n_times, n_simulations + 1).unwrap();
+    write_npy_u32(
+        &format!("{}/queue_paths.npy", output_dir),
+        &queue_data,
+        n_times,
+        n_simulations + 1,
+    )
+    .unwrap();
 
     // Times
     write_npy_f64_1d(&format!("{}/times.npy", output_dir), &eval_times).unwrap();
 
     // Event types: 1.0 for market order, 0.0 for meta order
-    let event_types: Vec<f64> = is_market_order.iter().map(|&b| if b { 1.0 } else { 0.0 }).collect();
+    let event_types: Vec<f64> = is_market_order
+        .iter()
+        .map(|&b| if b { 1.0 } else { 0.0 })
+        .collect();
     write_npy_f64_1d(&format!("{}/event_types.npy", output_dir), &event_types).unwrap();
 
     println!("[TIMING] Data write: {:?}", t0.elapsed());

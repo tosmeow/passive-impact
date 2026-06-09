@@ -1,5 +1,7 @@
-mod multivariate_process;
 mod markovian_process;
+mod multivariate_process;
 
-pub use multivariate_process::{MultivariateMarkovianIntensity, MultivariateEvent, MultivariateSimulationResult};
-pub use markovian_process::{QueuePath, QueueEvent, MarkovianProcess};
+pub use markovian_process::{MarkovianProcess, QueueEvent, QueuePath};
+pub use multivariate_process::{
+    MultivariateEvent, MultivariateMarkovianIntensity, MultivariateSimulationResult,
+};

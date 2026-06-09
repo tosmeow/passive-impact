@@ -10,11 +10,23 @@ fn main() {
 
     let binaries = [
         // Single queue
-        ("single_queue_efficient_with_us", "Single Queue - Efficient - With Us"),
-        ("single_queue_efficient_without_us", "Single Queue - Efficient - Without Us"),
+        (
+            "single_queue_efficient_with_us",
+            "Single Queue - Efficient - With Us",
+        ),
+        (
+            "single_queue_efficient_without_us",
+            "Single Queue - Efficient - Without Us",
+        ),
         // Double queue (bid-ask)
-        ("double_queue_efficient_with_us", "Double Queue - Efficient - With Us"),
-        ("double_queue_efficient_without_us", "Double Queue - Efficient - Without Us"),
+        (
+            "double_queue_efficient_with_us",
+            "Double Queue - Efficient - With Us",
+        ),
+        (
+            "double_queue_efficient_without_us",
+            "Double Queue - Efficient - Without Us",
+        ),
     ];
 
     let mut successes = 0;
@@ -28,13 +40,11 @@ fn main() {
         let t0 = Instant::now();
 
         // Get the path to the binary in the same directory as this executable
-        let exe_path = std::env::current_exe()
-            .expect("Failed to get current executable path");
+        let exe_path = std::env::current_exe().expect("Failed to get current executable path");
         let bin_dir = exe_path.parent().expect("Failed to get binary directory");
         let binary_path = bin_dir.join(binary);
 
-        let result = Command::new(&binary_path)
-            .status();
+        let result = Command::new(&binary_path).status();
 
         match result {
             Ok(status) if status.success() => {

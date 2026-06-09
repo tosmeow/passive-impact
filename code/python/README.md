@@ -2,9 +2,12 @@
 
 ## Build
 
-    maturin develop --release
+From the repository root:
 
-Re-run after any change to `src/lib.rs` (the PyO3 wrappers).
+    maturin develop --release --manifest-path code/python/Cargo.toml
+
+Re-run after any change to `code/python/src/lib.rs` or to Rust functions exposed
+through PyO3.
 
 ## Layout
 
@@ -14,3 +17,23 @@ Re-run after any change to `src/lib.rs` (the PyO3 wrappers).
 - `simproj/agressive_impact.py` — facade for the aggressive impact experiment
 - `simproj/queue_simulation.py` — facade for the queue-only experiment
 - `tests/` — pytest smoke tests
+
+## Impact-Cost Native Helpers
+
+The empirical impact-cost workflow lives at `experiments/impact_cost/`, but it
+uses native helpers re-exported from `simproj`:
+
+- `simulate_anchored_affine_queue` — simulate no-us queue offsets around an
+  empirical queue snapshot path.
+- `select_limit_flags_first_every`, `select_limit_flags_indices`, and
+  `select_limit_flags_random_fraction` — select passive limit rows for
+  counterfactual removal.
+- `track_passive_fills` and `simulate_execution_latency_grid` — track passive
+  execution under first-level queue priority conventions.
+- `passive_flow_impact_from_queue_samples` and
+  `passive_tail_propagator_impact_from_queue_samples` — native passive impact
+  primitives used by the Python pipeline layer.
+
+Run the pipeline modules with `python -m experiments.impact_cost.pipelines.<name>
+--help`; see `experiments/impact_cost/README.md` for the side, quantity, and
+cost conventions.

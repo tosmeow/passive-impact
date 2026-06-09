@@ -9,8 +9,8 @@
 //! ```
 //! where the queue difference decays mean-revertingly due to affine queue dynamics.
 
-pub mod single_queue;
 pub mod multi_queue;
+pub mod single_queue;
 
+pub use multi_queue::{BidAskImpactPath, BidAskTailImpact, ModeTailImpact, SymmetricCMatrix};
 pub use single_queue::ImpactPath;
-pub use multi_queue::{SymmetricCMatrix, ModeTailImpact, BidAskTailImpact, BidAskImpactPath};

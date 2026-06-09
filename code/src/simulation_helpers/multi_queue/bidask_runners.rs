@@ -1,10 +1,10 @@
+use crate::conditional_impact::{BidAskImpactPath, BidAskTailImpact};
 use crate::models::{
-    AffineBidAskQueueProcess, MultivariateSimulationResult,
-    MultivariateMarkovianIntensity, BidAskQueuePath,
+    AffineBidAskQueueProcess, BidAskQueuePath, MultivariateMarkovianIntensity,
+    MultivariateSimulationResult,
 };
 use crate::simulation::ConditionalSimulationContext;
-use crate::conditional_impact::{BidAskTailImpact, BidAskImpactPath};
-use crate::utils::{write_npy_f64, write_npy_u32, write_npy_f64_1d};
+use crate::utils::{write_npy_f64, write_npy_f64_1d, write_npy_u32};
 
 use rayon::prelude::*;
 
@@ -29,14 +29,18 @@ pub struct BidAskMemoryEfficientResults {
 }
 
 pub fn extract_ask_market_orders(result: &MultivariateSimulationResult) -> Vec<f64> {
-    result.events.iter()
+    result
+        .events
+        .iter()
         .filter(|e| e.dim == 2)
         .map(|e| e.time)
         .collect()
 }
 
 pub fn extract_bid_market_orders(result: &MultivariateSimulationResult) -> Vec<f64> {
-    result.events.iter()
+    result
+        .events
+        .iter()
         .filter(|e| e.dim == 5)
         .map(|e| e.time)
         .collect()
@@ -59,7 +63,9 @@ pub fn extract_bidask_events_by_dim(
             if exclude_dims.map(|ex| ex.contains(&dim)).unwrap_or(false) {
                 vec![]
             } else {
-                result.events.iter()
+                result
+                    .events
+                    .iter()
                     .filter(|e| e.dim == dim)
                     .map(|e| e.time)
                     .collect()
@@ -90,7 +96,6 @@ pub struct BidAskParallelSimulator<'a, P: MultivariateMarkovianIntensity + Sync>
 
 impl<'a, P: MultivariateMarkovianIntensity + Sync> BidAskParallelSimulator<'a, P> {
     pub fn run(&self, n_simulations: usize) -> BidAskSimulationResults {
-
         let has_conditioning = self.cond_events_by_dim.iter().any(|v| !v.is_empty());
 
         let results: Vec<(Vec<u32>, Vec<u32>, Vec<f64>, Vec<f64>)> = (0..n_simulations)
@@ -114,9 +119,18 @@ impl<'a, P: MultivariateMarkovianIntensity + Sync> BidAskParallelSimulator<'a, P
                     use crate::simulation_helpers::merge_bidask_events;
 
                     let internal_result = if let Some(ext) = self.new_external_events {
-                        simulate_with_externals(self.process, self.time_horizon, ext, Some(sim_idx as u64))
+                        simulate_with_externals(
+                            self.process,
+                            self.time_horizon,
+                            ext,
+                            Some(sim_idx as u64),
+                        )
                     } else {
-                        crate::simulation::simulate(self.process, self.time_horizon, Some(sim_idx as u64))
+                        crate::simulation::simulate(
+                            self.process,
+                            self.time_horizon,
+                            Some(sim_idx as u64),
+                        )
                     };
 
                     // Merge internal events with external events for queue path reconstruction
@@ -127,7 +141,9 @@ impl<'a, P: MultivariateMarkovianIntensity + Sync> BidAskParallelSimulator<'a, P
                     }
                 };
                 let sim_paths = AffineBidAskQueueProcess::result_to_queue_paths(
-                    &sim_result, self.initial_q_a, self.initial_q_b
+                    &sim_result,
+                    self.initial_q_a,
+                    self.initial_q_b,
                 );
 
                 // Compute impact using eigenvalue decomposition
@@ -154,7 +170,12 @@ impl<'a, P: MultivariateMarkovianIntensity + Sync> BidAskParallelSimulator<'a, P
                 let ask_samples = sample_ask_queue_at_times(&sim_paths, self.ask_market_orders);
                 let bid_samples = sample_bid_queue_at_times(&sim_paths, self.bid_market_orders);
 
-                (ask_samples, bid_samples, impact.ask_impact, impact.bid_impact)
+                (
+                    ask_samples,
+                    bid_samples,
+                    impact.ask_impact,
+                    impact.bid_impact,
+                )
             })
             .collect();
 
@@ -170,10 +191,14 @@ impl<'a, P: MultivariateMarkovianIntensity + Sync> BidAskParallelSimulator<'a, P
     where
         P::State: AsRef<[f64]> + Send,
     {
-        let ref_ask_at_ask = sample_ask_queue_at_times(self.reference_paths, self.ask_market_orders);
-        let ref_bid_at_ask = sample_bid_queue_at_times(self.reference_paths, self.ask_market_orders);
-        let ref_ask_at_bid = sample_ask_queue_at_times(self.reference_paths, self.bid_market_orders);
-        let ref_bid_at_bid = sample_bid_queue_at_times(self.reference_paths, self.bid_market_orders);
+        let ref_ask_at_ask =
+            sample_ask_queue_at_times(self.reference_paths, self.ask_market_orders);
+        let ref_bid_at_ask =
+            sample_bid_queue_at_times(self.reference_paths, self.ask_market_orders);
+        let ref_ask_at_bid =
+            sample_ask_queue_at_times(self.reference_paths, self.bid_market_orders);
+        let ref_bid_at_bid =
+            sample_bid_queue_at_times(self.reference_paths, self.bid_market_orders);
 
         let results: Vec<(Vec<u32>, Vec<u32>, Vec<f64>, Vec<f64>)> = (0..n_simulations)
             .into_par_iter()
@@ -191,7 +216,7 @@ impl<'a, P: MultivariateMarkovianIntensity + Sync> BidAskParallelSimulator<'a, P
                     self.ask_market_orders,
                     self.initial_q_a,
                     self.initial_q_b,
-                    None,  // Use default initial state
+                    None, // Use default initial state
                     Some(sim_idx as u64),
                 );
 
@@ -200,7 +225,7 @@ impl<'a, P: MultivariateMarkovianIntensity + Sync> BidAskParallelSimulator<'a, P
                     self.bid_market_orders,
                     self.initial_q_a,
                     self.initial_q_b,
-                    None,  // Use default initial state
+                    None, // Use default initial state
                     Some(sim_idx as u64),
                 );
 
@@ -208,20 +233,37 @@ impl<'a, P: MultivariateMarkovianIntensity + Sync> BidAskParallelSimulator<'a, P
                 let impact = if self.simulating_bar_q {
                     // with_us: reference is q, simulated is bar_q (q')
                     BidAskImpactPath::from_queue_samples(
-                        &ref_ask_at_ask, &ref_bid_at_ask, &sim_ask_at_ask, &sim_bid_at_ask,
-                        &ref_ask_at_bid, &ref_bid_at_bid, &sim_ask_at_bid, &sim_bid_at_bid,
+                        &ref_ask_at_ask,
+                        &ref_bid_at_ask,
+                        &sim_ask_at_ask,
+                        &sim_bid_at_ask,
+                        &ref_ask_at_bid,
+                        &ref_bid_at_bid,
+                        &sim_ask_at_bid,
+                        &sim_bid_at_bid,
                         self.tail_impact,
                     )
                 } else {
                     // without_us: simulated is q, reference is bar_q (q')
                     BidAskImpactPath::from_queue_samples(
-                        &sim_ask_at_ask, &sim_bid_at_ask, &ref_ask_at_ask, &ref_bid_at_ask,
-                        &sim_ask_at_bid, &sim_bid_at_bid, &ref_ask_at_bid, &ref_bid_at_bid,
+                        &sim_ask_at_ask,
+                        &sim_bid_at_ask,
+                        &ref_ask_at_ask,
+                        &ref_bid_at_ask,
+                        &sim_ask_at_bid,
+                        &sim_bid_at_bid,
+                        &ref_ask_at_bid,
+                        &ref_bid_at_bid,
                         self.tail_impact,
                     )
                 };
 
-                (sim_ask_at_ask, sim_bid_at_bid, impact.ask_impact, impact.bid_impact)
+                (
+                    sim_ask_at_ask,
+                    sim_bid_at_bid,
+                    impact.ask_impact,
+                    impact.bid_impact,
+                )
             })
             .collect();
 
@@ -250,40 +292,70 @@ pub fn write_bidask_results(
     // Ask impact paths
     let ask_impact_data: Vec<f64> = (0..n_ask_times)
         .flat_map(|t_idx| {
-            results.ask_impact_paths.iter().map(move |path| {
-                path.get(t_idx).copied().unwrap_or(f64::NAN)
-            })
+            results
+                .ask_impact_paths
+                .iter()
+                .map(move |path| path.get(t_idx).copied().unwrap_or(f64::NAN))
         })
         .collect();
-    write_npy_f64(&format!("{}/ask_impact_paths.npy", output_dir), &ask_impact_data, n_ask_times, n_simulations)?;
+    write_npy_f64(
+        &format!("{}/ask_impact_paths.npy", output_dir),
+        &ask_impact_data,
+        n_ask_times,
+        n_simulations,
+    )?;
 
     // Bid impact paths
     let bid_impact_data: Vec<f64> = (0..n_bid_times)
         .flat_map(|t_idx| {
-            results.bid_impact_paths.iter().map(move |path| {
-                path.get(t_idx).copied().unwrap_or(f64::NAN)
-            })
+            results
+                .bid_impact_paths
+                .iter()
+                .map(move |path| path.get(t_idx).copied().unwrap_or(f64::NAN))
         })
         .collect();
-    write_npy_f64(&format!("{}/bid_impact_paths.npy", output_dir), &bid_impact_data, n_bid_times, n_simulations)?;
+    write_npy_f64(
+        &format!("{}/bid_impact_paths.npy", output_dir),
+        &bid_impact_data,
+        n_bid_times,
+        n_simulations,
+    )?;
 
     // Ask queue paths
     let ask_queue_data: Vec<u32> = (0..n_ask_times)
         .flat_map(|t_idx| {
-            std::iter::once(reference_ask_samples[t_idx])
-                .chain(results.ask_queue_samples.iter().map(move |samples| samples[t_idx]))
+            std::iter::once(reference_ask_samples[t_idx]).chain(
+                results
+                    .ask_queue_samples
+                    .iter()
+                    .map(move |samples| samples[t_idx]),
+            )
         })
         .collect();
-    write_npy_u32(&format!("{}/ask_queue_paths.npy", output_dir), &ask_queue_data, n_ask_times, n_simulations + 1)?;
+    write_npy_u32(
+        &format!("{}/ask_queue_paths.npy", output_dir),
+        &ask_queue_data,
+        n_ask_times,
+        n_simulations + 1,
+    )?;
 
     // Bid queue paths
     let bid_queue_data: Vec<u32> = (0..n_bid_times)
         .flat_map(|t_idx| {
-            std::iter::once(reference_bid_samples[t_idx])
-                .chain(results.bid_queue_samples.iter().map(move |samples| samples[t_idx]))
+            std::iter::once(reference_bid_samples[t_idx]).chain(
+                results
+                    .bid_queue_samples
+                    .iter()
+                    .map(move |samples| samples[t_idx]),
+            )
         })
         .collect();
-    write_npy_u32(&format!("{}/bid_queue_paths.npy", output_dir), &bid_queue_data, n_bid_times, n_simulations + 1)?;
+    write_npy_u32(
+        &format!("{}/bid_queue_paths.npy", output_dir),
+        &bid_queue_data,
+        n_bid_times,
+        n_simulations + 1,
+    )?;
 
     // Times
     write_npy_f64_1d(&format!("{}/ask_times.npy", output_dir), ask_market_orders)?;
@@ -308,40 +380,70 @@ pub fn write_bidask_memory_efficient_results(
     // Ask impact paths
     let ask_impact_data: Vec<f64> = (0..n_ask_times)
         .flat_map(|t_idx| {
-            results.ask_impact_paths.iter().map(move |path| {
-                path.get(t_idx).copied().unwrap_or(f64::NAN)
-            })
+            results
+                .ask_impact_paths
+                .iter()
+                .map(move |path| path.get(t_idx).copied().unwrap_or(f64::NAN))
         })
         .collect();
-    write_npy_f64(&format!("{}/ask_impact_paths.npy", output_dir), &ask_impact_data, n_ask_times, n_simulations)?;
+    write_npy_f64(
+        &format!("{}/ask_impact_paths.npy", output_dir),
+        &ask_impact_data,
+        n_ask_times,
+        n_simulations,
+    )?;
 
     // Bid impact paths
     let bid_impact_data: Vec<f64> = (0..n_bid_times)
         .flat_map(|t_idx| {
-            results.bid_impact_paths.iter().map(move |path| {
-                path.get(t_idx).copied().unwrap_or(f64::NAN)
-            })
+            results
+                .bid_impact_paths
+                .iter()
+                .map(move |path| path.get(t_idx).copied().unwrap_or(f64::NAN))
         })
         .collect();
-    write_npy_f64(&format!("{}/bid_impact_paths.npy", output_dir), &bid_impact_data, n_bid_times, n_simulations)?;
+    write_npy_f64(
+        &format!("{}/bid_impact_paths.npy", output_dir),
+        &bid_impact_data,
+        n_bid_times,
+        n_simulations,
+    )?;
 
     // Ask queue paths
     let ask_queue_data: Vec<u32> = (0..n_ask_times)
         .flat_map(|t_idx| {
-            std::iter::once(reference_ask_samples[t_idx])
-                .chain(results.ask_queue_samples.iter().map(move |samples| samples[t_idx]))
+            std::iter::once(reference_ask_samples[t_idx]).chain(
+                results
+                    .ask_queue_samples
+                    .iter()
+                    .map(move |samples| samples[t_idx]),
+            )
         })
         .collect();
-    write_npy_u32(&format!("{}/ask_queue_paths.npy", output_dir), &ask_queue_data, n_ask_times, n_simulations + 1)?;
+    write_npy_u32(
+        &format!("{}/ask_queue_paths.npy", output_dir),
+        &ask_queue_data,
+        n_ask_times,
+        n_simulations + 1,
+    )?;
 
     // Bid queue paths
     let bid_queue_data: Vec<u32> = (0..n_bid_times)
         .flat_map(|t_idx| {
-            std::iter::once(reference_bid_samples[t_idx])
-                .chain(results.bid_queue_samples.iter().map(move |samples| samples[t_idx]))
+            std::iter::once(reference_bid_samples[t_idx]).chain(
+                results
+                    .bid_queue_samples
+                    .iter()
+                    .map(move |samples| samples[t_idx]),
+            )
         })
         .collect();
-    write_npy_u32(&format!("{}/bid_queue_paths.npy", output_dir), &bid_queue_data, n_bid_times, n_simulations + 1)?;
+    write_npy_u32(
+        &format!("{}/bid_queue_paths.npy", output_dir),
+        &bid_queue_data,
+        n_bid_times,
+        n_simulations + 1,
+    )?;
 
     // Times
     write_npy_f64_1d(&format!("{}/ask_times.npy", output_dir), ask_market_orders)?;

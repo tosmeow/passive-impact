@@ -41,7 +41,7 @@
 //! Where `I(init, c_lambda, Hawkes)` is the single-queue impact path computation.
 
 use crate::conditional_impact::TailImpact;
-use crate::models::{MultiExponentialHawkes, QueuePath, BidAskQueuePath};
+use crate::models::{BidAskQueuePath, MultiExponentialHawkes, QueuePath};
 
 /// Parameters for the symmetric C matrix.
 #[derive(Clone, Debug)]
@@ -102,13 +102,12 @@ pub struct ModeTailImpact {
 
 impl ModeTailImpact {
     /// Create a mode tail impact from Hawkes parameters and events.
-    pub fn new(
-        hawkes_params: MultiExponentialHawkes,
-        c_lambda: f64,
-        events: Vec<f64>,
-    ) -> Self {
+    pub fn new(hawkes_params: MultiExponentialHawkes, c_lambda: f64, events: Vec<f64>) -> Self {
         let tail_impact = TailImpact::new(hawkes_params, c_lambda, events);
-        Self { tail_impact, c_lambda }
+        Self {
+            tail_impact,
+            c_lambda,
+        }
     }
 }
 
@@ -204,7 +203,10 @@ impl BidAskImpactPath {
     ) -> Self {
         // Compute impact on ask side (at N^a event times)
         let ask_impact = Self::compute_side_impact(
-            q_a, q_b, q_prime_a, q_prime_b,
+            q_a,
+            q_b,
+            q_prime_a,
+            q_prime_b,
             &tail_impact.plus_ask.tail_impact,
             &tail_impact.minus_ask.tail_impact,
             true, // ask side: add the minus term
@@ -212,13 +214,19 @@ impl BidAskImpactPath {
 
         // Compute impact on bid side (at N^b event times)
         let bid_impact = Self::compute_side_impact(
-            q_a, q_b, q_prime_a, q_prime_b,
+            q_a,
+            q_b,
+            q_prime_a,
+            q_prime_b,
             &tail_impact.plus_bid.tail_impact,
             &tail_impact.minus_bid.tail_impact,
             false, // bid side: subtract the minus term
         );
 
-        Self { ask_impact, bid_impact }
+        Self {
+            ask_impact,
+            bid_impact,
+        }
     }
 
     /// Compute impact for one side.
@@ -268,7 +276,7 @@ impl BidAskImpactPath {
             let diff_b = curr_q_prime_b - curr_q_b;
 
             // Mode decomposition
-            let f_plus = diff_a + diff_b;  // symmetric mode
+            let f_plus = diff_a + diff_b; // symmetric mode
             let f_minus = diff_a - diff_b; // antisymmetric mode
 
             // Update cumulative terms
@@ -353,12 +361,28 @@ impl BidAskImpactPath {
         // Validate lengths
         assert_eq!(q_a_at_ask.len(), n_ask, "q_a_at_ask length mismatch");
         assert_eq!(q_b_at_ask.len(), n_ask, "q_b_at_ask length mismatch");
-        assert_eq!(q_prime_a_at_ask.len(), n_ask, "q_prime_a_at_ask length mismatch");
-        assert_eq!(q_prime_b_at_ask.len(), n_ask, "q_prime_b_at_ask length mismatch");
+        assert_eq!(
+            q_prime_a_at_ask.len(),
+            n_ask,
+            "q_prime_a_at_ask length mismatch"
+        );
+        assert_eq!(
+            q_prime_b_at_ask.len(),
+            n_ask,
+            "q_prime_b_at_ask length mismatch"
+        );
         assert_eq!(q_a_at_bid.len(), n_bid, "q_a_at_bid length mismatch");
         assert_eq!(q_b_at_bid.len(), n_bid, "q_b_at_bid length mismatch");
-        assert_eq!(q_prime_a_at_bid.len(), n_bid, "q_prime_a_at_bid length mismatch");
-        assert_eq!(q_prime_b_at_bid.len(), n_bid, "q_prime_b_at_bid length mismatch");
+        assert_eq!(
+            q_prime_a_at_bid.len(),
+            n_bid,
+            "q_prime_a_at_bid length mismatch"
+        );
+        assert_eq!(
+            q_prime_b_at_bid.len(),
+            n_bid,
+            "q_prime_b_at_bid length mismatch"
+        );
 
         // Compute ask impact
         let ask_impact = Self::compute_side_impact_from_samples(
@@ -382,7 +406,10 @@ impl BidAskImpactPath {
             false, // bid side: subtract the minus term
         );
 
-        Self { ask_impact, bid_impact }
+        Self {
+            ask_impact,
+            bid_impact,
+        }
     }
 
     /// Compute impact for one side from pre-sampled queue values.
@@ -407,7 +434,7 @@ impl BidAskImpactPath {
             let diff_b = q_prime_b[t_idx] as f64 - q_b[t_idx] as f64;
 
             // Mode decomposition
-            let f_plus = diff_a + diff_b;  // symmetric mode
+            let f_plus = diff_a + diff_b; // symmetric mode
             let f_minus = diff_a - diff_b; // antisymmetric mode
 
             // Update cumulative terms
@@ -464,12 +491,28 @@ mod tests {
 
         // If q = q', impact should be zero
         let events = vec![
-            QueueEvent { queue_event: 2, queue_size: 10, time: 0.0 },
-            QueueEvent { queue_event: 2, queue_size: 9, time: 1.0 },
-            QueueEvent { queue_event: 2, queue_size: 8, time: 2.0 },
+            QueueEvent {
+                queue_event: 2,
+                queue_size: 10,
+                time: 0.0,
+            },
+            QueueEvent {
+                queue_event: 2,
+                queue_size: 9,
+                time: 1.0,
+            },
+            QueueEvent {
+                queue_event: 2,
+                queue_size: 8,
+                time: 2.0,
+            },
         ];
-        let q_a = QueuePath { events: events.clone() };
-        let q_b = QueuePath { events: events.clone() };
+        let q_a = QueuePath {
+            events: events.clone(),
+        };
+        let q_b = QueuePath {
+            events: events.clone(),
+        };
 
         let c_matrix = SymmetricCMatrix::new(1.0, 0.2);
         let tail_impact = BidAskTailImpact::new_symmetric_hawkes(

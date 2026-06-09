@@ -1,11 +1,14 @@
-use simulation_project::models::{AffineQueueProcess, MultiExponentialHawkes, MultivariateEvent, MultivariateSimulationResult};
-use simulation_project::simulation::{simulate, simulate_with_externals, ConditionalSimulationContext, SimulationConfig};
-use simulation_project::simulation_helpers::{
-    hawkes_to_market_orders, merge_events,
-    extract_events_by_dim, sample_queue_at_times,
+use simulation_project::conditional_impact::{ImpactPath, TailImpact};
+use simulation_project::models::{
+    AffineQueueProcess, MultiExponentialHawkes, MultivariateEvent, MultivariateSimulationResult,
 };
-use simulation_project::conditional_impact::{TailImpact, ImpactPath};
-use simulation_project::utils::{write_npy_f64, write_npy_u32, write_npy_f64_1d};
+use simulation_project::simulation::{
+    simulate, simulate_with_externals, ConditionalSimulationContext, SimulationConfig,
+};
+use simulation_project::simulation_helpers::{
+    extract_events_by_dim, hawkes_to_market_orders, merge_events, sample_queue_at_times,
+};
+use simulation_project::utils::{write_npy_f64, write_npy_f64_1d, write_npy_u32};
 
 use std::time::Instant;
 
@@ -36,9 +39,9 @@ fn main() {
     let initial_queue_size: u32 = 200;
 
     // Affine queue parameters (same as single_queue)
-    let a_l = 100.0;   // λ^L(q) = a_l + b_l * q
+    let a_l = 100.0; // λ^L(q) = a_l + b_l * q
     let b_l = -0.275;
-    let a_c = 2.0;     // λ^C(q) = a_c + b_c * q
+    let a_c = 2.0; // λ^C(q) = a_c + b_c * q
     let b_c = 0.125;
 
     // Hawkes parameters for market orders
@@ -47,15 +50,15 @@ fn main() {
     let beta = vec![0.15, 0.60, 2.5, 10.0];
 
     // Extreme events configuration
-    let n_lc_events: u32 = 1000;  // Number of L/C events in [0, 1]
+    let n_lc_events: u32 = 1000; // Number of L/C events in [0, 1]
     let lc_start = 0.0;
     let lc_end = 1.0;
 
     // Range of initial queue state perturbations: q+1 to q+p
-    let p: u32 = 50;  // Maximum perturbation
+    let p: u32 = 50; // Maximum perturbation
 
     // Sampling grid for queue difference evolution
-    let m_samples: u32 = 1000;  // Number of sample points in [0, 1]
+    let m_samples: u32 = 1000; // Number of sample points in [0, 1]
 
     // Create sampling grid: linspace on [0, 1]
     let sample_times: Vec<f64> = (0..m_samples)
@@ -63,8 +66,14 @@ fn main() {
         .collect();
 
     println!("=== Extreme Events Experiment ===");
-    println!("Time horizon: {}, Initial queue: {}", time_horizon, initial_queue_size);
-    println!("L/C events: {} events in [{}, {}]", n_lc_events, lc_start, lc_end);
+    println!(
+        "Time horizon: {}, Initial queue: {}",
+        time_horizon, initial_queue_size
+    );
+    println!(
+        "L/C events: {} events in [{}, {}]",
+        n_lc_events, lc_start, lc_end
+    );
     println!("Initial state perturbations: q+1 to q+{}", p);
     println!("Sample grid: {} points in [0, 1]", m_samples);
 
@@ -82,10 +91,16 @@ fn main() {
     // Pre-simulate Hawkes path
     let hawkes = MultiExponentialHawkes::new_with_state(
         MultiExponentialHawkes::new(mu, alpha.clone(), beta.clone()).stationary_state(),
-        mu, alpha.clone(), beta.clone(),
+        mu,
+        alpha.clone(),
+        beta.clone(),
     );
     let hawkes_result = simulate(&hawkes, time_horizon, Some(42));
-    println!("[TIMING] Hawkes pre-simulation: {:?} ({} events)", t0.elapsed(), hawkes_result.events.len());
+    println!(
+        "[TIMING] Hawkes pre-simulation: {:?} ({} events)",
+        t0.elapsed(),
+        hawkes_result.events.len()
+    );
     let hawkes_as_market = hawkes_to_market_orders(&hawkes_result);
 
     // Create alternating L/C events (net zero effect on queue level)
@@ -94,14 +109,19 @@ fn main() {
 
     // Simulate reference q path with market orders only as externals
     let t0 = Instant::now();
-    let q_result_internal = simulate_with_externals(&process, time_horizon, &hawkes_as_market, Some(42));
+    let q_result_internal =
+        simulate_with_externals(&process, time_horizon, &hawkes_as_market, Some(42));
     let q_result = merge_events(&q_result_internal, &hawkes_as_market);
 
     // Build q_path INCLUDING the synthetic L/C events (as if q generated them)
     let q_result_with_lc = merge_events(&q_result, &lc_events);
     let q_path = AffineQueueProcess::result_to_queue_path(&q_result_with_lc, initial_queue_size);
-    println!("[TIMING] q simulation (reference): {:?} ({} total events, {} synthetic L/C)",
-             t0.elapsed(), q_path.events.len(), lc_events.events.len());
+    println!(
+        "[TIMING] q simulation (reference): {:?} ({} total events, {} synthetic L/C)",
+        t0.elapsed(),
+        q_path.events.len(),
+        lc_events.events.len()
+    );
 
     // Get reference queue value at t=0 (this is the q we'll perturb)
     let q_at_zero = q_path.queue_at_time(0.0);
@@ -124,14 +144,23 @@ fn main() {
         q_events_by_dim[dim].extend(&lc_times_by_dim[dim]);
         q_events_by_dim[dim].sort_by(|a, b| a.partial_cmp(b).unwrap());
     }
-    println!("Conditioning events: {} L, {} C", q_events_by_dim[0].len(), q_events_by_dim[1].len());
+    println!(
+        "Conditioning events: {} L, {} C",
+        q_events_by_dim[0].len(),
+        q_events_by_dim[1].len()
+    );
 
     // ==========================================================================
     // Setup TailImpact
     // ==========================================================================
     let t0 = Instant::now();
     let tail_impact = TailImpact::from_affine_queue(
-        mu, alpha.clone(), beta.clone(), b_l, b_c, market_orders.clone()
+        mu,
+        alpha.clone(),
+        beta.clone(),
+        b_l,
+        b_c,
+        market_orders.clone(),
     );
     println!("[TIMING] TailImpact setup: {:?}", t0.elapsed());
 
@@ -158,8 +187,8 @@ fn main() {
     let ctx = ConditionalSimulationContext::new(
         &process,
         &q_events_by_dim,
-        Some(&hawkes_as_market),  // q's externals (market only)
-        Some(&hawkes_as_market),  // q̄'s externals (same: market only)
+        Some(&hawkes_as_market), // q's externals (market only)
+        Some(&hawkes_as_market), // q̄'s externals (same: market only)
         time_horizon,
     );
 
@@ -171,7 +200,11 @@ fn main() {
 
     // Run all simulations
     let sim_results = ctx.simulate_multiple(&configs, 42);
-    println!("[TIMING] Conditional simulations ({}x): {:?}", p, t0.elapsed());
+    println!(
+        "[TIMING] Conditional simulations ({}x): {:?}",
+        p,
+        t0.elapsed()
+    );
 
     // ==========================================================================
     // Run baseline conditional simulations (without L/C events)
@@ -187,7 +220,11 @@ fn main() {
     );
 
     let sim_results_baseline = ctx_baseline.simulate_multiple(&configs, 42);
-    println!("[TIMING] Baseline conditional simulations ({}x): {:?}", p, t0_baseline.elapsed());
+    println!(
+        "[TIMING] Baseline conditional simulations ({}x): {:?}",
+        p,
+        t0_baseline.elapsed()
+    );
 
     // Collect baseline queue samples on the sample grid
     let mut baseline_queue_samples_grid: Vec<Vec<u32>> = Vec::with_capacity(p as usize);
@@ -246,39 +283,72 @@ fn main() {
     // Write impact paths at market order times: [n_market_times x n_sims]
     let impact_data: Vec<f64> = (0..n_market_times)
         .flat_map(|t_idx| {
-            all_impact_paths.iter().map(move |path| {
-                path.get(t_idx).copied().unwrap_or(f64::NAN)
-            })
+            all_impact_paths
+                .iter()
+                .map(move |path| path.get(t_idx).copied().unwrap_or(f64::NAN))
         })
         .collect();
-    write_npy_f64(&format!("{}/impact_paths.npy", output_dir), &impact_data, n_market_times, n_sims).unwrap();
+    write_npy_f64(
+        &format!("{}/impact_paths.npy", output_dir),
+        &impact_data,
+        n_market_times,
+        n_sims,
+    )
+    .unwrap();
 
     // Write queue paths at market order times: [n_market_times x (1 + n_sims)]
     let queue_data_market: Vec<u32> = (0..n_market_times)
         .flat_map(|t_idx| {
-            std::iter::once(q_at_market_orders[t_idx])
-                .chain(all_queue_samples_market.iter().map(move |samples| samples[t_idx]))
+            std::iter::once(q_at_market_orders[t_idx]).chain(
+                all_queue_samples_market
+                    .iter()
+                    .map(move |samples| samples[t_idx]),
+            )
         })
         .collect();
-    write_npy_u32(&format!("{}/queue_paths.npy", output_dir), &queue_data_market, n_market_times, n_sims + 1).unwrap();
+    write_npy_u32(
+        &format!("{}/queue_paths.npy", output_dir),
+        &queue_data_market,
+        n_market_times,
+        n_sims + 1,
+    )
+    .unwrap();
 
     // Write queue paths at sample grid: [n_sample_times x (1 + n_sims)]
     let queue_data_grid: Vec<u32> = (0..n_sample_times)
         .flat_map(|t_idx| {
-            std::iter::once(q_at_sample_times[t_idx])
-                .chain(all_queue_samples_grid.iter().map(move |samples| samples[t_idx]))
+            std::iter::once(q_at_sample_times[t_idx]).chain(
+                all_queue_samples_grid
+                    .iter()
+                    .map(move |samples| samples[t_idx]),
+            )
         })
         .collect();
-    write_npy_u32(&format!("{}/queue_paths_grid.npy", output_dir), &queue_data_grid, n_sample_times, n_sims + 1).unwrap();
+    write_npy_u32(
+        &format!("{}/queue_paths_grid.npy", output_dir),
+        &queue_data_grid,
+        n_sample_times,
+        n_sims + 1,
+    )
+    .unwrap();
 
     // Write baseline queue paths at sample grid: [n_sample_times x (1 + n_sims)]
     let baseline_queue_data_grid: Vec<u32> = (0..n_sample_times)
         .flat_map(|t_idx| {
-            std::iter::once(q_at_sample_times[t_idx])
-                .chain(baseline_queue_samples_grid.iter().map(move |samples| samples[t_idx]))
+            std::iter::once(q_at_sample_times[t_idx]).chain(
+                baseline_queue_samples_grid
+                    .iter()
+                    .map(move |samples| samples[t_idx]),
+            )
         })
         .collect();
-    write_npy_u32(&format!("{}/queue_paths_grid_baseline.npy", output_dir), &baseline_queue_data_grid, n_sample_times, n_sims + 1).unwrap();
+    write_npy_u32(
+        &format!("{}/queue_paths_grid_baseline.npy", output_dir),
+        &baseline_queue_data_grid,
+        n_sample_times,
+        n_sims + 1,
+    )
+    .unwrap();
 
     // Write market order times
     write_npy_f64_1d(&format!("{}/times.npy", output_dir), &market_orders).unwrap();
@@ -288,7 +358,11 @@ fn main() {
 
     // Write initial deltas
     let initial_deltas_f64: Vec<f64> = initial_deltas.iter().map(|&d| d as f64).collect();
-    write_npy_f64_1d(&format!("{}/initial_deltas.npy", output_dir), &initial_deltas_f64).unwrap();
+    write_npy_f64_1d(
+        &format!("{}/initial_deltas.npy", output_dir),
+        &initial_deltas_f64,
+    )
+    .unwrap();
 
     // Write L/C event times for reference
     let lc_times: Vec<f64> = lc_events.events.iter().map(|e| e.time).collect();
@@ -305,12 +379,29 @@ fn main() {
     println!("[TIMING] TOTAL: {:?}", t_total.elapsed());
     println!("\nOutput written to: {}", output_dir);
     println!("Files:");
-    println!("  - impact_paths.npy: [{} x {}] impact at market order times", n_market_times, n_sims);
-    println!("  - queue_paths.npy: [{} x {}] queues at market order times", n_market_times, n_sims + 1);
-    println!("  - queue_paths_grid.npy: [{} x {}] queues at sample grid (with L/C events)", n_sample_times, n_sims + 1);
+    println!(
+        "  - impact_paths.npy: [{} x {}] impact at market order times",
+        n_market_times, n_sims
+    );
+    println!(
+        "  - queue_paths.npy: [{} x {}] queues at market order times",
+        n_market_times,
+        n_sims + 1
+    );
+    println!(
+        "  - queue_paths_grid.npy: [{} x {}] queues at sample grid (with L/C events)",
+        n_sample_times,
+        n_sims + 1
+    );
     println!("  - queue_paths_grid_baseline.npy: [{} x {}] queues at sample grid (baseline, no L/C events)", n_sample_times, n_sims + 1);
     println!("  - times.npy: [{}] market order times", n_market_times);
-    println!("  - sample_times.npy: [{}] sample grid times", n_sample_times);
-    println!("  - initial_deltas.npy: [{}] initial queue perturbations", n_sims);
+    println!(
+        "  - sample_times.npy: [{}] sample grid times",
+        n_sample_times
+    );
+    println!(
+        "  - initial_deltas.npy: [{}] initial queue perturbations",
+        n_sims
+    );
     println!("  - lc_event_times.npy: [{}] L/C event times", n_lc_events);
 }

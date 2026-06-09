@@ -1,9 +1,14 @@
 use std::fs::File;
-use std::io::{Write, BufWriter};
+use std::io::{BufWriter, Write};
 
 // Write a 2D array of f64 to .npy format (row-major, C order)
 // Shape: (n_rows, n_cols)
-pub fn write_npy_f64(path: &str, data: &[f64], n_rows: usize, n_cols: usize) -> std::io::Result<()> {
+pub fn write_npy_f64(
+    path: &str,
+    data: &[f64],
+    n_rows: usize,
+    n_cols: usize,
+) -> std::io::Result<()> {
     let file = File::create(path)?;
     let mut writer = BufWriter::with_capacity(1 << 20, file); // 1MB buffer
 
@@ -41,7 +46,12 @@ pub fn write_npy_f64(path: &str, data: &[f64], n_rows: usize, n_cols: usize) -> 
 }
 
 /// Write a 2D array of u32 to .npy format.
-pub fn write_npy_u32(path: &str, data: &[u32], n_rows: usize, n_cols: usize) -> std::io::Result<()> {
+pub fn write_npy_u32(
+    path: &str,
+    data: &[u32],
+    n_rows: usize,
+    n_cols: usize,
+) -> std::io::Result<()> {
     let file = File::create(path)?;
     let mut writer = BufWriter::with_capacity(1 << 20, file);
 

@@ -1,4 +1,6 @@
-use crate::models::{MultivariateMarkovianIntensity, MultivariateEvent, MultivariateSimulationResult};
+use crate::models::{
+    MultivariateEvent, MultivariateMarkovianIntensity, MultivariateSimulationResult,
+};
 use crate::simulation_helpers::{create_rng, sample_exponential, sample_uniform};
 
 pub struct SimulationConfig<'a, S> {
@@ -13,7 +15,10 @@ impl<'a, S> SimulationConfig<'a, S> {
         external_events: Option<&'a MultivariateSimulationResult>,
         initial_state: Option<S>,
     ) -> Self {
-        Self { external_events, initial_state }
+        Self {
+            external_events,
+            initial_state,
+        }
     }
 }
 
@@ -82,21 +87,30 @@ impl<'a, P: MultivariateMarkovianIntensity> ConditionalSimulationContext<'a, P> 
         let mut cond_ext_idx = 0; // Index for conditioning external events
         let mut new_ext_idx = 0; // Index for new external events
 
-        let mut next_cond_times: Vec<f64> = self.conditioning_events_by_dim
+        let mut next_cond_times: Vec<f64> = self
+            .conditioning_events_by_dim
             .iter()
             .map(|events| events.first().copied().unwrap_or(f64::INFINITY))
             .collect(); // Pre-compute next conditioning event times per dimension
 
         while t < self.t_max {
-            let cond_intensities = self.process.intensities_from_state(&cond_state, t, t_last_cond); // Compute intensities for conditional state at current time.
-            let new_intensities = self.process.intensities_from_state(&new_state, t, t_last_new); // Compute intensities for simulated state at current time.
+            let cond_intensities = self
+                .process
+                .intensities_from_state(&cond_state, t, t_last_cond); // Compute intensities for conditional state at current time.
+            let new_intensities = self
+                .process
+                .intensities_from_state(&new_state, t, t_last_new); // Compute intensities for simulated state at current time.
 
             // Next external event for conditioning path (updates cond_state)
-            let cond_ext_event = self.conditioning_external_events.and_then(|ext| ext.events.get(cond_ext_idx));
+            let cond_ext_event = self
+                .conditioning_external_events
+                .and_then(|ext| ext.events.get(cond_ext_idx));
             let t_cond_ext = cond_ext_event.map(|e| e.time).unwrap_or(f64::INFINITY);
 
             // Next external event for new simulation (updates new_state)
-            let new_ext_event = self.new_external_events.and_then(|ext| ext.events.get(new_ext_idx));
+            let new_ext_event = self
+                .new_external_events
+                .and_then(|ext| ext.events.get(new_ext_idx));
             let t_new_ext = new_ext_event.map(|e| e.time).unwrap_or(f64::INFINITY);
 
             let (next_cond_internal_dim, next_cond_internal_time) = next_cond_times
@@ -128,7 +142,6 @@ impl<'a, P: MultivariateMarkovianIntensity> ConditionalSimulationContext<'a, P> 
                 .map(|(dim, &tau)| (dim, tau))
                 .unwrap_or((0, f64::INFINITY));
 
-
             let taus = [
                 t_cond_ext - t,
                 t_new_ext - t,
@@ -136,7 +149,8 @@ impl<'a, P: MultivariateMarkovianIntensity> ConditionalSimulationContext<'a, P> 
                 independent_tau,
             ];
 
-            let (_argmin, &tau_min) = taus.iter()
+            let (_argmin, &tau_min) = taus
+                .iter()
                 .enumerate()
                 .min_by(|a, b| a.1.partial_cmp(b.1).unwrap())
                 .unwrap();
@@ -150,7 +164,8 @@ impl<'a, P: MultivariateMarkovianIntensity> ConditionalSimulationContext<'a, P> 
 
             if taus[0] == tau_min {
                 if let Some(ext_event) = cond_ext_event {
-                    self.process.update_state(&mut cond_state, ext_event.dim, t, t_last_cond);
+                    self.process
+                        .update_state(&mut cond_state, ext_event.dim, t, t_last_cond);
                     t_last_cond = t;
                     cond_ext_idx += 1;
                 }
@@ -158,43 +173,65 @@ impl<'a, P: MultivariateMarkovianIntensity> ConditionalSimulationContext<'a, P> 
 
             if taus[1] == tau_min {
                 if let Some(ext_event) = new_ext_event {
-                    self.process.update_state(&mut new_state, ext_event.dim, t, t_last_new);
+                    self.process
+                        .update_state(&mut new_state, ext_event.dim, t, t_last_new);
                     t_last_new = t;
                     new_ext_idx += 1;
                     // Record external event in result so queue path reconstruction includes it
-                    result.push(MultivariateEvent { time: t, dim: ext_event.dim });
+                    result.push(MultivariateEvent {
+                        time: t,
+                        dim: ext_event.dim,
+                    });
                 }
             }
 
             if taus[2] == tau_min {
                 // Re-compute intensities at new time t (after tau_min elapsed)
-                let cond_int = self.process.intensities_from_state(&cond_state, t, t_last_cond)[next_cond_internal_dim];
+                let cond_int = self
+                    .process
+                    .intensities_from_state(&cond_state, t, t_last_cond)[next_cond_internal_dim];
 
                 // If conditioning intensity is 0, this dimension's events come from externals.
                 // We still update cond_state but skip the acceptance test for new_state (externals will handle recording the event).
                 if cond_int > EPSILON {
                     let u = sample_uniform(&mut rng);
-                    let new_int = self.process.intensities_from_state(&new_state, t, t_last_new)[next_cond_internal_dim];
+                    let new_int = self
+                        .process
+                        .intensities_from_state(&new_state, t, t_last_new)[next_cond_internal_dim];
                     if u * cond_int <= new_int {
-                        self.process.update_state(&mut new_state, next_cond_internal_dim, t, t_last_new);
+                        self.process.update_state(
+                            &mut new_state,
+                            next_cond_internal_dim,
+                            t,
+                            t_last_new,
+                        );
                         t_last_new = t;
-                        result.push(MultivariateEvent { time: t, dim: next_cond_internal_dim });
+                        result.push(MultivariateEvent {
+                            time: t,
+                            dim: next_cond_internal_dim,
+                        });
                     }
                 }
 
                 // Always update conditioning state and advance index
-                self.process.update_state(&mut cond_state, next_cond_internal_dim, t, t_last_cond);
+                self.process
+                    .update_state(&mut cond_state, next_cond_internal_dim, t, t_last_cond);
                 t_last_cond = t;
 
                 cond_indices[next_cond_internal_dim] += 1;
-                next_cond_times[next_cond_internal_dim] = self.conditioning_events_by_dim[next_cond_internal_dim]
+                next_cond_times[next_cond_internal_dim] = self.conditioning_events_by_dim
+                    [next_cond_internal_dim]
                     .get(cond_indices[next_cond_internal_dim])
                     .copied()
                     .unwrap_or(f64::INFINITY);
             } else if taus[3] == tau_min {
-                self.process.update_state(&mut new_state, independent_dim, t, t_last_new);
+                self.process
+                    .update_state(&mut new_state, independent_dim, t, t_last_new);
                 t_last_new = t;
-                result.push(MultivariateEvent { time: t, dim: independent_dim });
+                result.push(MultivariateEvent {
+                    time: t,
+                    dim: independent_dim,
+                });
             }
         }
         result
@@ -254,7 +291,9 @@ mod tests {
             conditioning_result.events.len()
         );
 
-        for (i, (sim, cond)) in simulated_result.events.iter()
+        for (i, (sim, cond)) in simulated_result
+            .events
+            .iter()
             .zip(conditioning_result.events.iter())
             .enumerate()
         {
@@ -277,7 +316,8 @@ mod tests {
         let external_events = crate::simulation::simulate(&external_hawkes, t_max, Some(123));
 
         // Simulate the conditioning path with these external events
-        let conditioning_result = simulate_with_externals(&hawkes, t_max, &external_events, Some(42));
+        let conditioning_result =
+            simulate_with_externals(&hawkes, t_max, &external_events, Some(42));
 
         let mut expected_events: Vec<MultivariateEvent> = conditioning_result.events.clone();
         expected_events.extend(external_events.events.iter().cloned());
@@ -292,7 +332,7 @@ mod tests {
             t_max,
         );
 
-        let simulated_result = ctx.simulate(None, Some(999));  // Different seed shouldn't matter
+        let simulated_result = ctx.simulate(None, Some(999)); // Different seed shouldn't matter
 
         // The simulated path must be identical to the conditioning path + externals
         assert_eq!(
@@ -376,13 +416,13 @@ mod tests {
         // Create a process where dim 2 has 0 intensity (like queue-only process)
         let process = MarkovianProcess::new(
             3,
-            vec![100.0],  // Initial state: q=100
+            vec![100.0], // Initial state: q=100
             |state: &[f64], _t: f64, _t_last: f64| {
                 let q = state[0];
                 vec![
                     (50.0 + 0.1 * q).max(0.0),  // dim 0: some intensity
                     (10.0 + 0.05 * q).max(0.0), // dim 1: some intensity
-                    0.0,                         // dim 2: ZERO (external only)
+                    0.0,                        // dim 2: ZERO (external only)
                 ]
             },
             |state: &[f64], event: &MultivariateEvent, _t: f64, _t_prev: f64| {
@@ -410,13 +450,20 @@ mod tests {
         // Include ALL dims in conditioning events (including dim 2 which has 0 intensity)
         // This is the "naive" approach that Option B should handle correctly
         let cond_events_by_dim: Vec<Vec<f64>> = (0..3)
-            .map(|dim| cond_result.events.iter().filter(|e| e.dim == dim).map(|e| e.time).collect())
+            .map(|dim| {
+                cond_result
+                    .events
+                    .iter()
+                    .filter(|e| e.dim == dim)
+                    .map(|e| e.time)
+                    .collect()
+            })
             .collect();
 
         // Run conditional simulation with same externals
         let ctx = ConditionalSimulationContext::new(
             &process,
-            &cond_events_by_dim,  // Includes dim 2 events (Option B: not manually emptied)
+            &cond_events_by_dim, // Includes dim 2 events (Option B: not manually emptied)
             Some(&external_events),
             Some(&external_events),
             t_max,
@@ -434,10 +481,16 @@ mod tests {
         );
 
         // Verify the dim 2 events are at the external event times
-        let dim2_times: Vec<f64> = sim_result.events.iter()
+        let dim2_times: Vec<f64> = sim_result
+            .events
+            .iter()
             .filter(|e| e.dim == 2)
             .map(|e| e.time)
             .collect();
-        assert_eq!(dim2_times, vec![2.0, 5.0, 8.0], "Dim-2 events should match external event times");
+        assert_eq!(
+            dim2_times,
+            vec![2.0, 5.0, 8.0],
+            "Dim-2 events should match external event times"
+        );
     }
 }

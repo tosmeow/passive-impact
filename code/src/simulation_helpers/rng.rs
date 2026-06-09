@@ -1,6 +1,6 @@
-use rand::{Rng, SeedableRng};
 use rand::rngs::StdRng;
-use rand_distr::{Exp, Distribution};
+use rand::{Rng, SeedableRng};
+use rand_distr::{Distribution, Exp};
 
 pub fn create_rng(seed: Option<u64>) -> StdRng {
     match seed {

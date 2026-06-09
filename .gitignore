@@ -1,11 +1,14 @@
 target/
 .idea/
+.DS_Store
+.venv*/
 *.csv
 *.npy
 *.ipynb
 __pycache__/
 
 # Ignored experiments
+python/experiments/impact_cost
 python/experiments/presentation
 python/experiments/hawkes_example
 python/experiments/market_orders
@@ -15,6 +18,12 @@ python/experiments/extreme_events
 src/bin/experiments/
 data/experiments/
 
+# local datasets
+data/
+experiments/**/data/**
+!experiments/**/data/
+!experiments/**/data/README.md
+
 # maturin / pyo3 build artifacts
 code/python/target/
 code/python/simproj/_native*.so
@@ -23,6 +32,15 @@ code/python/simproj.egg-info/
 
 # custom experiment outputs
 experiments/*/custom_experiment/output/
+
+# impact-cost local inputs, references, and generated runs
+experiments/impact_cost/data/**/*.parquet
+experiments/impact_cost/references/*.pdf
+experiments/impact_cost/references/*.jpeg
+experiments/impact_cost/references/*.jpg
+experiments/impact_cost/references/*.png
+experiments/impact_cost/runs/*
+!experiments/impact_cost/runs/README.md
 # Internal notes (kept in git history, not in working tree)
 docs/
 .github/

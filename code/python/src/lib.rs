@@ -1,22 +1,29 @@
 use numpy::{IntoPyArray, PyArray1, PyReadonlyArray1};
 use pyo3::prelude::*;
+use pyo3::types::PyDict;
+use simulation_project::conditional_impact::{AggressiveImpactPath, ImpactPath, TailImpact};
+use simulation_project::experiments::impact_cost::{
+    build_execution_latency_grid as rs_build_execution_latency_grid,
+    select_first_limit_every as rs_select_first_limit_every,
+    select_limit_indices as rs_select_limit_indices,
+    select_random_limit_fraction as rs_select_random_limit_fraction,
+    simulate_anchored_affine_queue as rs_simulate_anchored_affine_queue,
+    track_passive_fills as rs_track_passive_fills, AffineQueueIntensity, AnchoredQueueInput,
+    CancellationPolicy, ExecutionLatencyGridInput, PassiveFillTrackerInput,
+};
 use simulation_project::models::{
-    MultiExponentialHawkes,
-    AffineQueueProcess, AffineBidAskQueueProcess, BidAskAffineParams, AffineIntensityParams,
-    MarkovianProcess, MultivariateSimulationResult,
+    AffineBidAskQueueProcess, AffineIntensityParams, AffineQueueProcess, BidAskAffineParams,
+    MarkovianProcess, MultiExponentialHawkes, MultivariateSimulationResult,
 };
 use simulation_project::simulation::simulate as rs_simulate;
 use simulation_project::simulation::simulate_with_externals as rs_simulate_with_externals;
 use simulation_project::simulation::ConditionalSimulationContext;
 use simulation_project::simulation_helpers::{
-    hawkes_to_market_orders as rs_hawkes_to_market_orders,
-    merge_events as rs_merge_events,
-    create_meta_orders as rs_create_meta_orders,
-    events_to_dim as rs_events_to_dim,
+    create_meta_orders as rs_create_meta_orders, events_to_dim as rs_events_to_dim,
     extract_events_by_dim as rs_extract_events_by_dim,
+    hawkes_to_market_orders as rs_hawkes_to_market_orders, merge_events as rs_merge_events,
     sample_queue_at_times as rs_sample_queue_at_times,
 };
-use simulation_project::conditional_impact::{TailImpact, AggressiveImpactPath, ImpactPath};
 
 #[pyclass(name = "MultiExponentialHawkes")]
 #[derive(Clone)]
@@ -28,15 +35,16 @@ pub struct PyMultiExponentialHawkes {
 impl PyMultiExponentialHawkes {
     #[new]
     fn new(mu: f64, alpha: Vec<f64>, beta: Vec<f64>) -> Self {
-        Self { inner: MultiExponentialHawkes::new(mu, alpha, beta) }
+        Self {
+            inner: MultiExponentialHawkes::new(mu, alpha, beta),
+        }
     }
 
     #[staticmethod]
     fn with_stationary_state(mu: f64, alpha: Vec<f64>, beta: Vec<f64>) -> Self {
         let base = MultiExponentialHawkes::new(mu, alpha.clone(), beta.clone());
-        let inner = MultiExponentialHawkes::new_with_state(
-            base.stationary_state(), mu, alpha, beta,
-        );
+        let inner =
+            MultiExponentialHawkes::new_with_state(base.stationary_state(), mu, alpha, beta);
         Self { inner }
     }
 
@@ -111,7 +119,9 @@ impl PyAffineQueueProcess {
     /// be supplied as externals.
     #[staticmethod]
     fn new_queue(q0: f64, a_l: f64, b_l: f64, a_c: f64, b_c: f64) -> PyQueueProcess {
-        PyQueueProcess { inner: AffineQueueProcess::new_queue(q0, a_l, b_l, a_c, b_c) }
+        PyQueueProcess {
+            inner: AffineQueueProcess::new_queue(q0, a_l, b_l, a_c, b_c),
+        }
     }
 
     /// Static helper: c_lambda = b_c - b_l.
@@ -131,13 +141,22 @@ impl PyAffineBidAskQueueProcess {
     #[staticmethod]
     #[allow(clippy::too_many_arguments)]
     fn new_queue(
-        q0_a: f64, q0_b: f64,
+        q0_a: f64,
+        q0_b: f64,
         // ask side: λ^L_a = a + b_aa*q_a + b_ab*q_b, similarly for cancel
-        l_a_const: f64, l_a_self: f64, l_a_cross: f64,
-        c_a_const: f64, c_a_self: f64, c_a_cross: f64,
+        l_a_const: f64,
+        l_a_self: f64,
+        l_a_cross: f64,
+        c_a_const: f64,
+        c_a_self: f64,
+        c_a_cross: f64,
         // bid side
-        l_b_const: f64, l_b_self: f64, l_b_cross: f64,
-        c_b_const: f64, c_b_self: f64, c_b_cross: f64,
+        l_b_const: f64,
+        l_b_self: f64,
+        l_b_cross: f64,
+        c_b_const: f64,
+        c_b_self: f64,
+        c_b_cross: f64,
     ) -> PyQueueProcess {
         let params = BidAskAffineParams {
             lambda_l_a: AffineIntensityParams::new(l_a_const, l_a_self, l_a_cross),
@@ -145,7 +164,9 @@ impl PyAffineBidAskQueueProcess {
             lambda_l_b: AffineIntensityParams::new(l_b_const, l_b_self, l_b_cross),
             lambda_c_b: AffineIntensityParams::new(c_b_const, c_b_self, c_b_cross),
         };
-        PyQueueProcess { inner: AffineBidAskQueueProcess::new_queue(q0_a, q0_b, params) }
+        PyQueueProcess {
+            inner: AffineBidAskQueueProcess::new_queue(q0_a, q0_b, params),
+        }
     }
 }
 
@@ -170,18 +191,24 @@ fn simulate_hawkes_as_market_orders(
     seed: Option<u64>,
 ) -> PySimulationResult {
     let result = rs_simulate(&hawkes.inner, t_max, seed);
-    PySimulationResult { inner: rs_hawkes_to_market_orders(&result) }
+    PySimulationResult {
+        inner: rs_hawkes_to_market_orders(&result),
+    }
 }
 
 #[pyfunction]
 fn merge_events(a: &PySimulationResult, b: &PySimulationResult) -> PySimulationResult {
-    PySimulationResult { inner: rs_merge_events(&a.inner, &b.inner) }
+    PySimulationResult {
+        inner: rs_merge_events(&a.inner, &b.inner),
+    }
 }
 
 /// Build an evenly-spaced metaorder block of n orders from t_start to t_end.
 #[pyfunction]
 fn create_meta_orders(n: u32, t_start: f64, t_end: f64) -> PySimulationResult {
-    PySimulationResult { inner: rs_create_meta_orders(n, t_start, t_end) }
+    PySimulationResult {
+        inner: rs_create_meta_orders(n, t_start, t_end),
+    }
 }
 
 /// Build a metaorder from an explicit list of times; tagged at target_dim.
@@ -191,10 +218,13 @@ fn create_meta_orders_from_times(
     target_dim: usize,
     total_dims: usize,
 ) -> PySimulationResult {
-    use simulation_project::models::{MultivariateEvent};
+    use simulation_project::models::MultivariateEvent;
     let mut result = MultivariateSimulationResult::new(total_dims);
     for &t in times.as_slice().unwrap() {
-        result.push(MultivariateEvent { time: t, dim: target_dim });
+        result.push(MultivariateEvent {
+            time: t,
+            dim: target_dim,
+        });
     }
     PySimulationResult { inner: result }
 }
@@ -205,7 +235,9 @@ fn events_to_dim(
     target_dim: usize,
     total_dims: usize,
 ) -> PySimulationResult {
-    PySimulationResult { inner: rs_events_to_dim(&events.inner, target_dim, total_dims) }
+    PySimulationResult {
+        inner: rs_events_to_dim(&events.inner, target_dim, total_dims),
+    }
 }
 
 /// Returns a list of f64 numpy arrays per dim.
@@ -217,7 +249,10 @@ fn extract_events_by_dim<'py>(
     exclude_dim: Option<usize>,
 ) -> Vec<Bound<'py, PyArray1<f64>>> {
     let by_dim = rs_extract_events_by_dim(&result.inner, total_dims, exclude_dim);
-    by_dim.into_iter().map(|v| v.into_pyarray_bound(py)).collect()
+    by_dim
+        .into_iter()
+        .map(|v| v.into_pyarray_bound(py))
+        .collect()
 }
 
 #[pyfunction]
@@ -230,6 +265,414 @@ fn sample_queue_at_times<'py>(
     let q_path = AffineQueueProcess::result_to_queue_path(&queue_path_events.inner, initial_q);
     let samples = rs_sample_queue_at_times(&q_path, times.as_slice().unwrap());
     samples.into_pyarray_bound(py)
+}
+
+/// Experiment-local anchored conditional queue simulation.
+///
+/// The empirical queue snapshots define q_bar. Rust simulates dq = q - q_bar
+/// and returns sampled queues/offsets on `sample_times`.
+#[pyfunction]
+#[allow(clippy::too_many_arguments)]
+fn simulate_anchored_affine_queue<'py>(
+    py: Python<'py>,
+    event_times: PyReadonlyArray1<f64>,
+    event_dims: PyReadonlyArray1<i32>,
+    event_qtys: PyReadonlyArray1<u32>,
+    bar_q_pre: PyReadonlyArray1<f64>,
+    bar_q_post: PyReadonlyArray1<f64>,
+    passive_flags: PyReadonlyArray1<bool>,
+    sample_times: PyReadonlyArray1<f64>,
+    initial_q: f64,
+    horizon_seconds: f64,
+    n_simulations: usize,
+    a_l: f64,
+    b_l: f64,
+    a_c: f64,
+    b_c: f64,
+    seed: Option<u64>,
+) -> PyResult<Bound<'py, PyDict>> {
+    let input = AnchoredQueueInput {
+        event_times: event_times.as_slice()?.to_vec(),
+        event_dims: event_dims.as_slice()?.to_vec(),
+        event_qtys: event_qtys.as_slice()?.to_vec(),
+        bar_q_pre: bar_q_pre.as_slice()?.to_vec(),
+        bar_q_post: bar_q_post.as_slice()?.to_vec(),
+        passive_flags: passive_flags.as_slice()?.to_vec(),
+        sample_times: sample_times.as_slice()?.to_vec(),
+        initial_q,
+        horizon_seconds,
+        n_simulations,
+        seed,
+        intensity: AffineQueueIntensity { a_l, b_l, a_c, b_c },
+    };
+
+    let result = rs_simulate_anchored_affine_queue(input)
+        .map_err(pyo3::exceptions::PyValueError::new_err)?;
+
+    let out = PyDict::new_bound(py);
+    out.set_item("n_times", result.n_times)?;
+    out.set_item("n_simulations", result.n_simulations)?;
+    out.set_item("factual_queue", result.factual_queue.into_pyarray_bound(py))?;
+    out.set_item(
+        "mechanical_queue",
+        result.mechanical_queue.into_pyarray_bound(py),
+    )?;
+    out.set_item("queue_samples", result.queue_samples.into_pyarray_bound(py))?;
+    out.set_item(
+        "offset_samples",
+        result.offset_samples.into_pyarray_bound(py),
+    )?;
+    out.set_item("event_times", result.event_times.into_pyarray_bound(py))?;
+    out.set_item("event_dims", result.event_dims.into_pyarray_bound(py))?;
+    out.set_item("event_qtys", result.event_qtys.into_pyarray_bound(py))?;
+    out.set_item(
+        "event_simulations",
+        result.event_simulations.into_pyarray_bound(py),
+    )?;
+    Ok(out)
+}
+
+#[pyfunction]
+fn select_limit_flags_first_every<'py>(
+    py: Python<'py>,
+    event_times: PyReadonlyArray1<f64>,
+    event_dims: PyReadonlyArray1<i32>,
+    every_seconds: f64,
+) -> PyResult<Bound<'py, PyArray1<bool>>> {
+    let flags = rs_select_first_limit_every(
+        event_times.as_slice()?,
+        event_dims.as_slice()?,
+        every_seconds,
+    )
+    .map_err(pyo3::exceptions::PyValueError::new_err)?;
+    Ok(flags.into_pyarray_bound(py))
+}
+
+#[pyfunction]
+fn select_limit_flags_indices<'py>(
+    py: Python<'py>,
+    event_dims: PyReadonlyArray1<i32>,
+    indices: Vec<usize>,
+    index_base: usize,
+) -> PyResult<Bound<'py, PyArray1<bool>>> {
+    let flags = rs_select_limit_indices(event_dims.as_slice()?, &indices, index_base)
+        .map_err(pyo3::exceptions::PyValueError::new_err)?;
+    Ok(flags.into_pyarray_bound(py))
+}
+
+#[pyfunction]
+fn select_limit_flags_random_fraction<'py>(
+    py: Python<'py>,
+    event_dims: PyReadonlyArray1<i32>,
+    fraction: f64,
+    seed: Option<u64>,
+) -> PyResult<Bound<'py, PyArray1<bool>>> {
+    let flags = rs_select_random_limit_fraction(event_dims.as_slice()?, fraction, seed)
+        .map_err(pyo3::exceptions::PyValueError::new_err)?;
+    Ok(flags.into_pyarray_bound(py))
+}
+
+#[pyfunction]
+#[pyo3(signature = (
+    event_times,
+    event_dims,
+    event_qtys,
+    queue_post,
+    passive_flags,
+    cancellation_policy,
+    theta,
+    seed,
+    cap_position_by_queue_post = false
+))]
+fn track_passive_fills<'py>(
+    py: Python<'py>,
+    event_times: PyReadonlyArray1<f64>,
+    event_dims: PyReadonlyArray1<i32>,
+    event_qtys: PyReadonlyArray1<u32>,
+    queue_post: PyReadonlyArray1<f64>,
+    passive_flags: PyReadonlyArray1<bool>,
+    cancellation_policy: String,
+    theta: f64,
+    seed: Option<u64>,
+    cap_position_by_queue_post: bool,
+) -> PyResult<Bound<'py, PyDict>> {
+    let policy = CancellationPolicy::from_name(&cancellation_policy, theta)
+        .map_err(pyo3::exceptions::PyValueError::new_err)?;
+    let input = PassiveFillTrackerInput {
+        event_times: event_times.as_slice()?.to_vec(),
+        event_dims: event_dims.as_slice()?.to_vec(),
+        event_qtys: event_qtys.as_slice()?.to_vec(),
+        queue_post: queue_post.as_slice()?.to_vec(),
+        passive_flags: passive_flags.as_slice()?.to_vec(),
+        cancellation_policy: policy,
+        cap_position_by_queue_post,
+        seed,
+    };
+    let result = rs_track_passive_fills(input).map_err(pyo3::exceptions::PyValueError::new_err)?;
+
+    let out = PyDict::new_bound(py);
+    out.set_item("order_ids", result.order_ids.into_pyarray_bound(py))?;
+    out.set_item("order_row_pos", result.order_row_pos.into_pyarray_bound(py))?;
+    out.set_item("order_times", result.order_times.into_pyarray_bound(py))?;
+    out.set_item("initial_qtys", result.initial_qtys.into_pyarray_bound(py))?;
+    out.set_item("executed_qtys", result.executed_qtys.into_pyarray_bound(py))?;
+    out.set_item(
+        "remaining_qtys",
+        result.remaining_qtys.into_pyarray_bound(py),
+    )?;
+    out.set_item(
+        "final_position_qtys",
+        result.final_position_qtys.into_pyarray_bound(py),
+    )?;
+    out.set_item(
+        "final_top_qtys",
+        result.final_top_qtys.into_pyarray_bound(py),
+    )?;
+    out.set_item(
+        "completed_times",
+        result.completed_times.into_pyarray_bound(py),
+    )?;
+    out.set_item(
+        "fill_order_ids",
+        result.fill_order_ids.into_pyarray_bound(py),
+    )?;
+    out.set_item(
+        "fill_order_row_pos",
+        result.fill_order_row_pos.into_pyarray_bound(py),
+    )?;
+    out.set_item(
+        "fill_event_row_pos",
+        result.fill_event_row_pos.into_pyarray_bound(py),
+    )?;
+    out.set_item("fill_times", result.fill_times.into_pyarray_bound(py))?;
+    out.set_item("fill_qtys", result.fill_qtys.into_pyarray_bound(py))?;
+    Ok(out)
+}
+
+/// Experiment-local minute-by-minute passive execution latency grid.
+///
+/// For each `minute_start`, this selects up to `n_orders` own limit orders by
+/// taking the first limit event in each `order_spacing_seconds` slot, then
+/// tracks fills over `tracking_horizon_seconds`.
+#[pyfunction]
+#[allow(clippy::too_many_arguments)]
+#[pyo3(signature = (
+    event_times,
+    event_dims,
+    event_qtys,
+    queue_post,
+    source_row_pos,
+    minute_starts,
+    n_orders,
+    order_spacing_seconds,
+    tracking_horizon_seconds,
+    cancellation_policy,
+    theta,
+    seed,
+    cap_position_by_queue_post = false
+))]
+fn simulate_execution_latency_grid<'py>(
+    py: Python<'py>,
+    event_times: PyReadonlyArray1<f64>,
+    event_dims: PyReadonlyArray1<i32>,
+    event_qtys: PyReadonlyArray1<u32>,
+    queue_post: PyReadonlyArray1<f64>,
+    source_row_pos: PyReadonlyArray1<i64>,
+    minute_starts: PyReadonlyArray1<f64>,
+    n_orders: usize,
+    order_spacing_seconds: f64,
+    tracking_horizon_seconds: f64,
+    cancellation_policy: String,
+    theta: f64,
+    seed: Option<u64>,
+    cap_position_by_queue_post: bool,
+) -> PyResult<Bound<'py, PyDict>> {
+    let event_times = event_times.as_slice()?;
+    let event_dims = event_dims.as_slice()?;
+    let event_qtys = event_qtys.as_slice()?;
+    let queue_post = queue_post.as_slice()?;
+    let source_row_pos = source_row_pos.as_slice()?;
+    let minute_starts = minute_starts.as_slice()?;
+
+    let policy = CancellationPolicy::from_name(&cancellation_policy, theta)
+        .map_err(pyo3::exceptions::PyValueError::new_err)?;
+
+    let source_row_positions: Vec<usize> = source_row_pos
+        .iter()
+        .map(|&row_pos| {
+            if row_pos < 0 {
+                Err(pyo3::exceptions::PyValueError::new_err(
+                    "source_row_pos must be non-negative",
+                ))
+            } else {
+                Ok(row_pos as usize)
+            }
+        })
+        .collect::<PyResult<_>>()?;
+
+    let result = rs_build_execution_latency_grid(ExecutionLatencyGridInput {
+        event_times: event_times.to_vec(),
+        event_dims: event_dims.to_vec(),
+        event_qtys: event_qtys.to_vec(),
+        queue_post: queue_post.to_vec(),
+        source_row_positions,
+        minute_starts: minute_starts.to_vec(),
+        tracking_horizon_seconds,
+        n_orders,
+        order_spacing_seconds,
+        cancellation_policy: policy,
+        cap_position_by_queue_post,
+        seed,
+    })
+    .map_err(pyo3::exceptions::PyValueError::new_err)?;
+
+    let mut orders_filled_by_window = vec![0_u32; minute_starts.len()];
+    for row in &result.order_rows {
+        if row.remaining_qty == 0 {
+            orders_filled_by_window[row.minute_index] += 1;
+        }
+    }
+
+    let mut order_ids = Vec::<usize>::with_capacity(result.order_rows.len());
+    let mut order_window_ids = Vec::<usize>::with_capacity(result.order_rows.len());
+    let mut order_minute_starts = Vec::<f64>::with_capacity(result.order_rows.len());
+    let mut order_slots = Vec::<usize>::with_capacity(result.order_rows.len());
+    let mut order_row_pos = Vec::<usize>::with_capacity(result.order_rows.len());
+    let mut order_source_row_pos = Vec::<i64>::with_capacity(result.order_rows.len());
+    let mut order_times = Vec::<f64>::with_capacity(result.order_rows.len());
+    let mut initial_qtys = Vec::<u32>::with_capacity(result.order_rows.len());
+    let mut executed_qtys = Vec::<u32>::with_capacity(result.order_rows.len());
+    let mut remaining_qtys = Vec::<u32>::with_capacity(result.order_rows.len());
+    let mut final_position_qtys = Vec::<f64>::with_capacity(result.order_rows.len());
+    let mut final_top_qtys = Vec::<u32>::with_capacity(result.order_rows.len());
+    let mut completed_times = Vec::<f64>::with_capacity(result.order_rows.len());
+    let mut latencies = Vec::<f64>::with_capacity(result.order_rows.len());
+    let mut order_key_to_global =
+        std::collections::HashMap::<(usize, usize), (usize, usize, i64)>::new();
+
+    for row in &result.order_rows {
+        let global_order_id = order_ids.len();
+        let source_row_pos_i64 = row.source_row_pos as i64;
+        order_key_to_global.insert(
+            (row.minute_index, row.order_id),
+            (global_order_id, row.event_row_pos, source_row_pos_i64),
+        );
+
+        order_ids.push(global_order_id);
+        order_window_ids.push(row.minute_index);
+        order_minute_starts.push(row.minute_start_time);
+        order_slots.push(row.order_slot);
+        order_row_pos.push(row.event_row_pos);
+        order_source_row_pos.push(source_row_pos_i64);
+        order_times.push(row.post_time);
+        initial_qtys.push(row.initial_qty);
+        executed_qtys.push(row.executed_qty);
+        remaining_qtys.push(row.remaining_qty);
+        final_position_qtys.push(row.final_position_qty);
+        final_top_qtys.push(row.final_top_qty);
+        completed_times.push(row.completed_time.unwrap_or(f64::NAN));
+        latencies.push(row.latency_seconds.unwrap_or(f64::NAN));
+    }
+
+    let mut fill_order_ids = Vec::<usize>::with_capacity(result.fill_rows.len());
+    let mut fill_window_ids = Vec::<usize>::with_capacity(result.fill_rows.len());
+    let mut fill_order_row_pos = Vec::<usize>::with_capacity(result.fill_rows.len());
+    let mut fill_order_source_row_pos = Vec::<i64>::with_capacity(result.fill_rows.len());
+    let mut fill_event_row_pos = Vec::<usize>::with_capacity(result.fill_rows.len());
+    let mut fill_event_source_row_pos = Vec::<i64>::with_capacity(result.fill_rows.len());
+    let mut fill_times = Vec::<f64>::with_capacity(result.fill_rows.len());
+    let mut fill_qtys = Vec::<u32>::with_capacity(result.fill_rows.len());
+
+    for row in &result.fill_rows {
+        let (global_order_id, order_event_row_pos, order_source_row_pos) = order_key_to_global
+            .get(&(row.minute_index, row.order_id))
+            .copied()
+            .ok_or_else(|| {
+                pyo3::exceptions::PyValueError::new_err(
+                    "native grid returned a fill for an unknown order id",
+                )
+            })?;
+
+        fill_order_ids.push(global_order_id);
+        fill_window_ids.push(row.minute_index);
+        fill_order_row_pos.push(order_event_row_pos);
+        fill_order_source_row_pos.push(order_source_row_pos);
+        fill_event_row_pos.push(row.fill_event_row_pos);
+        fill_event_source_row_pos.push(row.fill_source_row_pos as i64);
+        fill_times.push(row.fill_time);
+        fill_qtys.push(row.fill_qty);
+    }
+
+    let out = PyDict::new_bound(py);
+    out.set_item("n_windows", minute_starts.len())?;
+    out.set_item("n_orders", n_orders)?;
+    out.set_item("order_spacing_seconds", order_spacing_seconds)?;
+    out.set_item("tracking_horizon_seconds", tracking_horizon_seconds)?;
+    out.set_item(
+        "minute_starts",
+        minute_starts.to_vec().into_pyarray_bound(py),
+    )?;
+    out.set_item(
+        "orders_requested_by_window",
+        vec![n_orders as u32; minute_starts.len()].into_pyarray_bound(py),
+    )?;
+    out.set_item(
+        "orders_posted_by_window",
+        result
+            .posted_counts
+            .iter()
+            .map(|&count| count as u32)
+            .collect::<Vec<_>>()
+            .into_pyarray_bound(py),
+    )?;
+    out.set_item(
+        "orders_filled_by_window",
+        orders_filled_by_window.into_pyarray_bound(py),
+    )?;
+    out.set_item("order_ids", order_ids.into_pyarray_bound(py))?;
+    out.set_item("order_window_ids", order_window_ids.into_pyarray_bound(py))?;
+    out.set_item(
+        "order_minute_starts",
+        order_minute_starts.into_pyarray_bound(py),
+    )?;
+    out.set_item("order_slots", order_slots.into_pyarray_bound(py))?;
+    out.set_item("order_row_pos", order_row_pos.into_pyarray_bound(py))?;
+    out.set_item(
+        "order_source_row_pos",
+        order_source_row_pos.into_pyarray_bound(py),
+    )?;
+    out.set_item("order_times", order_times.into_pyarray_bound(py))?;
+    out.set_item("initial_qtys", initial_qtys.into_pyarray_bound(py))?;
+    out.set_item("executed_qtys", executed_qtys.into_pyarray_bound(py))?;
+    out.set_item("remaining_qtys", remaining_qtys.into_pyarray_bound(py))?;
+    out.set_item(
+        "final_position_qtys",
+        final_position_qtys.into_pyarray_bound(py),
+    )?;
+    out.set_item("final_top_qtys", final_top_qtys.into_pyarray_bound(py))?;
+    out.set_item("completed_times", completed_times.into_pyarray_bound(py))?;
+    out.set_item("latencies", latencies.into_pyarray_bound(py))?;
+    out.set_item("fill_order_ids", fill_order_ids.into_pyarray_bound(py))?;
+    out.set_item("fill_window_ids", fill_window_ids.into_pyarray_bound(py))?;
+    out.set_item(
+        "fill_order_row_pos",
+        fill_order_row_pos.into_pyarray_bound(py),
+    )?;
+    out.set_item(
+        "fill_order_source_row_pos",
+        fill_order_source_row_pos.into_pyarray_bound(py),
+    )?;
+    out.set_item(
+        "fill_event_row_pos",
+        fill_event_row_pos.into_pyarray_bound(py),
+    )?;
+    out.set_item(
+        "fill_event_source_row_pos",
+        fill_event_source_row_pos.into_pyarray_bound(py),
+    )?;
+    out.set_item("fill_times", fill_times.into_pyarray_bound(py))?;
+    out.set_item("fill_qtys", fill_qtys.into_pyarray_bound(py))?;
+    Ok(out)
 }
 
 /// Conditional simulation context. Owns its inputs (conditioning events + externals + process)
@@ -280,21 +723,13 @@ impl PyConditionalSimulationContext {
             self.new_externals.as_ref(),
             self.t_max,
         );
-        let samples = ctx.simulate_queue_at_times(
-            times.as_slice().unwrap(),
-            initial_queue_size,
-            None,
-            seed,
-        );
+        let samples =
+            ctx.simulate_queue_at_times(times.as_slice().unwrap(), initial_queue_size, None, seed);
         samples.into_pyarray_bound(py)
     }
 
     /// Single-shot conditional simulate; returns the resulting event stream.
-    fn simulate(
-        &self,
-        py: Python,
-        seed: Option<u64>,
-    ) -> PySimulationResult {
+    fn simulate(&self, py: Python, seed: Option<u64>) -> PySimulationResult {
         let process_borrow = self.process.borrow(py);
         let ctx = ConditionalSimulationContext::new(
             &process_borrow.inner,
@@ -303,7 +738,9 @@ impl PyConditionalSimulationContext {
             self.new_externals.as_ref(),
             self.t_max,
         );
-        PySimulationResult { inner: ctx.simulate(None, seed) }
+        PySimulationResult {
+            inner: ctx.simulate(None, seed),
+        }
     }
 }
 
@@ -324,7 +761,9 @@ impl PyTailImpact {
         b_c: f64,
         events: Vec<f64>,
     ) -> Self {
-        Self { inner: TailImpact::from_affine_queue(mu, alpha, beta, b_l, b_c, events) }
+        Self {
+            inner: TailImpact::from_affine_queue(mu, alpha, beta, b_l, b_c, events),
+        }
     }
 }
 
@@ -360,21 +799,21 @@ fn aggressive_impact_from_queue_samples(
         &is_market_order,
         &hawkes.inner,
         move |q: f64| -> f64 {
-            Python::with_gil(|py| {
-                match kappa_clone.call1(py, (q,)) {
-                    Ok(r) => r.extract::<f64>(py).unwrap_or_else(|e| {
-                        eprintln!("kappa(q={}) returned non-f64: {:?}", q, e);
-                        f64::NAN
-                    }),
-                    Err(e) => {
-                        eprintln!("kappa(q={}) raised: {:?}", q, e);
-                        f64::NAN
-                    }
+            Python::with_gil(|py| match kappa_clone.call1(py, (q,)) {
+                Ok(r) => r.extract::<f64>(py).unwrap_or_else(|e| {
+                    eprintln!("kappa(q={}) returned non-f64: {:?}", q, e);
+                    f64::NAN
+                }),
+                Err(e) => {
+                    eprintln!("kappa(q={}) raised: {:?}", q, e);
+                    f64::NAN
                 }
             })
         },
     );
-    Ok(PyAggressiveImpactPath { impact_path: path.impact_path })
+    Ok(PyAggressiveImpactPath {
+        impact_path: path.impact_path,
+    })
 }
 
 /// Compute aggressive impact path from pre-sampled queues using the hybrid model.
@@ -400,22 +839,22 @@ fn aggressive_impact_from_queue_samples_hybrid(
         &is_market_order,
         &hawkes.inner,
         move |q: f64| -> f64 {
-            Python::with_gil(|py| {
-                match kappa_clone.call1(py, (q,)) {
-                    Ok(r) => r.extract::<f64>(py).unwrap_or_else(|e| {
-                        eprintln!("kappa(q={}) returned non-f64: {:?}", q, e);
-                        f64::NAN
-                    }),
-                    Err(e) => {
-                        eprintln!("kappa(q={}) raised: {:?}", q, e);
-                        f64::NAN
-                    }
+            Python::with_gil(|py| match kappa_clone.call1(py, (q,)) {
+                Ok(r) => r.extract::<f64>(py).unwrap_or_else(|e| {
+                    eprintln!("kappa(q={}) returned non-f64: {:?}", q, e);
+                    f64::NAN
+                }),
+                Err(e) => {
+                    eprintln!("kappa(q={}) raised: {:?}", q, e);
+                    f64::NAN
                 }
             })
         },
         bar_kappa,
     );
-    Ok(PyAggressiveImpactPath { impact_path: path.impact_path })
+    Ok(PyAggressiveImpactPath {
+        impact_path: path.impact_path,
+    })
 }
 
 /// Compute the impact path I(t) for a (q, bar_q) pair via the affine-queue model.
@@ -437,6 +876,93 @@ fn compute_impact_path<'py>(
     impact.impact_path.into_pyarray_bound(py)
 }
 
+/// Compute passive flow-imbalance impact from queues sampled at market times.
+#[pyfunction]
+#[allow(clippy::too_many_arguments)]
+fn passive_flow_impact_from_queue_samples<'py>(
+    py: Python<'py>,
+    q_samples: PyReadonlyArray1<u32>,
+    q_bar_samples: PyReadonlyArray1<u32>,
+    market_times: PyReadonlyArray1<f64>,
+    mu: f64,
+    alpha: Vec<f64>,
+    beta: Vec<f64>,
+    b_l: f64,
+    b_c: f64,
+    c_kappa: f64,
+) -> PyResult<Bound<'py, PyArray1<f64>>> {
+    let q = q_samples.as_slice()?;
+    let q_bar = q_bar_samples.as_slice()?;
+    let events = market_times.as_slice()?;
+    if q.len() != q_bar.len() || q.len() != events.len() {
+        return Err(pyo3::exceptions::PyValueError::new_err(
+            "q_samples, q_bar_samples, and market_times must have matching lengths",
+        ));
+    }
+    if alpha.len() != beta.len() {
+        return Err(pyo3::exceptions::PyValueError::new_err(
+            "alpha and beta must have matching lengths",
+        ));
+    }
+
+    let tail = TailImpact::from_affine_queue(mu, alpha, beta, b_l, b_c, events.to_vec());
+    let mut impact = ImpactPath::from_queue_samples(q, q_bar, &tail).impact_path;
+    for value in &mut impact {
+        *value *= c_kappa;
+    }
+    Ok(impact.into_pyarray_bound(py))
+}
+
+/// Compute passive flow-imbalance impact using direct fitted propagator tails.
+///
+/// This is the propagator-input analogue of `passive_flow_impact_from_queue_samples`.
+/// The returned path is a single-queue contribution; callers that need signed
+/// bid/ask price impact should apply their side sign convention outside Rust.
+#[pyfunction]
+#[allow(clippy::too_many_arguments)]
+fn passive_tail_propagator_impact_from_queue_samples<'py>(
+    py: Python<'py>,
+    q_samples: PyReadonlyArray1<u32>,
+    q_bar_samples: PyReadonlyArray1<u32>,
+    market_times: PyReadonlyArray1<f64>,
+    propagator_kappa: f64,
+    propagator_weights: Vec<f64>,
+    propagator_beta: Vec<f64>,
+    b_l: f64,
+    b_c: f64,
+    queue_sensitivity: f64,
+    zeta: f64,
+) -> PyResult<Bound<'py, PyArray1<f64>>> {
+    let q = q_samples.as_slice()?;
+    let q_bar = q_bar_samples.as_slice()?;
+    let events = market_times.as_slice()?;
+    if q.len() != q_bar.len() || q.len() != events.len() {
+        return Err(pyo3::exceptions::PyValueError::new_err(
+            "q_samples, q_bar_samples, and market_times must have matching lengths",
+        ));
+    }
+    if propagator_weights.len() != propagator_beta.len() {
+        return Err(pyo3::exceptions::PyValueError::new_err(
+            "propagator_weights and propagator_beta must have matching lengths",
+        ));
+    }
+
+    let tail = TailImpact::from_tail_propagator(
+        propagator_kappa,
+        propagator_weights,
+        propagator_beta,
+        AffineQueueProcess::c_lambda(b_l, b_c),
+        zeta,
+        events.to_vec(),
+    )
+    .map_err(pyo3::exceptions::PyValueError::new_err)?;
+    let mut impact = ImpactPath::from_queue_samples(q, q_bar, &tail).impact_path;
+    for value in &mut impact {
+        *value *= queue_sensitivity;
+    }
+    Ok(impact.into_pyarray_bound(py))
+}
+
 #[pymodule]
 fn _native(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add("__version__", "0.1.0")?;
@@ -454,11 +980,25 @@ fn _native(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(events_to_dim, m)?)?;
     m.add_function(wrap_pyfunction!(extract_events_by_dim, m)?)?;
     m.add_function(wrap_pyfunction!(sample_queue_at_times, m)?)?;
+    m.add_function(wrap_pyfunction!(simulate_anchored_affine_queue, m)?)?;
+    m.add_function(wrap_pyfunction!(select_limit_flags_first_every, m)?)?;
+    m.add_function(wrap_pyfunction!(select_limit_flags_indices, m)?)?;
+    m.add_function(wrap_pyfunction!(select_limit_flags_random_fraction, m)?)?;
+    m.add_function(wrap_pyfunction!(track_passive_fills, m)?)?;
+    m.add_function(wrap_pyfunction!(simulate_execution_latency_grid, m)?)?;
     m.add_class::<PyConditionalSimulationContext>()?;
     m.add_class::<PyTailImpact>()?;
     m.add_class::<PyAggressiveImpactPath>()?;
     m.add_function(wrap_pyfunction!(aggressive_impact_from_queue_samples, m)?)?;
-    m.add_function(wrap_pyfunction!(aggressive_impact_from_queue_samples_hybrid, m)?)?;
+    m.add_function(wrap_pyfunction!(
+        aggressive_impact_from_queue_samples_hybrid,
+        m
+    )?)?;
     m.add_function(wrap_pyfunction!(compute_impact_path, m)?)?;
+    m.add_function(wrap_pyfunction!(passive_flow_impact_from_queue_samples, m)?)?;
+    m.add_function(wrap_pyfunction!(
+        passive_tail_propagator_impact_from_queue_samples,
+        m
+    )?)?;
     Ok(())
 }
