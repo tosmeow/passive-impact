@@ -851,10 +851,16 @@ def _import_simproj():
     except (ImportError, ModuleNotFoundError):
         import sys
 
+        for name in [
+            key
+            for key in sys.modules
+            if key == "simproj" or key.startswith("simproj.")
+        ]:
+            sys.modules.pop(name, None)
         repo_root = Path(__file__).resolve().parents[3]
         code_python = repo_root / "code" / "python"
-        if str(code_python) not in sys.path:
-            sys.path.insert(0, str(code_python))
+        sys.path = [path for path in sys.path if path != str(code_python)]
+        sys.path.insert(0, str(code_python))
         import simproj  # type: ignore
 
         return simproj

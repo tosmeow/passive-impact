@@ -194,22 +194,45 @@ $$
 
 where
 
-```math
+$$
 \mathcal{I}_t =
 \int_t^\infty e^{-c_\lambda(s-t)}\mathbb{E}_t[\lambda_s]\,ds.
-```
+$$
 
-For fitted tail-propagator experiments, this is evaluated at consuming
-market-event times as
+For fitted tail-propagator experiments, the calibrated input is a price
+propagator rather than a Hawkes kernel:
 
-```math
-MI_t =
-c_\kappa \int_0^t (\bar{q}^{a,t}_s-q^a_s)\,dN^a_s
-+ c_\kappa(\bar{q}^{a,t}_t-q^a_t)
+$$
+G(u)=\kappa_s+\sum_{i=1}^m w_i e^{-\beta_i u}
+=\kappa_s\,\xi(u),
+\qquad
+\xi(u)=1+\sum_{i=1}^m a_i e^{-\beta_i u}.
+$$
+
+The propagator-implied response kernel gives the passive continuation kernel
+
+$$
+K_C(a)=\int_0^\infty e^{-C_\lambda u}r(a+u)\,du
+=\sum_{i=1}^m \eta_i e^{-\beta_i a},
+\qquad
+\eta_i=\frac{\beta_i w_i}{\kappa_s(\beta_i+C_\lambda)}.
+$$
+
+With signed queue displacement $U_t=s(\bar q_t-q_t)$ and fitted queue slope
+$\kappa_1$, the evaluated impact is written in the same realized-plus-tail
+form:
+
+$$
+MI(t)
+=\kappa_1\int_0^t U_s\,dN_s
++\kappa_1 U_t
 \left(
-\zeta + \int_0^t \sum_{i=1}^m \gamma_i e^{-\beta_i(t-s)}\,dN^a_s
+\zeta+\int_0^t K_C(t-s)\,dN_s
 \right).
-```
+$$
+
+The config-level mapping is documented in
+[`experiments/impact_cost/load_experiments/FORMULAS.md`](experiments/impact_cost/load_experiments/FORMULAS.md).
 
 ### Aggressive Market Impact
 

@@ -59,4 +59,6 @@ Reusable dataframe, lifecycle, impact, and accounting helpers live in `core/`;
 the canonical runnable workflow lives in `load_experiments/`.
 
 For the current file map, config sections, data schema, and lifecycle outputs,
-see [`COMPONENTS.md`](COMPONENTS.md).
+see [`COMPONENTS.md`](COMPONENTS.md). For the lifecycle and tail-propagator
+formulas with config-parameter mapping, see
+[`load_experiments/FORMULAS.md`](load_experiments/FORMULAS.md).

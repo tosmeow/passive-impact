@@ -8,11 +8,11 @@ image_dir = "experiments/impact_cost/load_experiments/images"
 
 [episodes]
 episode_spacing_seconds = 60.0
-max_episodes = 10
+max_episodes = 20
 randomize_episodes = false
 horizon_seconds = 3.0
 output_step_seconds = 0.002
-warmup_seconds = 0.0
+warmup_seconds = 10.0
 n_policy_paths = 10
 min_market_events = 1
 start_time = "2025-05-29 08:00:00"
@@ -42,9 +42,9 @@ cancel_jitter_seconds = 0.001
 repost_delay_seconds = 0.050
 
 [impact]
-propagator_kappa = 0.00895780
+propagator_kappa = 1.0
 propagator_gamma = -0.00001713
-propagator_weights = [-0.00102289, 0.00084759, 0.00161378, 0.00031951]
+propagator_weights = [-5.23666801, 4.33922263, 8.26171935, 1.63572603]
 propagator_beta = [10.0, 1.0, 0.1, 0.01]
 propagator_tail_zeta = 0.0
 b_l = -0.000097

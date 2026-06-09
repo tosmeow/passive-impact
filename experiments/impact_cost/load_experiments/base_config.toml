@@ -1,0 +1,51 @@
+# Canonical lifecycle impact-cost experiment config.
+# Edit this file for final experiment runs; the runner is fixed to tail_propagator.
+
+[paths]
+aggregated_path = "experiments/impact_cost/load_experiments/data/processed/factual_2025_05_29_esm5.parquet"
+output_dir = "experiments/impact_cost/load_experiments/data/lifecycle_passive_cost"
+image_dir = "experiments/impact_cost/load_experiments/images"
+
+[episodes]
+episode_spacing_seconds = 60.0
+max_episodes = 20
+randomize_episodes = false
+horizon_seconds = 3.0
+output_step_seconds = 0.002
+warmup_seconds = 0.0
+n_policy_paths = 10
+min_market_events = 1
+start_time = "2025-05-29 08:00:00"
+end_time = "2025-05-29 15:00:00"
+seed = 2027
+
+[queue]
+raw_side = "A"
+queue_col = "q_b"
+market_side = "B"
+
+[lifecycle]
+n_cycles = 3
+orders_per_cycle = 10
+order_qty = 1
+posting_spacing_seconds = 0.010
+fill_count_model = "binomial"
+fill_probability = 0.14285714285714285
+# fixed_filled_orders = 4
+fill_selection = "oldest"
+fill_time_model = "clustered_exponential"
+fill_wait_mean_seconds = 0.150
+fill_gap_mean_seconds = 0.010
+min_resting_seconds = 0.300
+cancel_delay_seconds = 0.010
+cancel_jitter_seconds = 0.001
+repost_delay_seconds = 0.050
+
+[impact]
+propagator_kappa = 0.00895780
+propagator_gamma = -0.00001713
+propagator_weights = [-0.00102289, 0.00084759, 0.00161378, 0.00031951]
+propagator_beta = [10.0, 1.0, 0.1, 0.01]
+propagator_tail_zeta = 0.0
+b_l = -0.000097
+b_c = 0.0000989
