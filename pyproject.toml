@@ -12,6 +12,7 @@ dev = [
     "ipykernel>=6",
     "nbconvert>=7",
     "pyarrow>=14",
+    "scipy>=1.10",
 ]
 
 [build-system]

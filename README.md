@@ -323,6 +323,6 @@ The original Rust binaries still exist for fast batch baseline generation:
 
 ## Dependencies
 
-- `numpy`, `pandas`, `matplotlib`, `pyarrow`: Python facades, plotting, and parquet-backed experiment inputs
+- `numpy`, `pandas`, `matplotlib`, `scipy`, `pyarrow`: Python facades, plotting, and parquet-backed experiment inputs
 - `maturin`, `pyo3`: Rust-to-Python bindings (development only)
 - `pytest`: Testing framework

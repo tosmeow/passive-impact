@@ -10,8 +10,20 @@ Usage:
 """
 import argparse
 
+from plot_utils_propagator import (
+    load_data as _load_propagator_data,
+    plot_impact_by_event_type,
+    plot_queue_diff,
+    plot_shades,
+)
 from plot_utils_propagator import generate_all_plots as gen_propagator
 from plot_utils_hybrid import generate_all_plots as gen_hybrid
+
+
+def load_data():
+    """Load propagator data using the legacy 3-value notebook API."""
+    impact_df, queue_df, is_market, _meta_end = _load_propagator_data()
+    return impact_df, queue_df, is_market
 
 
 def parse_args():

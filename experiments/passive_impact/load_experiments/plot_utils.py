@@ -8,8 +8,17 @@ Usage:
 """
 import argparse
 
-from plot_utils_single import generate_all_plots as gen_single
-from plot_utils_double import generate_all_plots as gen_double
+from plot_utils_single import (
+    generate_all_plots as gen_single,
+    load_data,
+    plot_queue_shades,
+)
+from plot_utils_double import (
+    generate_all_plots as gen_double,
+    load_bidask_data,
+    plot_dashboard,
+    plot_impact_difference,
+)
 
 
 def parse_args():
