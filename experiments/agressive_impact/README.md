@@ -13,7 +13,7 @@ Edit the `config` block at the top of [`custom_experiment/main.py`](custom_exper
 python experiments/agressive_impact/custom_experiment/main.py
 ```
 
-Knobs: `time_horizon`, `n_simulations`, `initial_queue_size`, `model` (`"propagator"` | `"hybrid"`), `bar_kappa` (required for hybrid), the Hawkes parameters, the affine-queue parameters, the metaorder shape, and a `kappa: Callable[[float], float]` for the per-trade impact function (defaults to the paper's $c_1 \sqrt{\log(e^{-c_2 q} + 1)}$).
+Knobs: `time_horizon`, `n_simulations`, `initial_queue_size`, `counterfactual` (`False` for with-us, `True` for without-us), `model` (`"propagator"` | `"hybrid"`), `bar_kappa` (required for hybrid), the Hawkes parameters, the affine-queue parameters, the metaorder shape, and a `kappa: Callable[[float], float]` for the per-trade impact function (defaults to the paper's $c_1 \sqrt{\log(e^{-c_2 q} + 1)}$).
 
 Outputs (`times.npy`, `queue_paths.npy`, `impact_paths.npy`, `event_types.npy`) land in `custom_experiment/output/` (gitignored).
 

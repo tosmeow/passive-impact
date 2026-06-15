@@ -8,6 +8,7 @@ config = ai.AggressiveImpactConfig(
     time_horizon=100.0,
     n_simulations=500,
     initial_queue_size=200,
+    counterfactual=False,         # False: with us | True: without us
     model="propagator",          # "propagator" | "hybrid"
     bar_kappa=None,              # required when model == "hybrid"
     mu=1.0,

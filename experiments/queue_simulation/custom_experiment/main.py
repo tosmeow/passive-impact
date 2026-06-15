@@ -8,6 +8,7 @@ config = qs.QueueSimulationConfig(
     n_eval_times=1000,
     initial_queue_size=200,
     mode="single",
+    counterfactual=False,         # False: with us | True: without us
     mu=1.0,
     alpha=[0.065, 0.2, 0.325, 0.65],
     beta=[0.15, 0.60, 2.5, 10.0],

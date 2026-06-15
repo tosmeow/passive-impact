@@ -14,7 +14,7 @@ python experiments/queue_simulation/custom_experiment/main.py
 
 Knobs: `time_horizon`, `n_simulations`, `n_eval_times` (size of the uniform sampling grid), `initial_queue_size`, `mode` (`"single"` | `"double"`), the Hawkes parameters, the affine-queue parameters, and the metaorder shape (integer count or explicit list of arrival times).
 
-Outputs (`times.npy`, `queue_paths.npy` with shape `(n_eval_times, n_simulations + 1)` — first column is the baseline $q$, remaining columns are the per-simulation $\bar{q}$) land in `custom_experiment/output/` (gitignored).
+Set `counterfactual=False` for with-us conditioning, or `counterfactual=True` for the without-us counterfactual. Outputs (`times.npy`, `queue_paths.npy` with shape `(n_eval_times, n_simulations + 1)`) land in `custom_experiment/output/` (gitignored).
 
 ## Pre-saved baselines — `load_experiments/`
 
