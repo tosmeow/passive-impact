@@ -174,9 +174,6 @@ thus providing the following solution relying on the resolvent operator $(\delta
 ```
 for some constants $(\gamma_i)_{1\le i\le m}$ and $\zeta$.
 
-The config-level mapping is documented in
-[`experiments/impact_cost/load_experiments/FORMULAS.md`](experiments/impact_cost/load_experiments/FORMULAS.md).
-
 ### Aggressive Market Impact
 
 For aggressive metaorders, the strategy consumes liquidity directly through
