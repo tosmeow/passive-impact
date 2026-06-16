@@ -30,7 +30,7 @@ if __package__ in {None, ""}:
     from utils.plot_utils_propagator import generate_all_plots as gen_propagator
     from utils.plot_utils_hybrid import compute_plot_y_lims as compute_hybrid_y_lims
     from utils.plot_utils_hybrid import generate_all_plots as gen_hybrid
-    from experiments.plot_utils_common import add_title_argument
+    from experiments.plot_utils_common import add_format_argument, add_title_argument
 else:
     from .utils.plot_utils_propagator import (
         compute_plot_y_lims as compute_propagator_y_lims,
@@ -42,7 +42,7 @@ else:
     from .utils.plot_utils_propagator import generate_all_plots as gen_propagator
     from .utils.plot_utils_hybrid import compute_plot_y_lims as compute_hybrid_y_lims
     from .utils.plot_utils_hybrid import generate_all_plots as gen_hybrid
-    from ...plot_utils_common import add_title_argument
+    from ...plot_utils_common import add_format_argument, add_title_argument
 
 
 def load_data(counterfactual=False):
@@ -70,6 +70,7 @@ def parse_args():
     p.add_argument('--bar-kappa', type=float, default=None,
                    help='Hybrid-only value used when data-base does not contain bar_kappa.npy.')
     add_title_argument(p, default=False)
+    add_format_argument(p, default='pdf')
     args = p.parse_args()
     if args.counterfactual and args.scenario not in {None, 'without'}:
         p.error('--counterfactual cannot be combined with --scenario with or --scenario both')
@@ -84,6 +85,7 @@ def generate_all_plots(
     output_dir=None,
     bar_kappa=None,
     include_title=False,
+    output_format='pdf',
 ):
     """Generate all plots for the given model.
 
@@ -119,6 +121,7 @@ def generate_all_plots(
                 output_dir=_model_output_dir(output_dir, 'propagator', model),
                 include_title=include_title,
                 y_lims=propagator_y_lims,
+                output_format=output_format,
             )
 
     if model in {'both', 'hybrid'}:
@@ -147,6 +150,7 @@ def generate_all_plots(
                 bar_kappa=bar_kappa,
                 include_title=include_title,
                 y_lims=hybrid_y_lims,
+                output_format=output_format,
             )
 
 
@@ -216,4 +220,5 @@ if __name__ == '__main__':
         output_dir=args.output_dir,
         bar_kappa=args.bar_kappa,
         include_title=args.include_title,
+        output_format=args.output_format,
     )

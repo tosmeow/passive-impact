@@ -17,7 +17,11 @@ if __package__ in {None, ""}:
     if str(repo_root) not in sys.path:
         sys.path.insert(0, str(repo_root))
 
-    from experiments.plot_utils_common import add_title_argument
+    from experiments.plot_utils_common import (
+        add_format_argument,
+        add_title_argument,
+        with_output_format,
+    )
     from experiments.impact_cost.core.cost_utils import MARKET, event_seconds
     from experiments.impact_cost.core.experiment_utils import (
         candidate_episodes,
@@ -47,7 +51,11 @@ if __package__ in {None, ""}:
         DEFAULT_PROPAGATOR_WEIGHTS,
     )
 else:
-    from ...plot_utils_common import add_title_argument
+    from ...plot_utils_common import (
+        add_format_argument,
+        add_title_argument,
+        with_output_format,
+    )
     from ..core.cost_utils import MARKET, event_seconds
     from ..core.experiment_utils import (
         candidate_episodes,
@@ -130,6 +138,7 @@ def run_lifecycle_passive_cost_pipeline(
     cfg: LifecyclePassiveCostConfig,
     *,
     include_title: bool = False,
+    output_format: str = "pdf",
 ) -> dict[str, Any]:
     """Run looped passive lifecycle cost paths and write outputs."""
     _validate_config(cfg)
@@ -386,8 +395,21 @@ def run_lifecycle_passive_cost_pipeline(
     impact_summary.to_csv(output_dir / "price_impact_path_summary.csv", index=False)
     active_samples.to_csv(output_dir / "active_quantity_path_samples.csv", index=False)
     active_summary.to_csv(output_dir / "active_quantity_path_summary.csv", index=False)
+    plot_path = with_output_format(
+        image_dir / "lifecycle_impact_cost_paths.pdf",
+        output_format,
+    )
+    step_plot_path = with_output_format(
+        image_dir / "lifecycle_representative_cost_steps.pdf",
+        output_format,
+    )
+    step_shared_y_plot_path = with_output_format(
+        image_dir / "lifecycle_representative_cost_steps_shared_y.pdf",
+        output_format,
+    )
+
     _plot_lifecycle_paths(
-        image_dir / "lifecycle_impact_cost_paths.png",
+        plot_path,
         samples,
         cost_summary,
         impact_summary,
@@ -396,7 +418,7 @@ def run_lifecycle_passive_cost_pipeline(
         include_title=include_title,
     )
     _plot_representative_step_paths(
-        image_dir / "lifecycle_representative_cost_steps.png",
+        step_plot_path,
         samples,
         jumps,
         path_summary,
@@ -404,7 +426,7 @@ def run_lifecycle_passive_cost_pipeline(
         include_title=include_title,
     )
     _plot_representative_step_paths(
-        image_dir / "lifecycle_representative_cost_steps_shared_y.png",
+        step_shared_y_plot_path,
         samples,
         jumps,
         path_summary,
@@ -432,10 +454,9 @@ def run_lifecycle_passive_cost_pipeline(
         "mean_filled_orders": float(path_summary["n_filled_orders"].mean())
         if len(path_summary)
         else float("nan"),
-        "plot_path": image_dir / "lifecycle_impact_cost_paths.png",
-        "step_plot_path": image_dir / "lifecycle_representative_cost_steps.png",
-        "step_shared_y_plot_path": image_dir
-        / "lifecycle_representative_cost_steps_shared_y.png",
+        "plot_path": plot_path,
+        "step_plot_path": step_plot_path,
+        "step_shared_y_plot_path": step_shared_y_plot_path,
         "path_summary_path": output_dir / "policy_path_summary.csv",
         "fill_jumps_path": output_dir / "impact_cost_fill_jumps.csv",
     }
@@ -931,6 +952,7 @@ def _parse_args() -> argparse.Namespace:
         help="Override the config and randomly sample candidate episodes.",
     )
     add_title_argument(parser, default=False)
+    add_format_argument(parser, default="pdf")
     return parser.parse_args()
 
 
@@ -950,6 +972,7 @@ def main() -> None:
     summary = run_lifecycle_passive_cost_pipeline(
         cfg,
         include_title=args.include_title,
+        output_format=args.output_format,
     )
     print(
         json.dumps(

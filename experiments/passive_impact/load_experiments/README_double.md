@@ -14,28 +14,19 @@ Extends passive impact to a full bid-ask queue pair. A limit-order metaorder is 
 
 ### Queue dynamics
 
-<p align="center">
-  <img src="images/bidask_queue_given_q.png" width="48%" alt="Queues given q"/>
-  <img src="images/bidask_queue_given_qbar.png" width="48%" alt="Queues given qbar"/>
-</p>
+[Queues given q](images_double/bidask_queue_given_q.pdf) · [Queues given qbar](images_double/bidask_queue_given_qbar.pdf)
 
 *Left*: Counterfactual queues given the baseline $q$. Ask (blue) and bid (orange) evolve independently; the metaorder only affects the ask side. *Right*: Same, conditioning on the impacted queue $\bar{q}$.
 
 ### Per-side impact
 
-<p align="center">
-  <img src="images/ask_impact_given_q.png" width="48%" alt="Ask impact given q"/>
-  <img src="images/bid_impact_given_q.png" width="48%" alt="Bid impact given q"/>
-</p>
+[Ask impact given q](images_double/ask_impact_given_q.pdf) · [Bid impact given q](images_double/bid_impact_given_q.pdf)
 
 *Left*: Ask-side impact $I^a(t)$ (directly affected by the metaorder). *Right*: Bid-side impact $I^b(t)$ (indirectly affected through queue coupling).
 
 ### Net price impact (ask $-$ bid)
 
-<p align="center">
-  <img src="images/bidask_impact_given_q.png" width="48%" alt="Net impact given q"/>
-  <img src="images/bidask_impact_given_qbar.png" width="48%" alt="Net impact given qbar"/>
-</p>
+[Net impact given q](images_double/bidask_impact_given_q.pdf) · [Net impact given qbar](images_double/bidask_impact_given_qbar.pdf)
 
 *Left*: Total price impact given baseline $q$. *Right*: Total price impact given impacted $\bar{q}$. Green band shows $\pm 1$ standard deviation.
 

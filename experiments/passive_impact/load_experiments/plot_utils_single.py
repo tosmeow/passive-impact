@@ -11,11 +11,13 @@ if __package__ in {None, ""}:
         sys.path.insert(0, str(repo_root))
 
 from experiments.plot_utils_common import (
+    add_format_argument,
     add_title_argument,
     data_dir,
     image_dir,
     maybe_set_title,
     save_or_show,
+    with_output_format,
 )
 
 
@@ -30,6 +32,7 @@ def parse_args():
         help='Time at which the metaorder ends, drawn as a vertical line (default: 60.0).'
     )
     add_title_argument(parser, default=False)
+    add_format_argument(parser, default='pdf')
     return parser.parse_args()
 
 
@@ -113,7 +116,7 @@ def plot_queue_shades(
     save_or_show(fig, save_path, dpi=300)
 
 
-def generate_all_plots(data_mode, meta_end, include_title=False):
+def generate_all_plots(data_mode, meta_end, include_title=False, output_format='pdf'):
     """Generate and save all four analysis plots."""
 
     path_with, path_without, queue_with, queue_without = load_data(data_mode)
@@ -129,7 +132,7 @@ def generate_all_plots(data_mode, meta_end, include_title=False):
         label='Price Impact',
         meta_end=meta_end,
         ref_col=None,
-        save_path=output_dir / 'impact_given_q.png',
+        save_path=with_output_format(output_dir / 'impact_given_q.pdf', output_format),
         include_title=include_title,
     )
 
@@ -140,7 +143,7 @@ def generate_all_plots(data_mode, meta_end, include_title=False):
         label='Queue Size',
         meta_end=meta_end,
         ref_col='q',
-        save_path=output_dir / 'queue_given_q.png',
+        save_path=with_output_format(output_dir / 'queue_given_q.pdf', output_format),
         include_title=include_title,
     )
 
@@ -151,7 +154,7 @@ def generate_all_plots(data_mode, meta_end, include_title=False):
         label='Price Impact',
         meta_end=meta_end,
         ref_col=None,
-        save_path=output_dir / 'impact_given_qbar.png',
+        save_path=with_output_format(output_dir / 'impact_given_qbar.pdf', output_format),
         include_title=include_title,
     )
 
@@ -162,11 +165,16 @@ def generate_all_plots(data_mode, meta_end, include_title=False):
         label='Queue Size',
         meta_end=meta_end,
         ref_col='bar_q',
-        save_path=output_dir / 'queue_given_qbar.png',
+        save_path=with_output_format(output_dir / 'queue_given_qbar.pdf', output_format),
         include_title=include_title,
     )
 
 
 if __name__ == '__main__':
     args = parse_args()
-    generate_all_plots(args.data_mode, args.meta_end, include_title=args.include_title)
+    generate_all_plots(
+        args.data_mode,
+        args.meta_end,
+        include_title=args.include_title,
+        output_format=args.output_format,
+    )

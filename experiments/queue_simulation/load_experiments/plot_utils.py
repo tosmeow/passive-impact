@@ -13,10 +13,12 @@ if __package__ in {None, ""}:
         sys.path.insert(0, str(repo_root))
 
 from experiments.plot_utils_common import (
+    add_format_argument,
     add_title_argument,
     maybe_set_title,
     save_or_show,
     script_dir,
+    with_output_format,
 )
 
 SCRIPT_DIR = script_dir(__file__)
@@ -108,6 +110,7 @@ def generate_all_plots(
     data_base=None,
     output_dir=None,
     include_title=False,
+    output_format='pdf',
 ):
     df = load_data(
         mode,
@@ -120,7 +123,7 @@ def generate_all_plots(
         df,
         counterfactual=counterfactual,
         meta_end=meta_end,
-        save_path=output_dir / f'queue_paths_{mode}.png',
+        save_path=with_output_format(output_dir / f'queue_paths_{mode}.pdf', output_format),
         include_title=include_title,
     )
 
@@ -137,6 +140,7 @@ def parse_args():
     p.add_argument('--output-dir', default=None,
                    help='Directory where images should be written.')
     add_title_argument(p, default=False)
+    add_format_argument(p, default='pdf')
     return p.parse_args()
 
 
@@ -150,4 +154,5 @@ if __name__ == '__main__':
         data_base=args.data_base,
         output_dir=args.output_dir,
         include_title=args.include_title,
+        output_format=args.output_format,
     )

@@ -5,6 +5,9 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 
+DEFAULT_OUTPUT_FORMAT = "pdf"
+OUTPUT_FORMATS = ("pdf", "png")
+
 
 def script_dir(file: str) -> Path:
     """Return the directory containing a plotting script."""
@@ -28,15 +31,39 @@ def add_title_argument(parser, *, default: bool = False) -> None:
         "--title",
         dest="include_title",
         action="store_true",
-        help="Draw titles on generated PNG images.",
+        help="Draw titles on generated plot files.",
     )
     title_group.add_argument(
         "--no-title",
         dest="include_title",
         action="store_false",
-        help="Do not draw titles on generated PNG images.",
+        help="Do not draw titles on generated plot files.",
     )
     parser.set_defaults(include_title=default)
+
+
+def add_format_argument(parser, *, default: str = DEFAULT_OUTPUT_FORMAT) -> None:
+    """Add the standard output-format selector to an argparse parser."""
+    parser.add_argument(
+        "--format",
+        dest="output_format",
+        choices=OUTPUT_FORMATS,
+        default=default,
+        help=f"Output file format (default: {default}).",
+    )
+
+
+def normalize_output_format(output_format: str | None) -> str:
+    """Normalize and validate an output format string."""
+    fmt = (output_format or DEFAULT_OUTPUT_FORMAT).lower()
+    if fmt not in OUTPUT_FORMATS:
+        raise ValueError(f"output_format must be one of {OUTPUT_FORMATS}; got {output_format!r}")
+    return fmt
+
+
+def with_output_format(path, output_format: str | None) -> Path:
+    """Return `path` with its suffix replaced by the requested output format."""
+    return Path(path).with_suffix(f".{normalize_output_format(output_format)}")
 
 
 def maybe_set_title(ax, title: str, include_title: bool) -> None:

@@ -9,7 +9,7 @@ This note maps the current `config.toml` fields to the formulas used by
 | --- | --- |
 | `aggregated_path` | Empirical event/queue input for $\bar q_k$, $t_k$, sides, and quantities. |
 | `output_dir` | CSV/JSON output directory. |
-| `image_dir` | PNG output directory. |
+| `image_dir` | PDF output directory. |
 | `episode_spacing_seconds` | Candidate episode spacing bucket. |
 | `max_episodes` | Cap on selected episode candidates. |
 | `randomize_episodes` | Randomized episode cap selection. |
@@ -306,5 +306,5 @@ C(t)=\sum_{\tau_j\le t}\Delta C_j.
 $$
 
 `output_dir` receives the CSV/JSON outputs for these paths. `image_dir`
-receives the PNG figures. `aggregated_path` is the processed parquet containing
+receives the PDF figures. `aggregated_path` is the processed parquet containing
 the empirical $\bar q_k$, event times, event sides, and quantities.

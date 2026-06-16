@@ -40,4 +40,5 @@ After both data directions exist, run:
 python experiments/agressive_impact/load_experiments/plot_utils.py
 ```
 
-to generate both `_given_q.png` and `_given_qbar.png` images.
+to generate both `_given_q.pdf` and `_given_qbar.pdf` figures. Pass
+`--format png` if PNG files are needed for a downstream workflow.

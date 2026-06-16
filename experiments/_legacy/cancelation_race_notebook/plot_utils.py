@@ -333,11 +333,11 @@ def generate_all_plots():
 
     print("Generating cancelation race analysis plots...")
 
-    plot_queue_trajectories(data, save_path=os.path.join(images_dir, 'queue_trajectories.png'))
-    plot_queue_at_fixed_time(data, eval_time=None, save_path=os.path.join(images_dir, 'queue_at_end.png'))
-    plot_cumulative_queue_exposure(data, save_path=os.path.join(images_dir, 'cumulative_exposure.png'))
-    plot_pairwise_comparison(data, save_path=os.path.join(images_dir, 'pairwise_comparison.png'))
-    plot_advantage_over_time(data, save_path=os.path.join(images_dir, 'advantage_over_time.png'))
+    plot_queue_trajectories(data, save_path=os.path.join(images_dir, 'queue_trajectories.pdf'))
+    plot_queue_at_fixed_time(data, eval_time=None, save_path=os.path.join(images_dir, 'queue_at_end.pdf'))
+    plot_cumulative_queue_exposure(data, save_path=os.path.join(images_dir, 'cumulative_exposure.pdf'))
+    plot_pairwise_comparison(data, save_path=os.path.join(images_dir, 'pairwise_comparison.pdf'))
+    plot_advantage_over_time(data, save_path=os.path.join(images_dir, 'advantage_over_time.pdf'))
 
     print("Done!")
 

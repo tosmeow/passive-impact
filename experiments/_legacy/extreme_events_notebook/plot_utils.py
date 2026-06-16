@@ -286,10 +286,10 @@ def generate_all_plots():
 
     print("Generating extreme events analysis plots...")
 
-    plot_queue_diff_decay(data, save_path='images/queue_diff_decay.png')
-    plot_impact_staleness(data, save_path='images/impact_staleness.png')
-    plot_decay_rate_analysis(data, save_path='images/decay_rate_analysis.png')
-    plot_impact_per_unit(data, save_path='images/impact_per_unit.png')
+    plot_queue_diff_decay(data, save_path='images/queue_diff_decay.pdf')
+    plot_impact_staleness(data, save_path='images/impact_staleness.pdf')
+    plot_decay_rate_analysis(data, save_path='images/decay_rate_analysis.pdf')
+    plot_impact_per_unit(data, save_path='images/impact_per_unit.pdf')
 
     print("Done!")
 

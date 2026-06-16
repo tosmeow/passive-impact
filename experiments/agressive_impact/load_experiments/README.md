@@ -14,17 +14,13 @@ Market-order impact under the propagator price model. A buy-side metaorder consu
 
 ### Impact trajectory
 
-<p align="center">
-  <img src="images/impact_paths_given_q.png" width="60%" alt="Impact paths"/>
-</p>
+[Impact paths given q](images/impact_paths_given_q.pdf)
 
 Distribution of aggressive impact $MI(t)$ across 500 counterfactual paths (gray), with mean in red.
 
 ### Queue dynamics
 
-<p align="center">
-  <img src="images/queue_paths_given_q.png" width="60%" alt="Queue paths"/>
-</p>
+[Queue paths given q](images/queue_paths_given_q.pdf)
 
 Counterfactual queue $\bar{q}$ (with metaorder, gray paths) versus baseline $q$ (black).
 
@@ -43,6 +39,6 @@ By default, `plot_utils.py` generates both conditioning cases. The legacy
 `--counterfactual` flag is an alias for `--scenario without`: those plots read
 the first queue column as `bar_q` and the simulations as `q_sim_*`, while the
 with-us case reads `q` and `bar_q_sim_*`. Generated image names end in
-`_given_q.png` for the default with-us conditioning and `_given_qbar.png` for
+`_given_q.pdf` for the default with-us conditioning and `_given_qbar.pdf` for
 the counterfactual without-us conditioning. The canonical aggressive plots are
-`impact_paths_*.png` and `queue_paths_*.png`.
+`impact_paths_*.pdf` and `queue_paths_*.pdf`.

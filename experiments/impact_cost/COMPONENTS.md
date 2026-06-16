@@ -14,7 +14,7 @@ not document archived diagnostics or earlier prototypes.
 | `load_experiments/lifecycle_passive_cost.py` | Canonical lifecycle runner. |
 | `load_experiments/plot_utils.py` | Regenerates figures from saved outputs. |
 | `load_experiments/data/` | Local parquet inputs and generated CSV/JSON outputs. |
-| `load_experiments/images/` | Generated PNG figures. |
+| `load_experiments/images/` | Generated PDF figures. |
 
 The `archive/` folder is retained for development history. It is not part of
 the current lifecycle workflow.
@@ -140,7 +140,7 @@ Main output files:
 - `active_quantity_path_summary.csv`
 - `lifecycle_passive_cost_config.json`
 
-PNG figures are written under:
+PDF figures are written under:
 
 ```text
 load_experiments/images/
@@ -148,9 +148,9 @@ load_experiments/images/
 
 Generated figures:
 
-- `lifecycle_impact_cost_paths.png`
-- `lifecycle_representative_cost_steps.png`
-- `lifecycle_representative_cost_steps_shared_y.png`
+- `lifecycle_impact_cost_paths.pdf`
+- `lifecycle_representative_cost_steps.pdf`
+- `lifecycle_representative_cost_steps_shared_y.pdf`
 
 Regenerate figures from saved CSV outputs with:
 

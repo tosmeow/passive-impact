@@ -12,6 +12,7 @@ if __package__ in {None, ""}:
 from experiments.plot_utils_common import (
     maybe_set_title,
     save_or_show,
+    with_output_format,
 )
 
 LOAD_EXPERIMENT_DIR = Path(__file__).resolve().parents[1]
@@ -288,6 +289,7 @@ def generate_all_plots(
     output_dir=None,
     include_title=False,
     y_lims=None,
+    output_format='pdf',
 ):
     """Generate and save all analysis plots."""
     impact_df, queue_df, is_market, meta_end = load_data(
@@ -309,7 +311,7 @@ def generate_all_plots(
         title='Aggressive Market Impact MI(t)',
         ylabel='Price Impact',
         meta_end=meta_end,
-        save_path=output_dir / f'impact_paths_{suffix}.png',
+        save_path=with_output_format(output_dir / f'impact_paths_{suffix}.pdf', output_format),
         include_title=include_title,
         y_lim=y_lims.get('impact') if y_lims else None,
     )
@@ -321,7 +323,7 @@ def generate_all_plots(
         ylabel='Queue Size',
         meta_end=meta_end,
         ref_col=layout['ref_col'],
-        save_path=output_dir / f'queue_paths_{suffix}.png',
+        save_path=with_output_format(output_dir / f'queue_paths_{suffix}.pdf', output_format),
         mean_label=layout['mean_label'],
         include_title=include_title,
         y_lim=y_lims.get('queue') if y_lims else None,

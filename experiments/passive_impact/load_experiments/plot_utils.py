@@ -27,7 +27,7 @@ if __package__ in {None, ""}:
         plot_dashboard,
         plot_impact_difference,
     )
-    from experiments.plot_utils_common import add_title_argument
+    from experiments.plot_utils_common import add_format_argument, add_title_argument
 else:
     from .plot_utils_single import (
         generate_all_plots as gen_single,
@@ -40,7 +40,7 @@ else:
         plot_dashboard,
         plot_impact_difference,
     )
-    from ...plot_utils_common import add_title_argument
+    from ...plot_utils_common import add_format_argument, add_title_argument
 
 
 def parse_args():
@@ -55,10 +55,11 @@ def parse_args():
                    help='Time at which the metaorder ends, drawn as a vertical line (default: 60.0). '
                         'Only used for single-queue mode.')
     add_title_argument(p, default=False)
+    add_format_argument(p, default='pdf')
     return p.parse_args()
 
 
-def generate_all_plots(mode, data_mode, meta_end=60.0, include_title=False):
+def generate_all_plots(mode, data_mode, meta_end=60.0, include_title=False, output_format='pdf'):
     """Generate all plots for the given mode.
 
     Args:
@@ -68,9 +69,9 @@ def generate_all_plots(mode, data_mode, meta_end=60.0, include_title=False):
         include_title: whether to draw plot titles
     """
     if mode == 'single':
-        gen_single(data_mode, meta_end, include_title=include_title)
+        gen_single(data_mode, meta_end, include_title=include_title, output_format=output_format)
     else:
-        gen_double(data_mode, meta_end, include_title=include_title)
+        gen_double(data_mode, meta_end, include_title=include_title, output_format=output_format)
 
 
 if __name__ == '__main__':
@@ -80,4 +81,5 @@ if __name__ == '__main__':
         args.data_mode,
         args.meta_end,
         include_title=args.include_title,
+        output_format=args.output_format,
     )
