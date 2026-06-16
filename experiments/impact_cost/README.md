@@ -29,7 +29,7 @@ factual aggregate queue, then generates our own passive post/fill/cancel
 lifecycle. It is fixed to the `tail_propagator` impact model; vary lifecycle,
 episode, queue, and tail-propagator parameters in `config.toml`.
 
-Generated CSV/JSON outputs land in `load_experiments/data/`; PDF figures land
+Generated CSV/JSON outputs land in `load_experiments/data/`; PNG figures land
 in `load_experiments/images/`. Regenerate figures from saved outputs with:
 
 ```bash

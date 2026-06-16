@@ -138,7 +138,7 @@ def run_lifecycle_passive_cost_pipeline(
     cfg: LifecyclePassiveCostConfig,
     *,
     include_title: bool = False,
-    output_format: str = "pdf",
+    output_format: str = "png",
 ) -> dict[str, Any]:
     """Run looped passive lifecycle cost paths and write outputs."""
     _validate_config(cfg)
@@ -396,15 +396,15 @@ def run_lifecycle_passive_cost_pipeline(
     active_samples.to_csv(output_dir / "active_quantity_path_samples.csv", index=False)
     active_summary.to_csv(output_dir / "active_quantity_path_summary.csv", index=False)
     plot_path = with_output_format(
-        image_dir / "lifecycle_impact_cost_paths.pdf",
+        image_dir / "lifecycle_impact_cost_paths.png",
         output_format,
     )
     step_plot_path = with_output_format(
-        image_dir / "lifecycle_representative_cost_steps.pdf",
+        image_dir / "lifecycle_representative_cost_steps.png",
         output_format,
     )
     step_shared_y_plot_path = with_output_format(
-        image_dir / "lifecycle_representative_cost_steps_shared_y.pdf",
+        image_dir / "lifecycle_representative_cost_steps_shared_y.png",
         output_format,
     )
 
@@ -952,7 +952,7 @@ def _parse_args() -> argparse.Namespace:
         help="Override the config and randomly sample candidate episodes.",
     )
     add_title_argument(parser, default=False)
-    add_format_argument(parser, default="pdf")
+    add_format_argument(parser, default="png")
     return parser.parse_args()
 
 

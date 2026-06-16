@@ -40,7 +40,7 @@ def generate_all_plots(
     config_path: str | Path = DEFAULT_CONFIG_PATH,
     *,
     include_title: bool = False,
-    output_format: str = "pdf",
+    output_format: str = "png",
 ) -> list[Path]:
     """Regenerate all canonical lifecycle plots from saved output tables."""
     cfg = load_lifecycle_config(config_path)
@@ -55,13 +55,13 @@ def generate_all_plots(
     jumps = _read_csv(data_dir / "impact_cost_fill_jumps.csv")
     path_summary = _read_csv(data_dir / "policy_path_summary.csv")
 
-    plot_path = with_output_format(image_dir / "lifecycle_impact_cost_paths.pdf", output_format)
+    plot_path = with_output_format(image_dir / "lifecycle_impact_cost_paths.png", output_format)
     step_path = with_output_format(
-        image_dir / "lifecycle_representative_cost_steps.pdf",
+        image_dir / "lifecycle_representative_cost_steps.png",
         output_format,
     )
     shared_step_path = with_output_format(
-        image_dir / "lifecycle_representative_cost_steps_shared_y.pdf",
+        image_dir / "lifecycle_representative_cost_steps_shared_y.png",
         output_format,
     )
 
@@ -106,7 +106,7 @@ def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--config", default=str(DEFAULT_CONFIG_PATH))
     add_title_argument(parser, default=False)
-    add_format_argument(parser, default="pdf")
+    add_format_argument(parser, default="png")
     return parser.parse_args()
 
 

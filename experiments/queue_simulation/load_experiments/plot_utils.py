@@ -110,7 +110,7 @@ def generate_all_plots(
     data_base=None,
     output_dir=None,
     include_title=False,
-    output_format='pdf',
+    output_format='png',
 ):
     df = load_data(
         mode,
@@ -123,7 +123,7 @@ def generate_all_plots(
         df,
         counterfactual=counterfactual,
         meta_end=meta_end,
-        save_path=with_output_format(output_dir / f'queue_paths_{mode}.pdf', output_format),
+        save_path=with_output_format(output_dir / f'queue_paths_{mode}.png', output_format),
         include_title=include_title,
     )
 
@@ -140,7 +140,7 @@ def parse_args():
     p.add_argument('--output-dir', default=None,
                    help='Directory where images should be written.')
     add_title_argument(p, default=False)
-    add_format_argument(p, default='pdf')
+    add_format_argument(p, default='png')
     return p.parse_args()
 
 

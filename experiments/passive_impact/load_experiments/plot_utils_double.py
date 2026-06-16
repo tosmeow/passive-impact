@@ -51,7 +51,7 @@ def parse_args():
         help='Which simulation backend results to load (default: efficient).',
     )
     add_title_argument(parser, default=False)
-    add_format_argument(parser, default='pdf')
+    add_format_argument(parser, default='png')
     return parser.parse_args()
 
 
@@ -471,7 +471,7 @@ def _plot_impact_panel(ax, ask_df, bid_df, title, include_title=False):
     ax.legend(loc='best', fontsize=8)
 
 
-def generate_all_plots(data_mode=None, meta_end=None, include_title=False, output_format='pdf'):
+def generate_all_plots(data_mode=None, meta_end=None, include_title=False, output_format='png'):
     """Generate and save all bid-ask analysis plots."""
 
     print("Loading bid-ask simulation data...")
@@ -492,7 +492,7 @@ def generate_all_plots(data_mode=None, meta_end=None, include_title=False, outpu
         title='Bid-Ask Queues: Counterfactual given base queue q',
         ask_ref_col='q_a',
         bid_ref_col='q_b',
-        save_path=with_output_format(image_dir / 'bidask_queue_given_q.pdf', output_format),
+        save_path=with_output_format(image_dir / 'bidask_queue_given_q.png', output_format),
         include_title=include_title,
     )
 
@@ -505,7 +505,7 @@ def generate_all_plots(data_mode=None, meta_end=None, include_title=False, outpu
         title='Bid-Ask Queues: Counterfactual given impacted queue q̄',
         ask_ref_col='bar_q_a',
         bid_ref_col='bar_q_b',
-        save_path=with_output_format(image_dir / 'bidask_queue_given_qbar.pdf', output_format),
+        save_path=with_output_format(image_dir / 'bidask_queue_given_qbar.png', output_format),
         include_title=include_title,
     )
 
@@ -516,7 +516,7 @@ def generate_all_plots(data_mode=None, meta_end=None, include_title=False, outpu
         data['ask_impact_with'],
         data['bid_impact_with'],
         title='Total Price Impact (Ask - Bid) given base queue q',
-        save_path=with_output_format(image_dir / 'bidask_impact_given_q.pdf', output_format),
+        save_path=with_output_format(image_dir / 'bidask_impact_given_q.png', output_format),
         include_title=include_title,
     )
 
@@ -524,7 +524,7 @@ def generate_all_plots(data_mode=None, meta_end=None, include_title=False, outpu
         data['ask_impact_without'],
         data['bid_impact_without'],
         title='Total Price Impact (Ask - Bid) given impacted queue q̄',
-        save_path=with_output_format(image_dir / 'bidask_impact_given_qbar.pdf', output_format),
+        save_path=with_output_format(image_dir / 'bidask_impact_given_qbar.png', output_format),
         include_title=include_title,
     )
 
@@ -535,7 +535,7 @@ def generate_all_plots(data_mode=None, meta_end=None, include_title=False, outpu
         data['ask_impact_with'],
         title='Ask Side Impact I^a(t) given base queue q',
         color='blue',
-        save_path=with_output_format(image_dir / 'ask_impact_given_q.pdf', output_format),
+        save_path=with_output_format(image_dir / 'ask_impact_given_q.png', output_format),
         include_title=include_title,
     )
 
@@ -543,7 +543,7 @@ def generate_all_plots(data_mode=None, meta_end=None, include_title=False, outpu
         data['bid_impact_with'],
         title='Bid Side Impact I^b(t) given base queue q',
         color='orange',
-        save_path=with_output_format(image_dir / 'bid_impact_given_q.pdf', output_format),
+        save_path=with_output_format(image_dir / 'bid_impact_given_q.png', output_format),
         include_title=include_title,
     )
 
@@ -551,7 +551,7 @@ def generate_all_plots(data_mode=None, meta_end=None, include_title=False, outpu
         data['ask_impact_without'],
         title='Ask Side Impact I^a(t) given impacted queue q̄',
         color='blue',
-        save_path=with_output_format(image_dir / 'ask_impact_given_qbar.pdf', output_format),
+        save_path=with_output_format(image_dir / 'ask_impact_given_qbar.png', output_format),
         include_title=include_title,
     )
 
@@ -559,7 +559,7 @@ def generate_all_plots(data_mode=None, meta_end=None, include_title=False, outpu
         data['bid_impact_without'],
         title='Bid Side Impact I^b(t) given impacted queue q̄',
         color='orange',
-        save_path=with_output_format(image_dir / 'bid_impact_given_qbar.pdf', output_format),
+        save_path=with_output_format(image_dir / 'bid_impact_given_qbar.png', output_format),
         include_title=include_title,
     )
 

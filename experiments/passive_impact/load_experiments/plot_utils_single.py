@@ -32,7 +32,7 @@ def parse_args():
         help='Time at which the metaorder ends, drawn as a vertical line (default: 60.0).'
     )
     add_title_argument(parser, default=False)
-    add_format_argument(parser, default='pdf')
+    add_format_argument(parser, default='png')
     return parser.parse_args()
 
 
@@ -142,7 +142,7 @@ def plot_queue_shades(
     save_or_show(fig, save_path, dpi=300)
 
 
-def generate_all_plots(data_mode, meta_end, include_title=False, output_format='pdf'):
+def generate_all_plots(data_mode, meta_end, include_title=False, output_format='png'):
     """Generate and save all four analysis plots."""
 
     path_with, path_without, queue_with, queue_without = load_data(data_mode)
@@ -158,7 +158,7 @@ def generate_all_plots(data_mode, meta_end, include_title=False, output_format='
         label='Price Impact',
         meta_end=meta_end,
         ref_col=None,
-        save_path=with_output_format(output_dir / 'impact_given_q.pdf', output_format),
+        save_path=with_output_format(output_dir / 'impact_given_q.png', output_format),
         mean_label='Mean impact',
         include_title=include_title,
     )
@@ -170,7 +170,7 @@ def generate_all_plots(data_mode, meta_end, include_title=False, output_format='
         label='Queue Size',
         meta_end=meta_end,
         ref_col='q',
-        save_path=with_output_format(output_dir / 'queue_given_q.pdf', output_format),
+        save_path=with_output_format(output_dir / 'queue_given_q.png', output_format),
         mean_label='Mean $\\bar{q}$',
         include_title=include_title,
     )
@@ -182,7 +182,7 @@ def generate_all_plots(data_mode, meta_end, include_title=False, output_format='
         label='Price Impact',
         meta_end=meta_end,
         ref_col=None,
-        save_path=with_output_format(output_dir / 'impact_given_qbar.pdf', output_format),
+        save_path=with_output_format(output_dir / 'impact_given_qbar.png', output_format),
         mean_label='Mean impact',
         include_title=include_title,
     )
@@ -194,7 +194,7 @@ def generate_all_plots(data_mode, meta_end, include_title=False, output_format='
         label='Queue Size',
         meta_end=meta_end,
         ref_col='bar_q',
-        save_path=with_output_format(output_dir / 'queue_given_qbar.pdf', output_format),
+        save_path=with_output_format(output_dir / 'queue_given_qbar.png', output_format),
         mean_label='Mean q',
         include_title=include_title,
     )

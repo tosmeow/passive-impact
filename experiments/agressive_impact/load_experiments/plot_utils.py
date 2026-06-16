@@ -81,7 +81,7 @@ def parse_args():
     p.add_argument('--bar-kappa', type=float, default=None,
                    help='Value used when data-base does not contain bar_kappa.npy.')
     add_title_argument(p, default=False)
-    add_format_argument(p, default='pdf')
+    add_format_argument(p, default='png')
     args = p.parse_args()
     if args.counterfactual and args.scenario not in {None, 'without'}:
         p.error('--counterfactual cannot be combined with --scenario with or --scenario both')
@@ -95,7 +95,7 @@ def generate_all_plots(
     output_dir=None,
     bar_kappa=None,
     include_title=False,
-    output_format='pdf',
+    output_format='png',
 ):
     """Generate all plots for the requested conditioning scenario(s)."""
     scenario_counterfactuals = _scenario_counterfactuals(scenario, counterfactual)

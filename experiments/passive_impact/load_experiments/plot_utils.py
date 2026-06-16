@@ -55,11 +55,11 @@ def parse_args():
                    help='Time at which the metaorder ends, drawn as a vertical line (default: 60.0). '
                         'Only used for single-queue mode.')
     add_title_argument(p, default=False)
-    add_format_argument(p, default='pdf')
+    add_format_argument(p, default='png')
     return p.parse_args()
 
 
-def generate_all_plots(mode, data_mode, meta_end=60.0, include_title=False, output_format='pdf'):
+def generate_all_plots(mode, data_mode, meta_end=60.0, include_title=False, output_format='png'):
     """Generate all plots for the given mode.
 
     Args:

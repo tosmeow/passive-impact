@@ -49,6 +49,5 @@ see [`FORMULAS.md`](FORMULAS.md).
 python -m experiments.impact_cost.load_experiments.plot_utils
 ```
 
-CSV/JSON outputs are written under `data/lifecycle_passive_cost/`; PDF figures
-are written under `images/`. Pass `--format png` if PNG files are needed for a
-downstream workflow.
+CSV/JSON outputs are written under `data/lifecycle_passive_cost/`; PNG figures
+are written under `images/`.

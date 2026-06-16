@@ -5,8 +5,8 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 
-DEFAULT_OUTPUT_FORMAT = "pdf"
-OUTPUT_FORMATS = ("pdf", "png")
+DEFAULT_OUTPUT_FORMAT = "png"
+OUTPUT_FORMATS = ("png", "pdf")
 
 
 def script_dir(file: str) -> Path:
