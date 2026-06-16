@@ -620,21 +620,21 @@ def _plot_lifecycle_paths(
             linewidth=1.9,
             linestyle="--",
             alpha=0.78,
-            label="mean price impact",
+            label="Mean price impact",
         )
 
     if not cost_summary.empty:
         x = cost_summary["time_s"].to_numpy(dtype=np.float64)
         mean = cost_summary["mean_cost"].to_numpy(dtype=np.float64)
-        ax.step(x, mean, where="post", color="#1f5d99", linewidth=2.0, label="mean cost")
+        ax.step(x, mean, where="post", color="#1f5d99", linewidth=2.0, label="Mean cost")
 
     ax.axhline(0.0, color="black", linewidth=0.8, alpha=0.45)
     ax.set_xlim(0.0, float(cfg.horizon_seconds))
     if include_title:
         ax.set_title("Looped passive lifecycle mean impact cost")
-    ax.set_xlabel("seconds from first post")
-    ax.set_ylabel("cumulative impact cost")
-    ax_impact.set_ylabel("price impact")
+    ax.set_xlabel("Seconds from first post")
+    ax.set_ylabel("Cumulative impact cost")
+    ax_impact.set_ylabel("Price impact")
     ax.grid(True, alpha=0.25)
     handles, labels = ax.get_legend_handles_labels()
     h2, l2 = ax_impact.get_legend_handles_labels()
@@ -698,7 +698,7 @@ def _plot_representative_step_paths(
                 where="post",
                 color="#1f5d99",
                 linewidth=2.0,
-                label="cost path",
+                label="Cost path",
             )
         if not jump_rows.empty:
             ax.scatter(
@@ -707,7 +707,7 @@ def _plot_representative_step_paths(
                 s=24,
                 color="#b83232",
                 zorder=3,
-                label="fills",
+                label="Fills",
             )
             for fill_time in jump_rows["fill_time_s"].to_numpy(dtype=np.float64):
                 ax.axvline(fill_time, color="#b83232", linewidth=0.6, alpha=0.16)
@@ -716,7 +716,7 @@ def _plot_representative_step_paths(
         if np.isfinite(y_max):
             ax.set_ylim(min(0.0, -0.04 * y_max), 1.08 * y_max)
         ax.grid(True, alpha=0.25)
-        ax.set_ylabel("cost")
+        ax.set_ylabel("Cost")
         if include_title:
             ax.set_title(
                 "window {episode}, policy path {policy}, fills {fills}, final {final:.6g}".format(
@@ -729,7 +729,7 @@ def _plot_representative_step_paths(
             )
         ax.legend(loc="best")
 
-    axes[-1].set_xlabel("seconds from first post")
+    axes[-1].set_xlabel("Seconds from first post")
     axes[-1].set_xlim(0.0, float(cfg.horizon_seconds))
     title = "Representative individual lifecycle cost paths"
     if shared_y:
