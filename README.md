@@ -1,6 +1,6 @@
 # Passive Market Impact Simulation
 
-A high-performance Rust library for simulating and analyzing market impact using point processes. Combines Hawkes processes (for market orders) with queue-reactive Markovian dynamics (for limit orders and cancellations) to compute the price effect of trading strategies through conditional path simulation. The library accompanies the work on conditional simulation of Poisson measures and market impact.
+A high-performance Rust library for simulating and analyzing market impact using point processes. Combines Hawkes processes (for market orders) with queue-reactive Markovian dynamics (for limit orders and cancellations) to compute the price effect of trading strategies through conditional path simulation. This comes accompanying our paper **Conditional Simulation of Poisson Measures and Market Impact** [link].
 
 ## Visual Overview
 
@@ -17,14 +17,16 @@ A high-performance Rust library for simulating and analyzing market impact using
 
 ## What This Library Provides
 
-- **Exact conditional simulation of Poisson processes** given an observed trajectory, by adding or removing jump times consistently with the conditioning.
-- **Counterfactual queue simulation** from an observed queue trajectory:
-  - *Removing a metaorder*: start from a trajectory that contains a metaorder and simulate the queue that would have been observed if the metaorder had not been sent.
-  - *Adding a metaorder*: start from a baseline trajectory and inject a hypothetical buy/sell metaorder executed through limit or market orders.
-- **Conditional market impact** from observed and counterfactual queues, covering passive limit-order and aggressive market-order strategies on the same realised trajectory.
-- **Ex-post and alternative-strategy analysis**: recover the conditional distribution of impact for an executed strategy, or compare hypothetical strategies against the same observed market path.
-- **Closed-form market impact computation** under Hawkes market-order flow with sum-of-exponentials kernels, using resolvent methods to avoid nested Monte Carlo.
-- **Anchored impact-cost experiments** that replay empirical queue snapshots and sample execution-time cost jumps for passive lifecycle strategies.
+
+- **Exact conditional simulation of Poisson processes** given an observed initial trajectory, by either adding or removing jump times consistently with the conditioning.
+- **Counterfactual queue simulation.** Given an observed queue trajectory, simulate what the queue would have been under a different metaorder scenario:
+  - *Removing a metaorder.* Starting from an observed trajectory that contains a metaorder, simulate the counterfactual queue in which the metaorder was never sent.
+  - *Adding a metaorder.* Starting from an observed (baseline) trajectory, simulate the counterfactual queue in which an additional buy/sell metaorder is injected, executed as either limit or market orders.
+- **Conditional market impact.** Compare observed and counterfactual queues to recover the price impact attributable to a metaorder — covering both passive (limit-order) and aggressive (market-order) impact. This enables two complementary analyses on the *same* observed trajectory:
+  - *Ex-post (a posteriori) impact of an executed strategy.* For a trading strategy that was actually executed, recover the full **distribution** of its market impact conditional on the observed market data.
+  - *Impact of alternative strategies.* On the same observed trajectory, estimate the impact that a different, hypothetical strategy would have had — enabling realistic backtesting and side-by-side comparison of strategies against the same realised market conditions.
+- **Closed-form market impact** under a Hawkes market-order flow with a sum-of-exponentials kernel, enabling impact estimation without nested Monte Carlo.
+- **Impact-cost experiments** that replay from real queue snapshots and own order postings with the associated execution flags.
 - **Flexible architecture** supporting both single-queue and bid-ask queue-pair scenarios, with optimized ("efficient") and general simulation variants.
 
 ## Setup
