@@ -1,4 +1,6 @@
 """Run a parameter-tweaked aggressive impact experiment."""
+from pathlib import Path
+
 import numpy as np
 
 from simproj import agressive_impact as ai
@@ -25,5 +27,7 @@ config = ai.AggressiveImpactConfig(
 
 if __name__ == "__main__":
     result = ai.run(config)
-    ai.save(result, "experiments/agressive_impact/custom_experiment/output/")
-    print("Done. Outputs in experiments/agressive_impact/custom_experiment/output/")
+    direction = "without_us" if config.counterfactual else "with_us"
+    output_dir = Path(__file__).resolve().parent / "output" / direction
+    ai.save(result, str(output_dir))
+    print(f"Done. Outputs in {output_dir}")

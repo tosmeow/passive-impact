@@ -1,5 +1,5 @@
 import numpy as np
-from simproj.passive_impact import PassiveImpactConfig, run, save
+from simproj.passive_impact import PassiveImpactConfig, _make_meta_orders, run, save
 
 
 def test_passive_impact_smoke(tmp_path):
@@ -27,6 +27,12 @@ def test_passive_impact_smoke(tmp_path):
 
     # Impact paths should now be non-trivial (not all zeros)
     assert np.any(result["impact_paths"] != 0.0)
+
+
+def test_passive_explicit_metaorder_times_are_limit_orders():
+    cfg = PassiveImpactConfig(metaorder=np.array([0.1, 0.4, 0.9], dtype=np.float64))
+    meta = _make_meta_orders(cfg)
+    assert np.all(meta.dims() == 0)
 
 
 def test_passive_impact_with_without_use_opposite_conditioning_paths():

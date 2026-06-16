@@ -38,7 +38,7 @@ def _make_meta_orders(cfg: QueueSimulationConfig):
     if isinstance(cfg.metaorder, int):
         return _native.create_meta_orders(cfg.metaorder, *cfg.metaorder_window)
     return _native.create_meta_orders_from_times(
-        np.asarray(cfg.metaorder, dtype=np.float64), target_dim=2, total_dims=3,
+        np.asarray(cfg.metaorder, dtype=np.float64), target_dim=0, total_dims=3,
     )
 
 

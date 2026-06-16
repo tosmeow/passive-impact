@@ -6,13 +6,60 @@ import os
 DATA_BASE = './data/hybrid'
 
 
-def load_data():
+def _queue_layout(counterfactual=False):
+    if counterfactual:
+        return {
+            'ref_col': 'bar_q',
+            'sim_prefix': 'q_sim_',
+            'columns': lambda n: ['bar_q'] + [f'q_sim_{i}' for i in range(n)],
+            'mean_label': 'Mean q',
+            'queue_title': 'Queue dynamics: $\\bar{q}$ (reference) vs q (without meta orders)',
+        }
+    return {
+        'ref_col': 'q',
+        'sim_prefix': 'bar_q_sim_',
+        'columns': lambda n: ['q'] + [f'bar_q_sim_{i}' for i in range(n)],
+        'mean_label': 'Mean $\\bar{q}$',
+        'queue_title': 'Queue dynamics: q (reference) vs $\\bar{q}$ (with meta orders)',
+    }
+
+
+def _default_output_dir(counterfactual):
+    return 'images_hybrid_without_us' if counterfactual else 'images_hybrid'
+
+
+def _queue_diffs(queue_df, counterfactual=False):
+    """Return bar_q - q for each simulation path under either direction."""
+    layout = _queue_layout(counterfactual)
+    if layout['ref_col'] not in queue_df.columns:
+        raise ValueError(f"Missing reference column {layout['ref_col']!r}")
+    sim_cols = [col for col in queue_df.columns if col.startswith(layout['sim_prefix'])]
+    if not sim_cols:
+        raise ValueError(f"No simulation columns found with prefix {layout['sim_prefix']!r}")
+
+    reference = queue_df[layout['ref_col']].astype(np.int64).to_numpy()
+    simulated = queue_df[sim_cols].astype(np.int64).to_numpy()
+    if counterfactual:
+        values = reference[:, None] - simulated
+    else:
+        values = simulated - reference[:, None]
+    return pd.DataFrame(values, index=queue_df.index, columns=sim_cols)
+
+
+def load_data(counterfactual=False, data_base=None, bar_kappa=None):
     """Load hybrid aggressive impact simulation results from .npy files."""
-    times = np.load(f'{DATA_BASE}/times.npy')
-    impact_paths = np.load(f'{DATA_BASE}/impact_paths.npy')
-    queue_paths = np.load(f'{DATA_BASE}/queue_paths.npy')
-    event_types = np.load(f'{DATA_BASE}/event_types.npy')
-    bar_kappa = float(np.load(f'{DATA_BASE}/bar_kappa.npy')[0])
+    data_base = data_base or DATA_BASE
+    times = np.load(f'{data_base}/times.npy')
+    impact_paths = np.load(f'{data_base}/impact_paths.npy')
+    queue_paths = np.load(f'{data_base}/queue_paths.npy')
+    event_types = np.load(f'{data_base}/event_types.npy')
+    if bar_kappa is None:
+        bar_kappa_path = f'{data_base}/bar_kappa.npy'
+        if not os.path.exists(bar_kappa_path):
+            raise FileNotFoundError(
+                f"Missing {bar_kappa_path}; pass bar_kappa when plotting custom hybrid output."
+            )
+        bar_kappa = float(np.load(bar_kappa_path)[0])
 
     n_sims = impact_paths.shape[1]
     is_market = event_types == 1.0
@@ -23,10 +70,11 @@ def load_data():
         columns=[f'sim_{i}' for i in range(n_sims)]
     )
 
+    layout = _queue_layout(counterfactual)
     queue_df = pd.DataFrame(
         queue_paths,
         index=pd.Index(times, name='time'),
-        columns=['q'] + [f'bar_q_sim_{i}' for i in range(n_sims)]
+        columns=layout['columns'](n_sims)
     )
 
     meta_mask = ~is_market
@@ -35,7 +83,16 @@ def load_data():
     return impact_df, queue_df, is_market, meta_end, bar_kappa
 
 
-def plot_shades(df, sim_prefix, title, ylabel, meta_end=None, ref_col=None, save_path=None):
+def plot_shades(
+    df,
+    sim_prefix,
+    title,
+    ylabel,
+    meta_end=None,
+    ref_col=None,
+    save_path=None,
+    mean_label='Mean',
+):
     """Plot individual simulation paths as transparent lines with mean overlay."""
     fig, ax = plt.subplots(figsize=(12, 6))
 
@@ -44,8 +101,11 @@ def plot_shades(df, sim_prefix, title, ylabel, meta_end=None, ref_col=None, save
     for col in sim_cols:
         ax.plot(df.index, df[col], color='gray', alpha=0.05, linewidth=0.5)
 
+    if not sim_cols:
+        raise ValueError(f"No simulation columns found with prefix {sim_prefix!r}")
+
     avg = df[sim_cols].mean(axis=1)
-    ax.plot(df.index, avg, color='red', linewidth=2.5, label='Mean')
+    ax.plot(df.index, avg, color='red', linewidth=2.5, label=mean_label)
 
     if ref_col is not None and ref_col in df.columns:
         ax.plot(df.index, df[ref_col], color='black', linewidth=2.5, label=ref_col)
@@ -102,14 +162,11 @@ def plot_impact_decomposition(impact_df, is_market, bar_kappa, meta_end=None, sa
         plt.show()
 
 
-def plot_queue_diff(queue_df, meta_end=None, save_path=None):
+def plot_queue_diff(queue_df, counterfactual=False, meta_end=None, save_path=None):
     """Plot the queue difference bar_q - q over time with quantile bands."""
     fig, ax = plt.subplots(figsize=(12, 6))
 
-    sim_cols = [col for col in queue_df.columns if col.startswith('bar_q_sim_')]
-    q = queue_df['q'].values
-
-    diffs = queue_df[sim_cols].astype(np.int64).subtract(q.astype(np.int64), axis=0)
+    diffs = _queue_diffs(queue_df, counterfactual=counterfactual)
     mean_diff = diffs.mean(axis=1)
     q10 = diffs.quantile(0.10, axis=1)
     q25 = diffs.quantile(0.25, axis=1)
@@ -140,13 +197,24 @@ def plot_queue_diff(queue_df, meta_end=None, save_path=None):
         plt.show()
 
 
-def generate_all_plots():
+def generate_all_plots(counterfactual=False, data_base=None, output_dir=None, bar_kappa=None):
     """Generate and save all analysis plots."""
-    impact_df, queue_df, is_market, meta_end, bar_kappa = load_data()
+    impact_df, queue_df, is_market, meta_end, bar_kappa = load_data(
+        counterfactual=counterfactual,
+        data_base=data_base,
+        bar_kappa=bar_kappa,
+    )
+    layout = _queue_layout(counterfactual)
 
-    os.makedirs('images', exist_ok=True)
+    output_dir = output_dir or _default_output_dir(counterfactual)
+    os.makedirs(output_dir, exist_ok=True)
 
-    print(f"Generating plots (bar_kappa={bar_kappa:.4f}, metaorder ends at t={meta_end:.2f})...")
+    direction = 'without us' if counterfactual else 'with us'
+    meta_msg = f"{meta_end:.2f}" if meta_end is not None else "unknown"
+    print(
+        f"Generating {direction} plots "
+        f"(bar_kappa={bar_kappa:.4f}, metaorder ends at t={meta_msg})..."
+    )
 
     plot_shades(
         impact_df,
@@ -154,17 +222,18 @@ def generate_all_plots():
         title=r'Aggressive Market Impact MI(t)',
         ylabel='Price Impact',
         meta_end=meta_end,
-        save_path='images/impact_paths.png'
+        save_path=os.path.join(output_dir, 'impact_paths.png')
     )
 
     plot_shades(
         queue_df,
-        sim_prefix='bar_q_sim_',
-        title='Queue dynamics: q (reference) vs $\\bar{q}$ (with meta orders)',
+        sim_prefix=layout['sim_prefix'],
+        title=layout['queue_title'],
         ylabel='Queue Size',
         meta_end=meta_end,
-        ref_col='q',
-        save_path='images/queue_paths.png'
+        ref_col=layout['ref_col'],
+        save_path=os.path.join(output_dir, 'queue_paths.png'),
+        mean_label=layout['mean_label'],
     )
 
     plot_impact_decomposition(
@@ -172,13 +241,14 @@ def generate_all_plots():
         is_market,
         bar_kappa,
         meta_end=meta_end,
-        save_path='images/impact_by_event_type.png'
+        save_path=os.path.join(output_dir, 'impact_by_event_type.png')
     )
 
     plot_queue_diff(
         queue_df,
+        counterfactual=counterfactual,
         meta_end=meta_end,
-        save_path='images/queue_diff.png'
+        save_path=os.path.join(output_dir, 'queue_diff.png')
     )
 
 

@@ -15,11 +15,11 @@ python experiments/agressive_impact/custom_experiment/main.py
 
 Knobs: `time_horizon`, `n_simulations`, `initial_queue_size`, `counterfactual` (`False` for with-us, `True` for without-us), `model` (`"propagator"` | `"hybrid"`), `bar_kappa` (required for hybrid), the Hawkes parameters, the affine-queue parameters, the metaorder shape, and a `kappa: Callable[[float], float]` for the per-trade impact function (defaults to the paper's $c_1 \sqrt{\log(e^{-c_2 q} + 1)}$).
 
-Outputs (`times.npy`, `queue_paths.npy`, `impact_paths.npy`, `event_types.npy`) land in `custom_experiment/output/` (gitignored).
+Outputs (`times.npy`, `queue_paths.npy`, `impact_paths.npy`, `event_types.npy`) land in `custom_experiment/output/with_us/` or `custom_experiment/output/without_us/` (gitignored).
 
 ## Pre-saved baselines — `load_experiments/`
 
-The notebook [`analysis.ipynb`](load_experiments/analysis.ipynb) loads `.npy` baselines from `load_experiments/data/{propagator,hybrid}/` and reproduces the standard plots via [`plot_utils.py`](load_experiments/plot_utils.py) (which dispatches to `plot_utils_propagator.py` and `plot_utils_hybrid.py`).
+The notebook [`analysis.ipynb`](load_experiments/analysis.ipynb) loads `.npy` baselines from `load_experiments/data/{propagator,hybrid}/` and reproduces the standard plots via [`plot_utils.py`](load_experiments/plot_utils.py) (which dispatches to `plot_utils_propagator.py` and `plot_utils_hybrid.py`). Pass `--counterfactual` when plotting without-us outputs so the first queue column is read as `bar_q` and the simulations as `q_sim_*`.
 
 Baseline `.npy` data is gitignored — regenerate via the Rust binaries:
 

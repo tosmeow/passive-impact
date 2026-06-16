@@ -1,4 +1,6 @@
 """Run a parameter-tweaked queue-only counterfactual simulation."""
+from pathlib import Path
+
 from simproj import queue_simulation as qs
 
 # ──────────────── CONFIG ────────────────
@@ -21,5 +23,7 @@ config = qs.QueueSimulationConfig(
 
 if __name__ == "__main__":
     result = qs.run(config)
-    qs.save(result, "experiments/queue_simulation/custom_experiment/output/")
-    print("Done. Outputs in experiments/queue_simulation/custom_experiment/output/")
+    direction = "without_us" if config.counterfactual else "with_us"
+    output_dir = Path(__file__).resolve().parent / "output" / direction
+    qs.save(result, str(output_dir))
+    print(f"Done. Outputs in {output_dir}")

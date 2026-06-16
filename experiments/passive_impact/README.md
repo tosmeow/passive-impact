@@ -18,7 +18,7 @@ python experiments/passive_impact/custom_experiment/main.py
 
 Knobs: `time_horizon`, `n_simulations`, `initial_queue_size`, `mode` (`"single"` | `"double"`), `counterfactual` (`False` for with-us, `True` for without-us), the Hawkes parameters `mu`/`alpha`/`beta`, the affine-queue parameters `a_l`/`b_l`/`a_c`/`b_c`, and the metaorder shape (either an integer count for evenly-spaced orders inside `metaorder_window`, or an explicit `list`/`np.ndarray` of arrival times).
 
-Outputs (`times.npy`, `queue_paths.npy`, `impact_paths.npy`) land in `custom_experiment/output/` (gitignored).
+Outputs (`times.npy`, `queue_paths.npy`, `impact_paths.npy`) land in `custom_experiment/output/with_us/` or `custom_experiment/output/without_us/` (gitignored).
 
 ## Pre-saved baselines — `load_experiments/`
 

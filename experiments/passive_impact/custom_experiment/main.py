@@ -1,4 +1,6 @@
 """Run a parameter-tweaked passive impact experiment."""
+from pathlib import Path
+
 from simproj import passive_impact as pi
 
 # ──────────────── CONFIG ────────────────
@@ -25,5 +27,7 @@ config = pi.PassiveImpactConfig(
 
 if __name__ == "__main__":
     result = pi.run(config)
-    pi.save(result, "experiments/passive_impact/custom_experiment/output/")
-    print("Done. Outputs in experiments/passive_impact/custom_experiment/output/")
+    direction = "without_us" if config.counterfactual else "with_us"
+    output_dir = Path(__file__).resolve().parent / "output" / direction
+    pi.save(result, str(output_dir))
+    print(f"Done. Outputs in {output_dir}")

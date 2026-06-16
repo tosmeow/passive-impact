@@ -52,7 +52,7 @@ def _make_meta_orders(cfg: PassiveImpactConfig):
     if isinstance(cfg.metaorder, int):
         return _native.create_meta_orders(cfg.metaorder, *cfg.metaorder_window)
     times = np.asarray(cfg.metaorder, dtype=np.float64)
-    return _native.create_meta_orders_from_times(times, target_dim=2, total_dims=3)
+    return _native.create_meta_orders_from_times(times, target_dim=0, total_dims=3)
 
 
 def _run_single_direction(cfg, direction: str) -> dict:

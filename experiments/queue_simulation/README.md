@@ -14,11 +14,11 @@ python experiments/queue_simulation/custom_experiment/main.py
 
 Knobs: `time_horizon`, `n_simulations`, `n_eval_times` (size of the uniform sampling grid), `initial_queue_size`, `mode` (`"single"` | `"double"`), the Hawkes parameters, the affine-queue parameters, and the metaorder shape (integer count or explicit list of arrival times).
 
-Set `counterfactual=False` for with-us conditioning, or `counterfactual=True` for the without-us counterfactual. Outputs (`times.npy`, `queue_paths.npy` with shape `(n_eval_times, n_simulations + 1)`) land in `custom_experiment/output/` (gitignored).
+Set `counterfactual=False` for with-us conditioning, or `counterfactual=True` for the without-us counterfactual. Outputs (`times.npy`, `queue_paths.npy` with shape `(n_eval_times, n_simulations + 1)`) land in `custom_experiment/output/with_us/` or `custom_experiment/output/without_us/` (gitignored).
 
 ## Pre-saved baselines — `load_experiments/`
 
-The notebook [`analysis.ipynb`](load_experiments/analysis.ipynb) loads `.npy` baselines from `load_experiments/data/single/efficient/` and renders the queue-shade plot via [`plot_utils.py`](load_experiments/plot_utils.py).
+The notebook [`analysis.ipynb`](load_experiments/analysis.ipynb) loads `.npy` baselines from `load_experiments/data/single/efficient/` and renders the queue-shade plot via [`plot_utils.py`](load_experiments/plot_utils.py). Pass `--counterfactual` when plotting without-us outputs so the first queue column is read as `bar_q` and the simulations as `q_sim_*`.
 
 Baseline `.npy` data is gitignored — regenerate via the Rust binary:
 

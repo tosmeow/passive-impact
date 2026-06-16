@@ -1,5 +1,5 @@
 import numpy as np
-from simproj.agressive_impact import AggressiveImpactConfig, run, save
+from simproj.agressive_impact import AggressiveImpactConfig, _make_meta_orders, run, save
 
 
 def test_agressive_impact_propagator_smoke(tmp_path):
@@ -17,6 +17,12 @@ def test_agressive_impact_propagator_smoke(tmp_path):
     save(result, str(tmp_path))
     assert (tmp_path / "queue_paths.npy").exists()
     assert (tmp_path / "event_types.npy").exists()
+
+
+def test_agressive_explicit_metaorder_times_are_market_orders():
+    cfg = AggressiveImpactConfig(metaorder=np.array([0.1, 0.4, 0.9], dtype=np.float64))
+    meta = _make_meta_orders(cfg)
+    assert np.all(meta.dims() == 2)
 
 
 def test_agressive_impact_hybrid_smoke(tmp_path):

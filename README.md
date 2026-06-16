@@ -58,7 +58,7 @@ python -c "import simproj; print(simproj.__version__)"
 
 ## Quick Start (Python)
 
-After [Setup](#setup), run any of the three simulation demo categories from Python — each ships a `custom_experiment/main.py` whose top section is a config dataclass. Edit the config, run the file, and `.npy` outputs land in `output/`.
+After [Setup](#setup), run any of the three simulation demo categories from Python — each ships a `custom_experiment/main.py` whose top section is a config dataclass. Edit the config, run the file, and `.npy` outputs land in `output/with_us/` or `output/without_us/` according to `counterfactual`.
 
 ```python
 # experiments/passive_impact/custom_experiment/main.py
@@ -82,7 +82,8 @@ config = pi.PassiveImpactConfig(
 )
 
 result = pi.run(config)               # dict[str, np.ndarray]
-pi.save(result, "experiments/passive_impact/custom_experiment/output/")
+direction = "without_us" if config.counterfactual else "with_us"
+pi.save(result, f"experiments/passive_impact/custom_experiment/output/{direction}/")
 ```
 
 Run it:
@@ -281,7 +282,7 @@ python experiments/agressive_impact/custom_experiment/main.py
 python experiments/queue_simulation/custom_experiment/main.py
 ```
 
-Outputs (`.npy` arrays) land in each folder's `output/` (gitignored). The Python facades produce the same shapes as the Rust binaries — see each `<Category>Config` dataclass in [`code/python/simproj/`](code/python/simproj/) for the full set of knobs (Hawkes parameters, queue parameters, metaorder shape, propagator vs. hybrid model, etc.).
+Outputs (`.npy` arrays) land in each folder's `output/with_us/` or `output/without_us/` directory (gitignored). The Python facades produce the same shapes as the Rust binaries — see each `<Category>Config` dataclass in [`code/python/simproj/`](code/python/simproj/) for the full set of knobs (Hawkes parameters, queue parameters, metaorder shape, propagator vs. hybrid model, etc.).
 
 ### Run the impact-cost workflow
 

@@ -35,4 +35,11 @@ Market-order impact under the propagator price model. A buy-side metaorder consu
 ```bash
 cargo run --release --bin agressive_impact
 python plot_utils.py
+python plot_utils.py --model propagator --counterfactual
+python plot_utils.py --model propagator --counterfactual \
+  --data-base ../custom_experiment/output/without_us
 ```
+
+Use `--counterfactual` for without-us outputs; those plots read the first queue
+column as `bar_q` and the simulations as `q_sim_*`, while the default reads
+`q` and `bar_q_sim_*`.

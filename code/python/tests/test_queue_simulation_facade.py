@@ -1,5 +1,5 @@
 import numpy as np
-from simproj.queue_simulation import QueueSimulationConfig, run, save
+from simproj.queue_simulation import QueueSimulationConfig, _make_meta_orders, run, save
 
 
 def test_queue_simulation_smoke(tmp_path):
@@ -12,6 +12,12 @@ def test_queue_simulation_smoke(tmp_path):
     assert result["queue_paths"].shape == (20, 3)
     save(result, str(tmp_path))
     assert (tmp_path / "queue_paths.npy").exists()
+
+
+def test_queue_simulation_explicit_metaorder_times_are_limit_orders():
+    cfg = QueueSimulationConfig(metaorder=np.array([0.1, 0.4, 0.9], dtype=np.float64))
+    meta = _make_meta_orders(cfg)
+    assert np.all(meta.dims() == 0)
 
 
 def test_queue_simulation_counterfactual_flag_and_save(tmp_path):
