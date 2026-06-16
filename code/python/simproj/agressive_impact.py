@@ -1,9 +1,9 @@
-"""Facade for the aggressive impact experiment (propagator + hybrid models)."""
+"""Facade for the aggressive impact experiment (hybrid model)."""
 from __future__ import annotations
 
 import os
 from dataclasses import dataclass, field
-from typing import Callable, Optional, Union
+from typing import Callable, Union
 
 import numpy as np
 
@@ -17,8 +17,7 @@ class AggressiveImpactConfig:
     initial_queue_size: int = 200
     counterfactual: bool = False     # False: with us | True: without us
 
-    model: str = "propagator"       # "propagator" | "hybrid"
-    bar_kappa: Optional[float] = None  # required when model == "hybrid"
+    bar_kappa: float = 0.01         # constant weight for propagated metaorders
 
     # Hawkes
     mu: float = 1.0
@@ -31,9 +30,9 @@ class AggressiveImpactConfig:
     a_c: float = 2.0
     b_c: float = 0.125
 
-    # Kappa(q) — defaults to the paper's c1 * sqrt(log(e^{-c2*q} + 1))
+    # Kappa(q) — hybrid instantaneous queue-dependent correction
     kappa: Callable[[float], float] = field(
-        default_factory=lambda: lambda q: 1000.0 * (np.log(np.exp(-0.01 * q) + 1.0) ** 0.5)
+        default_factory=lambda: lambda q: -0.001 * q
     )
 
     # Metaorder (aggressive metaorders are dim=2 = market orders)
@@ -126,19 +125,12 @@ def _run_single_direction(cfg: AggressiveImpactConfig, direction: str) -> dict:
             q_samples = sim_samples
             q_bar_samples = reference_samples
 
-        if cfg.model == "hybrid":
-            result = _native.aggressive_impact_from_queue_samples_hybrid(
-                q_samples=q_samples, q_bar_samples=q_bar_samples,
-                eval_times=eval_times, is_market_order=is_market_order,
-                hawkes=hawkes, kappa=cfg.kappa,
-                bar_kappa=cfg.bar_kappa,
-            )
-        else:
-            result = _native.aggressive_impact_from_queue_samples(
-                q_samples=q_samples, q_bar_samples=q_bar_samples,
-                eval_times=eval_times, is_market_order=is_market_order,
-                hawkes=hawkes, kappa=cfg.kappa,
-            )
+        result = _native.aggressive_impact_from_queue_samples(
+            q_samples=q_samples, q_bar_samples=q_bar_samples,
+            eval_times=eval_times, is_market_order=is_market_order,
+            hawkes=hawkes, kappa=cfg.kappa,
+            bar_kappa=cfg.bar_kappa,
+        )
         impact_paths[:, sim_idx] = result.impact()
 
     return {
@@ -146,16 +138,11 @@ def _run_single_direction(cfg: AggressiveImpactConfig, direction: str) -> dict:
         "queue_paths": queue_paths,
         "impact_paths": impact_paths,
         "event_types": np.array([1.0 if b else 0.0 for b in is_market_order]),
+        "bar_kappa": np.array([cfg.bar_kappa], dtype=np.float64),
     }
 
 
 def run(cfg: AggressiveImpactConfig) -> dict:
-    if cfg.model not in ("propagator", "hybrid"):
-        raise ValueError(
-            f"model must be 'propagator' or 'hybrid'; got {cfg.model!r}"
-        )
-    if cfg.model == "hybrid" and cfg.bar_kappa is None:
-        raise ValueError("hybrid model requires bar_kappa")
     return _run_single_direction(cfg, "without" if cfg.counterfactual else "with")
 
 

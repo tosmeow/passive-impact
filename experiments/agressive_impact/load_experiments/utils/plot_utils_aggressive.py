@@ -16,7 +16,7 @@ from experiments.plot_utils_common import (
 )
 
 LOAD_EXPERIMENT_DIR = Path(__file__).resolve().parents[1]
-DATA_BASE = LOAD_EXPERIMENT_DIR / 'data' / 'hybrid'
+DATA_BASE = LOAD_EXPERIMENT_DIR / 'data'
 
 
 def _queue_layout(counterfactual=False):
@@ -38,7 +38,7 @@ def _queue_layout(counterfactual=False):
 
 
 def _default_output_dir(counterfactual):
-    return LOAD_EXPERIMENT_DIR / 'images_hybrid'
+    return LOAD_EXPERIMENT_DIR / 'images'
 
 
 def _default_data_base(counterfactual):
@@ -56,6 +56,22 @@ def _default_data_base(counterfactual):
 
 def _conditioning_suffix(counterfactual):
     return 'given_qbar' if counterfactual else 'given_q'
+
+
+def _default_mean_label(sim_prefix, ylabel):
+    if 'impact' in ylabel.lower():
+        return 'Mean impact'
+    if sim_prefix.startswith('q_sim'):
+        return 'Mean q'
+    if sim_prefix.startswith('bar_q'):
+        return 'Mean $\\bar{q}$'
+    return 'Mean'
+
+
+def _display_col_label(col):
+    if col == 'bar_q':
+        return '$\\bar{q}$'
+    return col
 
 
 def _finite_values(values):
@@ -125,7 +141,7 @@ def _queue_diffs(queue_df, counterfactual=False):
 
 
 def load_data(counterfactual=False, data_base=None, bar_kappa=None):
-    """Load hybrid aggressive impact simulation results from .npy files."""
+    """Load aggressive impact simulation results from .npy files."""
     data_base = Path(data_base) if data_base is not None else _default_data_base(counterfactual)
     times = np.load(data_base / 'times.npy')
     impact_paths = np.load(data_base / 'impact_paths.npy')
@@ -133,11 +149,7 @@ def load_data(counterfactual=False, data_base=None, bar_kappa=None):
     event_types = np.load(data_base / 'event_types.npy')
     if bar_kappa is None:
         bar_kappa_path = data_base / 'bar_kappa.npy'
-        if not bar_kappa_path.exists():
-            raise FileNotFoundError(
-                f"Missing {bar_kappa_path}; pass bar_kappa when plotting custom hybrid output."
-            )
-        bar_kappa = float(np.load(bar_kappa_path)[0])
+        bar_kappa = float(np.load(bar_kappa_path)[0]) if bar_kappa_path.exists() else None
 
     n_sims = impact_paths.shape[1]
     is_market = event_types == 1.0
@@ -183,7 +195,7 @@ def plot_shades(
     meta_end=None,
     ref_col=None,
     save_path=None,
-    mean_label='Mean',
+    mean_label=None,
     include_title=False,
     y_lim=None,
 ):
@@ -198,11 +210,20 @@ def plot_shades(
     if not sim_cols:
         raise ValueError(f"No simulation columns found with prefix {sim_prefix!r}")
 
+    if mean_label is None:
+        mean_label = _default_mean_label(sim_prefix, ylabel)
+
     avg = df[sim_cols].mean(axis=1)
     ax.plot(df.index, avg, color='red', linewidth=2.5, label=mean_label)
 
     if ref_col is not None and ref_col in df.columns:
-        ax.plot(df.index, df[ref_col], color='black', linewidth=2.5, label=ref_col)
+        ax.plot(
+            df.index,
+            df[ref_col],
+            color='black',
+            linewidth=2.5,
+            label=_display_col_label(ref_col),
+        )
 
     if meta_end is not None:
         ax.axvline(x=meta_end, color='green', linestyle='--', label='End of metaorder')
@@ -249,7 +270,7 @@ def plot_impact_decomposition(
 
     ax.set_xlabel('Time (seconds)')
     ax.set_ylabel('Mean Impact MI(t)')
-    maybe_set_title(ax, 'Hybrid Aggressive Impact by Event Type', include_title)
+    maybe_set_title(ax, 'Aggressive Impact by Event Type', include_title)
     ax.legend()
     plt.tight_layout()
 
@@ -314,9 +335,10 @@ def generate_all_plots(
     direction = 'without us' if counterfactual else 'with us'
     suffix = _conditioning_suffix(counterfactual)
     meta_msg = f"{meta_end:.2f}" if meta_end is not None else "unknown"
+    kappa_msg = f"{bar_kappa:.4f}" if bar_kappa is not None else "n/a"
     print(
         f"Generating {direction} plots "
-        f"(bar_kappa={bar_kappa:.4f}, metaorder ends at t={meta_msg})..."
+        f"(bar_kappa={kappa_msg}, metaorder ends at t={meta_msg})..."
     )
 
     plot_shades(
@@ -326,6 +348,7 @@ def generate_all_plots(
         ylabel='Price Impact',
         meta_end=meta_end,
         save_path=with_output_format(output_dir / f'impact_paths_{suffix}.pdf', output_format),
+        mean_label='Mean impact',
         include_title=include_title,
         y_lim=y_lims.get('impact') if y_lims else None,
     )

@@ -1,14 +1,12 @@
-"""Plot utilities for aggressive impact experiments (propagator + hybrid).
+"""Plot utilities for aggressive impact experiments.
 
-Loads pre-saved baseline data from:
-    ./data/propagator/   — pure-propagator model
-    ./data/hybrid/       — hybrid propagator+instantaneous model
+Loads generated data from:
+    ./data/with/
+    ./data/without/
 
 Usage:
     python plot_utils.py
-    python plot_utils.py --model propagator
-    python plot_utils.py --model hybrid
-    python plot_utils.py --model propagator --scenario without
+    python plot_utils.py --scenario without
     python plot_utils.py --title
 """
 import argparse
@@ -20,55 +18,68 @@ if __package__ in {None, ""}:
     if str(repo_root) not in sys.path:
         sys.path.insert(0, str(repo_root))
 
-    from utils.plot_utils_propagator import (
-        compute_plot_y_lims as compute_propagator_y_lims,
-        load_data as _load_propagator_data,
-        plot_impact_by_event_type,
+    from utils.plot_utils_aggressive import (
+        compute_plot_y_lims,
+        generate_all_plots as _generate_scenario_plots,
+        load_data as _load_data,
+        plot_impact_decomposition,
         plot_queue_diff,
         plot_shades,
     )
-    from utils.plot_utils_propagator import generate_all_plots as gen_propagator
-    from utils.plot_utils_hybrid import compute_plot_y_lims as compute_hybrid_y_lims
-    from utils.plot_utils_hybrid import generate_all_plots as gen_hybrid
     from experiments.plot_utils_common import add_format_argument, add_title_argument
 else:
-    from .utils.plot_utils_propagator import (
-        compute_plot_y_lims as compute_propagator_y_lims,
-        load_data as _load_propagator_data,
-        plot_impact_by_event_type,
+    from .utils.plot_utils_aggressive import (
+        compute_plot_y_lims,
+        generate_all_plots as _generate_scenario_plots,
+        load_data as _load_data,
+        plot_impact_decomposition,
         plot_queue_diff,
         plot_shades,
     )
-    from .utils.plot_utils_propagator import generate_all_plots as gen_propagator
-    from .utils.plot_utils_hybrid import compute_plot_y_lims as compute_hybrid_y_lims
-    from .utils.plot_utils_hybrid import generate_all_plots as gen_hybrid
     from ...plot_utils_common import add_format_argument, add_title_argument
 
 
-def load_data(counterfactual=False):
-    """Load propagator data using the legacy 3-value notebook API."""
-    impact_df, queue_df, is_market, _meta_end = _load_propagator_data(
-        counterfactual=counterfactual
+def load_data(counterfactual=False, data_base=None, bar_kappa=None):
+    """Load aggressive impact data using the legacy 3-value notebook API."""
+    impact_df, queue_df, is_market, _meta_end, _bar_kappa = _load_data(
+        counterfactual=counterfactual,
+        data_base=data_base,
+        bar_kappa=bar_kappa,
     )
     return impact_df, queue_df, is_market
 
 
-def parse_args():
-    p = argparse.ArgumentParser(
-        description='Generate aggressive impact plots (propagator, hybrid, or both models).'
+def plot_impact_by_event_type(
+    impact_df,
+    is_market,
+    bar_kappa=0.01,
+    meta_end=None,
+    save_path=None,
+    include_title=False,
+):
+    """Backward-compatible wrapper around the event decomposition plot."""
+    return plot_impact_decomposition(
+        impact_df,
+        is_market,
+        bar_kappa=bar_kappa,
+        meta_end=meta_end,
+        save_path=save_path,
+        include_title=include_title,
     )
-    p.add_argument('--model', choices=['both', 'propagator', 'hybrid'], default='both',
-                   help='Which aggressive impact model results to plot.')
+
+
+def parse_args():
+    p = argparse.ArgumentParser(description='Generate aggressive impact plots.')
     p.add_argument('--scenario', choices=['with', 'without', 'both'], default=None,
                    help='Which conditioning case to plot (default: both).')
     p.add_argument('--counterfactual', action='store_true',
                    help='Alias for --scenario without: first column bar_q, simulations q.')
     p.add_argument('--data-base', default=None,
-                   help='Directory containing saved .npy files. With --model both, expects propagator/ and hybrid/ subdirectories.')
+                   help='Directory containing saved .npy files, or with/without subdirectories.')
     p.add_argument('--output-dir', default=None,
-                   help='Directory where images should be written. With --model both, writes propagator/ and hybrid/ subdirectories.')
+                   help='Directory where images should be written.')
     p.add_argument('--bar-kappa', type=float, default=None,
-                   help='Hybrid-only value used when data-base does not contain bar_kappa.npy.')
+                   help='Value used when data-base does not contain bar_kappa.npy.')
     add_title_argument(p, default=False)
     add_format_argument(p, default='pdf')
     args = p.parse_args()
@@ -78,7 +89,6 @@ def parse_args():
 
 
 def generate_all_plots(
-    model,
     counterfactual=False,
     scenario=None,
     data_base=None,
@@ -87,71 +97,30 @@ def generate_all_plots(
     include_title=False,
     output_format='pdf',
 ):
-    """Generate all plots for the given model.
-
-    Args:
-        model: 'both', 'propagator', or 'hybrid'
-    """
-    if model not in {'both', 'propagator', 'hybrid'}:
-        raise ValueError("model must be 'both', 'propagator', or 'hybrid'")
-
+    """Generate all plots for the requested conditioning scenario(s)."""
     scenario_counterfactuals = _scenario_counterfactuals(scenario, counterfactual)
-
-    if model in {'both', 'propagator'}:
-        propagator_bases = {
-            scenario_counterfactual: _model_data_base(
-                data_base,
-                'propagator',
-                model,
-                scenario_counterfactual,
-            )
-            for scenario_counterfactual in scenario_counterfactuals
-        }
-        propagator_y_lims = _shared_y_lims(
-            compute_propagator_y_lims(
-                counterfactual=scenario_counterfactual,
-                data_base=propagator_bases[scenario_counterfactual],
-            )
-            for scenario_counterfactual in scenario_counterfactuals
+    data_bases = {
+        scenario_counterfactual: _scenario_data_base(data_base, scenario_counterfactual)
+        for scenario_counterfactual in scenario_counterfactuals
+    }
+    y_lims = _shared_y_lims(
+        compute_plot_y_lims(
+            counterfactual=scenario_counterfactual,
+            data_base=data_bases[scenario_counterfactual],
+            bar_kappa=bar_kappa,
         )
-        for scenario_counterfactual in scenario_counterfactuals:
-            gen_propagator(
-                counterfactual=scenario_counterfactual,
-                data_base=propagator_bases[scenario_counterfactual],
-                output_dir=_model_output_dir(output_dir, 'propagator', model),
-                include_title=include_title,
-                y_lims=propagator_y_lims,
-                output_format=output_format,
-            )
-
-    if model in {'both', 'hybrid'}:
-        hybrid_bases = {
-            scenario_counterfactual: _model_data_base(
-                data_base,
-                'hybrid',
-                model,
-                scenario_counterfactual,
-            )
-            for scenario_counterfactual in scenario_counterfactuals
-        }
-        hybrid_y_lims = _shared_y_lims(
-            compute_hybrid_y_lims(
-                counterfactual=scenario_counterfactual,
-                data_base=hybrid_bases[scenario_counterfactual],
-                bar_kappa=bar_kappa,
-            )
-            for scenario_counterfactual in scenario_counterfactuals
+        for scenario_counterfactual in scenario_counterfactuals
+    )
+    for scenario_counterfactual in scenario_counterfactuals:
+        _generate_scenario_plots(
+            counterfactual=scenario_counterfactual,
+            data_base=data_bases[scenario_counterfactual],
+            output_dir=output_dir,
+            bar_kappa=bar_kappa,
+            include_title=include_title,
+            y_lims=y_lims,
+            output_format=output_format,
         )
-        for scenario_counterfactual in scenario_counterfactuals:
-            gen_hybrid(
-                counterfactual=scenario_counterfactual,
-                data_base=hybrid_bases[scenario_counterfactual],
-                output_dir=_model_output_dir(output_dir, 'hybrid', model),
-                bar_kappa=bar_kappa,
-                include_title=include_title,
-                y_lims=hybrid_y_lims,
-                output_format=output_format,
-            )
 
 
 def _scenario_counterfactuals(scenario, counterfactual):
@@ -166,12 +135,10 @@ def _scenario_counterfactuals(scenario, counterfactual):
     raise ValueError("scenario must be one of None, 'with', 'without', or 'both'")
 
 
-def _model_data_base(data_base, model_name, requested_model, counterfactual):
+def _scenario_data_base(data_base, counterfactual):
     if data_base is None:
         return None
     path = Path(data_base)
-    if requested_model == 'both':
-        path = path / model_name
     if _has_plot_arrays(path):
         return path
     scenario_path = path / ('without' if counterfactual else 'with')
@@ -201,19 +168,9 @@ def _shared_y_lims(y_lims_by_scenario):
     return shared
 
 
-def _model_output_dir(output_dir, model_name, requested_model):
-    if output_dir is None:
-        return None
-    path = Path(output_dir)
-    if requested_model == 'both':
-        return path / model_name
-    return path
-
-
 if __name__ == '__main__':
     args = parse_args()
     generate_all_plots(
-        args.model,
         counterfactual=args.counterfactual,
         scenario=args.scenario,
         data_base=args.data_base,

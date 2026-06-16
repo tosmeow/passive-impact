@@ -81,6 +81,22 @@ def load_data(data_mode):
     return path_with, path_without, queue_with_df, queue_without_df
 
 
+def _default_mean_label(sim_col, ylabel):
+    if 'impact' in ylabel.lower():
+        return 'Mean impact'
+    if sim_col.startswith('q_sim'):
+        return 'Mean q'
+    if sim_col.startswith('bar_q'):
+        return 'Mean $\\bar{q}$'
+    return 'Mean'
+
+
+def _display_col_label(col):
+    if col == 'bar_q':
+        return '$\\bar{q}$'
+    return col
+
+
 def plot_queue_shades(
     df,
     sim_col,
@@ -89,6 +105,7 @@ def plot_queue_shades(
     meta_end=None,
     ref_col=None,
     save_path=None,
+    mean_label=None,
     include_title=False,
 ):
     fig, ax = plt.subplots(figsize=(12, 6))
@@ -98,11 +115,20 @@ def plot_queue_shades(
     for col in sim_cols:
         ax.plot(df.index, df[col], color='gray', alpha=0.05, linewidth=0.5)
 
+    if mean_label is None:
+        mean_label = _default_mean_label(sim_col, label)
+
     avg_sims = df[sim_cols].mean(axis=1)
-    ax.plot(df.index, avg_sims, color='red', linewidth=2.5, label='Mean')
+    ax.plot(df.index, avg_sims, color='red', linewidth=2.5, label=mean_label)
 
     if ref_col is not None:
-        ax.plot(df.index, df[ref_col], color='black', linewidth=2.5, label=ref_col)
+        ax.plot(
+            df.index,
+            df[ref_col],
+            color='black',
+            linewidth=2.5,
+            label=_display_col_label(ref_col),
+        )
 
     if meta_end is not None:
         ax.axvline(x=meta_end, color='green', linestyle='--', label='End of metaorder')
@@ -133,6 +159,7 @@ def generate_all_plots(data_mode, meta_end, include_title=False, output_format='
         meta_end=meta_end,
         ref_col=None,
         save_path=with_output_format(output_dir / 'impact_given_q.pdf', output_format),
+        mean_label='Mean impact',
         include_title=include_title,
     )
 
@@ -144,6 +171,7 @@ def generate_all_plots(data_mode, meta_end, include_title=False, output_format='
         meta_end=meta_end,
         ref_col='q',
         save_path=with_output_format(output_dir / 'queue_given_q.pdf', output_format),
+        mean_label='Mean $\\bar{q}$',
         include_title=include_title,
     )
 
@@ -155,6 +183,7 @@ def generate_all_plots(data_mode, meta_end, include_title=False, output_format='
         meta_end=meta_end,
         ref_col=None,
         save_path=with_output_format(output_dir / 'impact_given_qbar.pdf', output_format),
+        mean_label='Mean impact',
         include_title=include_title,
     )
 
@@ -166,6 +195,7 @@ def generate_all_plots(data_mode, meta_end, include_title=False, output_format='
         meta_end=meta_end,
         ref_col='bar_q',
         save_path=with_output_format(output_dir / 'queue_given_qbar.pdf', output_format),
+        mean_label='Mean q',
         include_title=include_title,
     )
 

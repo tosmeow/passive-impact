@@ -69,10 +69,6 @@ path = "bin/double_queue/efficient/without_us.rs"
 name = "agressive_impact"
 path = "bin/agressive_impact/main.rs"
 
-[[bin]]
-name = "agressive_impact_hybrid"
-path = "bin/agressive_impact_hybrid/main.rs"
-
 # Experiments
 [[bin]]
 name = "cancelation_race"

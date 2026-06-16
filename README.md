@@ -238,9 +238,10 @@ The config-level mapping is documented in
 ### Aggressive Market Impact
 
 For aggressive metaorders, the strategy consumes liquidity directly through
-market orders. The propagator and hybrid models in `conditional_impact`
-compare the impacted queue path against the no-metaorder counterfactual and
-propagate the resulting order-flow shock through the price kernel.
+market orders. The hybrid aggressive-impact model in `conditional_impact`
+compares the impacted queue path against the no-metaorder counterfactual,
+propagates deterministic metaorder flow with constant `bar_kappa`, and adds the
+queue-dependent market-order correction instantaneously.
 
 ## Modules
 
@@ -260,7 +261,7 @@ Four top-level experiment categories live under `experiments/`:
 | Category | What it shows | Entry points |
 |---|---|---|
 | **Passive Impact** | Conditional impact from limit-order metaorders (single + double queue) | [`load_experiments/analysis.ipynb`](experiments/passive_impact/load_experiments/analysis.ipynb), [`custom_experiment/main.py`](experiments/passive_impact/custom_experiment/main.py) |
-| **Aggressive Impact** | Market-order impact under propagator and hybrid models | [`load_experiments/analysis.ipynb`](experiments/agressive_impact/load_experiments/analysis.ipynb), [`custom_experiment/main.py`](experiments/agressive_impact/custom_experiment/main.py) |
+| **Aggressive Impact** | Hybrid market-order impact from aggressive metaorders | [`load_experiments/analysis.ipynb`](experiments/agressive_impact/load_experiments/analysis.ipynb), [`custom_experiment/main.py`](experiments/agressive_impact/custom_experiment/main.py) |
 | **Queue Simulation** | Counterfactual queue paths under a metaorder (no impact curve) | [`load_experiments/analysis.ipynb`](experiments/queue_simulation/load_experiments/analysis.ipynb), [`custom_experiment/main.py`](experiments/queue_simulation/custom_experiment/main.py) |
 | **Impact Cost** | Empirical passive lifecycle execution-cost workflow using aggregate queue snapshots and tail-propagator price impact | [`README.md`](experiments/impact_cost/README.md), [`COMPONENTS.md`](experiments/impact_cost/COMPONENTS.md), [`load_experiments/`](experiments/impact_cost/load_experiments/) |
 
@@ -282,7 +283,7 @@ python experiments/agressive_impact/custom_experiment/main.py
 python experiments/queue_simulation/custom_experiment/main.py
 ```
 
-Outputs (`.npy` arrays) land in each folder's `output/with_us/` or `output/without_us/` directory (gitignored). The Python facades produce the same shapes as the Rust binaries — see each `<Category>Config` dataclass in [`code/python/simproj/`](code/python/simproj/) for the full set of knobs (Hawkes parameters, queue parameters, metaorder shape, propagator vs. hybrid model, etc.).
+Outputs (`.npy` arrays) land in each folder's `output/with_us/` or `output/without_us/` directory (gitignored). The Python facades produce the same shapes as the Rust binaries — see each `<Category>Config` dataclass in [`code/python/simproj/`](code/python/simproj/) for the full set of knobs (Hawkes parameters, queue parameters, metaorder shape, `bar_kappa`, etc.).
 
 ### Run the impact-cost workflow
 
@@ -315,7 +316,6 @@ The original Rust binaries still exist for fast batch baseline generation:
     cargo run --release --bin double_queue_efficient_with_us
     cargo run --release --bin double_queue_efficient_without_us
     cargo run --release --bin agressive_impact
-    cargo run --release --bin agressive_impact_hybrid
     cargo run --release --bin queue_simulation_efficient
 
 (General variants are also kept for validation: `*_general_with_us`, `*_general_without_us`.)

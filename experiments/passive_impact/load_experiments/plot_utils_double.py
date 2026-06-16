@@ -24,6 +24,21 @@ from experiments.plot_utils_common import (
 # Compact color scheme
 COLORS = {'ask': '#2563eb', 'bid': '#ea580c', 'impact': '#16a34a', 'sim': '#9ca3af'}
 
+
+def _display_queue_label(col):
+    if col == 'bar_q':
+        return '$\\bar{q}$'
+    if col.startswith('bar_q_'):
+        side = col.removeprefix('bar_q_')
+        if side in {'a', 'b'}:
+            return f'$\\bar{{q}}^{side}$'
+    if col.startswith('q_'):
+        side = col.removeprefix('q_')
+        if side in {'a', 'b'}:
+            return f'$q^{side}$'
+    return col
+
+
 # Data directory - can be 'general' or 'efficient'
 DATA_MODE = 'efficient'  # Change to 'general' for non-memory-efficient data
 DATA_BASE = data_dir(__file__, 'double', DATA_MODE)
@@ -176,11 +191,11 @@ def plot_dual_queue_shades(ask_df, bid_df, ask_sim_col, bid_sim_col,
     # Reference lines
     if ask_ref_col is not None and ask_ref_col in ask_df.columns:
         ax.plot(ask_df.index, ask_df[ask_ref_col], color='darkblue',
-                linewidth=2.5, label=f'Ask reference ({ask_ref_col})')
+                linewidth=2.5, label=f'Ask reference ({_display_queue_label(ask_ref_col)})')
 
     if bid_ref_col is not None and bid_ref_col in bid_df.columns:
         ax.plot(bid_df.index, bid_df[bid_ref_col], color='darkorange',
-                linewidth=2.5, label=f'Bid reference ({bid_ref_col})')
+                linewidth=2.5, label=f'Bid reference ({_display_queue_label(bid_ref_col)})')
 
     ax.set_xlabel('Time')
     ax.set_ylabel('Queue Size')
@@ -210,7 +225,7 @@ def plot_impact_shades(df, title, label='Price Impact', color='green',
         ax.plot(df.index, df[col], color='gray', alpha=0.1, linewidth=0.5)
 
     avg_sims = df[sim_cols].mean(axis=1)
-    ax.plot(df.index, avg_sims, color=color, linewidth=2.5, label='Mean')
+    ax.plot(df.index, avg_sims, color=color, linewidth=2.5, label='Mean impact')
 
     ax.axhline(y=0, color='black', linestyle=':', alpha=0.5)
     ax.set_xlabel('Time')
@@ -306,7 +321,7 @@ def plot_impact_difference(ask_df, bid_df, title, save_path=None, include_title=
 
     # Mean
     diff_mean = diff_df[sim_cols].mean(axis=1)
-    ax.plot(diff_df.index, diff_mean, color='green', linewidth=2.5, label='Mean (Ask - Bid)')
+    ax.plot(diff_df.index, diff_mean, color='green', linewidth=2.5, label='Mean impact (Ask - Bid)')
 
     # Std bands
     diff_std = diff_df[sim_cols].std(axis=1)
@@ -447,7 +462,7 @@ def _plot_impact_panel(ax, ask_df, bid_df, title, include_title=False):
     std = diff_df[sim_cols].std(axis=1)
     ax.fill_between(diff_df.index, mean - std, mean + std,
                     color=COLORS['impact'], alpha=0.2)
-    ax.plot(diff_df.index, mean, color=COLORS['impact'], lw=2.5, label='Mean ± std')
+    ax.plot(diff_df.index, mean, color=COLORS['impact'], lw=2.5, label='Mean impact ± std')
 
     ax.axhline(0, color='black', ls=':', alpha=0.5)
     ax.set_xlabel('Time')

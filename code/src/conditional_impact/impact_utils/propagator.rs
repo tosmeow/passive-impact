@@ -8,7 +8,7 @@
 //
 // NOTE: This resolvent is used by the passive (flow imbalance) model to
 // solve the Volterra equation for E_t[λ_s]. It is NOT the propagator kernel
-// G used in the aggressive (propagator) price model. The propagator kernel
+// G used in the aggressive hybrid price model. The propagator kernel
 // G(t) = (1 - ‖φ‖₁) + Σᵢ (αᵢ/βᵢ) e^{-βᵢt} is derived from the
 // martingale condition and uses the Hawkes rates βᵢ directly — see
 // propagator_model/mod.rs.

@@ -26,7 +26,7 @@ def test_aggressive_impact_from_samples():
     result = simproj.aggressive_impact_from_queue_samples(
         q_samples=q, q_bar_samples=q_bar,
         eval_times=times, is_market_order=is_market,
-        hawkes=hawkes, kappa=kappa,
+        hawkes=hawkes, kappa=kappa, bar_kappa=0.01,
     )
     impact = result.impact()
     assert impact.shape == (n,)

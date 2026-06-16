@@ -779,49 +779,12 @@ impl PyAggressiveImpactPath {
     }
 }
 
-/// Compute aggressive impact path from pre-sampled queues.
-/// `kappa` is a Python callable f64 -> f64 invoked at each evaluation time.
-#[pyfunction]
-fn aggressive_impact_from_queue_samples(
-    py: Python,
-    q_samples: PyReadonlyArray1<u32>,
-    q_bar_samples: PyReadonlyArray1<u32>,
-    eval_times: PyReadonlyArray1<f64>,
-    is_market_order: Vec<bool>,
-    hawkes: &PyMultiExponentialHawkes,
-    kappa: PyObject,
-) -> PyResult<PyAggressiveImpactPath> {
-    let kappa_clone = kappa.clone_ref(py);
-    let path = AggressiveImpactPath::from_queue_samples(
-        q_samples.as_slice().unwrap(),
-        q_bar_samples.as_slice().unwrap(),
-        eval_times.as_slice().unwrap(),
-        &is_market_order,
-        &hawkes.inner,
-        move |q: f64| -> f64 {
-            Python::with_gil(|py| match kappa_clone.call1(py, (q,)) {
-                Ok(r) => r.extract::<f64>(py).unwrap_or_else(|e| {
-                    eprintln!("kappa(q={}) returned non-f64: {:?}", q, e);
-                    f64::NAN
-                }),
-                Err(e) => {
-                    eprintln!("kappa(q={}) raised: {:?}", q, e);
-                    f64::NAN
-                }
-            })
-        },
-    );
-    Ok(PyAggressiveImpactPath {
-        impact_path: path.impact_path,
-    })
-}
-
 /// Compute aggressive impact path from pre-sampled queues using the hybrid model.
 /// `kappa` is a Python callable f64 -> f64; `bar_kappa` is a scalar f64 for the
 /// metaorder component.
 #[pyfunction]
 #[allow(clippy::too_many_arguments)]
-fn aggressive_impact_from_queue_samples_hybrid(
+fn aggressive_impact_from_queue_samples(
     py: Python,
     q_samples: PyReadonlyArray1<u32>,
     q_bar_samples: PyReadonlyArray1<u32>,
@@ -832,7 +795,7 @@ fn aggressive_impact_from_queue_samples_hybrid(
     bar_kappa: f64,
 ) -> PyResult<PyAggressiveImpactPath> {
     let kappa_clone = kappa.clone_ref(py);
-    let path = AggressiveImpactPath::from_queue_samples_hybrid(
+    let path = AggressiveImpactPath::from_queue_samples(
         q_samples.as_slice().unwrap(),
         q_bar_samples.as_slice().unwrap(),
         eval_times.as_slice().unwrap(),
@@ -990,10 +953,6 @@ fn _native(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyTailImpact>()?;
     m.add_class::<PyAggressiveImpactPath>()?;
     m.add_function(wrap_pyfunction!(aggressive_impact_from_queue_samples, m)?)?;
-    m.add_function(wrap_pyfunction!(
-        aggressive_impact_from_queue_samples_hybrid,
-        m
-    )?)?;
     m.add_function(wrap_pyfunction!(compute_impact_path, m)?)?;
     m.add_function(wrap_pyfunction!(passive_flow_impact_from_queue_samples, m)?)?;
     m.add_function(wrap_pyfunction!(

@@ -37,7 +37,7 @@ fn main() {
     let direction = parse_direction();
 
     // ==========================================================================
-    // Configuration (same queue/Hawkes parameters as single_queue)
+    // Configuration (hybrid aggressive-impact baseline)
     // ==========================================================================
     let time_horizon = 90.0;
     let n_simulations = 500;
@@ -49,7 +49,7 @@ fn main() {
     let a_c = 2.0;
     let b_c = 0.125;
 
-    // Hawkes parameters for market orders (close to t^{-1.5} power-law kernel)
+    // Hawkes parameters for market orders
     let mu = 1.0;
     let alpha = vec![0.065, 0.2, 0.325, 0.65];
     let beta = vec![0.15, 0.60, 2.5, 10.0];
@@ -59,11 +59,12 @@ fn main() {
     let meta_start = 0.0;
     let meta_end = 2.0 * time_horizon / 3.0;
 
-    // Kappa function from paper: kappa(q) = c1 * sqrt(log(e^{-c2*q} + 1))
-    // This gives kappa(q) ~ c3 * q^{1/2} for large q (decreasing, concave).
-    let c1_kappa = 0.01_f64;
-    let c2_kappa = 0.0001_f64;
-    let kappa = |q: f64| c1_kappa * ((-c2_kappa * q).exp() + 1.0_f64).ln().sqrt();
+    // Kappa function: kappa(q) = -c_kappa * q  (purely linear, no constant)
+    let c_kappa = 0.001_f64;
+    let kappa = |q: f64| -c_kappa * q;
+
+    // bar_kappa: constant weight for the propagator term (fixed small value)
+    let bar_kappa = 0.01_f64;
 
     println!(
         "=== Aggressive Impact Experiment ({}) ===",
@@ -73,10 +74,7 @@ fn main() {
         "Time horizon: {}, Simulations: {}, Initial queue: {}",
         time_horizon, n_simulations, initial_queue_size
     );
-    println!(
-        "kappa(q) = {} * sqrt(log(e^(-{}*q) + 1))",
-        c1_kappa, c2_kappa
-    );
+    println!("kappa(q) = -{} * q, bar_kappa = {}", c_kappa, bar_kappa);
 
     let c_lambda = AffineQueueProcess::c_lambda(b_l, b_c);
     println!("c_lambda = {}", c_lambda);
@@ -101,7 +99,7 @@ fn main() {
     );
 
     // ==========================================================================
-    // Create aggressive meta orders and compute propagator
+    // Create aggressive meta orders
     // ==========================================================================
     // Meta orders are market orders (dim=2) that reduce the queue
     let meta_orders_raw = create_meta_orders(n_meta, meta_start, meta_end);
@@ -221,7 +219,8 @@ fn main() {
                 Some(sim_idx as u64),
             );
 
-            // Impact is always computed from q and bar_q, regardless of which path was simulated.
+            // Hybrid impact: metaorders propagate with bar_kappa; market orders
+            // contribute instantaneous queue-dependent corrections.
             let impact_path = if simulating_bar_q {
                 AggressiveImpactPath::from_queue_samples(
                     &reference_samples,
@@ -230,6 +229,7 @@ fn main() {
                     &is_market_order,
                     &hawkes_model,
                     &kappa,
+                    bar_kappa,
                 )
             } else {
                 AggressiveImpactPath::from_queue_samples(
@@ -239,6 +239,7 @@ fn main() {
                     &is_market_order,
                     &hawkes_model,
                     &kappa,
+                    bar_kappa,
                 )
             };
 
@@ -257,7 +258,7 @@ fn main() {
     // ==========================================================================
     let t0 = Instant::now();
     let output_dirs = output_dirs_for(
-        "experiments/agressive_impact/load_experiments/data/propagator",
+        "experiments/agressive_impact/load_experiments/data",
         direction,
     );
     write_aggressive_outputs(
@@ -267,6 +268,7 @@ fn main() {
         &reference_samples,
         &results,
         n_simulations,
+        bar_kappa,
     );
 
     println!("[TIMING] Data write: {:?}", t0.elapsed());
@@ -321,6 +323,7 @@ fn write_aggressive_outputs(
     reference_samples: &[u32],
     results: &[(Vec<u32>, Vec<f64>)],
     n_simulations: usize,
+    bar_kappa: f64,
 ) {
     let n_times = eval_times.len();
 
@@ -370,5 +373,6 @@ fn write_aggressive_outputs(
         .unwrap();
         write_npy_f64_1d(&format!("{}/times.npy", output_dir), eval_times).unwrap();
         write_npy_f64_1d(&format!("{}/event_types.npy", output_dir), &event_types).unwrap();
+        write_npy_f64_1d(&format!("{}/bar_kappa.npy", output_dir), &[bar_kappa]).unwrap();
     }
 }

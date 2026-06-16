@@ -1,6 +1,6 @@
 # Conditional Impact
 
-Closed-form market impact computation for Hawkes process-driven limit order books. This module implements two complementary pricing models for market impact: the **Flow Imbalance Model** (passive impact from queue expectations) and the **Propagator Model** (aggressive impact from kernel-weighted price responses).
+Closed-form market impact computation for Hawkes process-driven limit order books. This module implements two complementary pricing models for market impact: the **Flow Imbalance Model** (passive impact from queue expectations) and the **Hybrid Propagator Model** (aggressive impact from propagated metaorders plus instantaneous queue corrections).
 
 ## Overview
 
@@ -8,7 +8,7 @@ Both models assume:
 - Intensity functions $\lambda^L$ (decreasing in $q$) and $\lambda^C$ (increasing in $q$) are affine in queue state $q$.
 - The net intensity difference is $\lambda^L - \lambda^C = d_\lambda - c_{\lambda} \cdot q$ with decay rate $c_{\lambda} > 0$.
 - The passive (flow imbalance) model additionally requires $\kappa(q)$ to be affine: $\kappa(q) = c_\kappa q + d_\kappa$, enabling a closed-form impact formula.
-- The aggressive (propagator) model accepts any decreasing $\kappa$; the paper uses $\kappa(q) = c_1\sqrt{\log(e^{-c_2 q}+1)}$.
+- The aggressive hybrid model accepts a queue-correction function $\kappa$ and a constant propagated metaorder weight $\bar{\kappa}$.
 
 The module provides closed-form solutions and O(k) efficient computation for multi-exponential Hawkes kernels.
 
@@ -26,7 +26,7 @@ conditional_impact/
 │   ├── multi_queue/
 │   │   └── bidask_impact.rs   # Bid-ask impact computation
 │   └── README.md              # Detailed flow imbalance model documentation
-├── propagator_model/      # Aggressive impact via propagator price kernel
+├── propagator_model/      # Hybrid aggressive impact via propagator price kernel
 │   ├── mod.rs             # AggressiveImpactPath implementation
 │   └── README.md              # Detailed propagator model documentation
 └── README.md (this file)  # Module overview and navigation
@@ -46,10 +46,10 @@ conditional_impact/
 
 **See**: [flow_imbalance_model/README.md](flow_imbalance_model/README.md) for detailed formulas and theory.
 
-### Propagator Model
+### Hybrid Propagator Model
 **Location**: `propagator_model/`
-**Purpose**: Compute aggressive market impact via kernel-weighted price response.
-**Key Insight**: The underlying price responds to a propagator kernel $G(t) = 1 + \sum_i \frac{\alpha_i/\beta_i}{1-\|\varphi\|_1} e^{-\beta_i t}$, with $G(0) = 1/(1-\|\varphi\|_1)$ (mean cluster size) and $G(\infty) = 1$ (permanent impact). Derived from the Hawkes kernel via the martingale condition $G'(t) = -G(0)\varphi(t)$, with $G(0)$ fixed by matching the expectation-based price $\lim_{T\to\infty} \mathbb{E}_t[N^a_T - N^b_T]$.
+**Purpose**: Compute aggressive market impact via propagated metaorders and instantaneous queue corrections.
+**Key Insight**: Metaorder events respond through a propagator kernel $G(t) = 1 + \sum_i \frac{\alpha_i/\beta_i}{1-\|\varphi\|_1} e^{-\beta_i t}$ with constant weight $\bar{\kappa}$, while ordinary market-order corrections accumulate as $\kappa(\bar{q})-\kappa(q)$ without temporal decay.
 
 **Main Classes**:
 - `AggressiveImpactPath` — Impact trajectory for aggressive orders that reduce queue
@@ -76,7 +76,7 @@ for (i, val) in impact.impact_path.iter().enumerate() {
 }
 ```
 
-### Propagator Model (Aggressive Impact)
+### Hybrid Propagator Model (Aggressive Impact)
 
 ```rust
 use simulation_project::conditional_impact::AggressiveImpactPath;
@@ -86,9 +86,9 @@ use simulation_project::models::MultiExponentialHawkes;
 let hawkes = MultiExponentialHawkes::new(mu, alpha, beta);
 
 // Compute aggressive impact for given queue samples
-let c1 = 1000.0_f64;
-let c2 = 0.01_f64;
-let kappa = |q: f64| c1 * ((-c2 * q).exp() + 1.0_f64).ln().sqrt();
+let c_kappa = 0.001_f64;
+let kappa = |q: f64| -c_kappa * q;
+let bar_kappa = 0.01_f64;
 
 let impact_path = AggressiveImpactPath::from_queue_samples(
     &q_samples,
@@ -97,6 +97,7 @@ let impact_path = AggressiveImpactPath::from_queue_samples(
     &is_market_order,
     &hawkes,
     &kappa,
+    bar_kappa,
 );
 
 for (i, val) in impact_path.impact_path.iter().enumerate() {
@@ -111,7 +112,7 @@ for (i, val) in impact_path.impact_path.iter().enumerate() {
   - Tail intensity computation
   - Bid-ask extension
 
-- **[Propagator Model](propagator_model/README.md)** — Aggressive impact via kernel-weighted price response
+- **[Hybrid Propagator Model](propagator_model/README.md)** — Aggressive impact via propagated metaorders and queue corrections
   - Martingale propagator derivation
   - Impact computation
 

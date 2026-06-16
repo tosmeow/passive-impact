@@ -27,15 +27,16 @@ def test_aggressive_plot_loader_labels_counterfactual_direction(monkeypatch, tmp
     module = _load_module(
         monkeypatch,
         tmp_path,
-        "plot_utils_propagator_test",
-        "experiments/agressive_impact/load_experiments/utils/plot_utils_propagator.py",
+        "plot_utils_aggressive_test",
+        "experiments/agressive_impact/load_experiments/utils/plot_utils_aggressive.py",
     )
     _write_queue_fixture(tmp_path)
     np.save(tmp_path / "impact_paths.npy", np.array([[0.0, 0.0], [1.0, 2.0]]))
     np.save(tmp_path / "event_types.npy", np.array([0.0, 1.0]))
+    np.save(tmp_path / "bar_kappa.npy", np.array([0.01]))
 
-    _, queue_with, _, _ = module.load_data(counterfactual=False, data_base=str(tmp_path))
-    _, queue_without, _, _ = module.load_data(counterfactual=True, data_base=str(tmp_path))
+    _, queue_with, _, _, _ = module.load_data(counterfactual=False, data_base=str(tmp_path))
+    _, queue_without, _, _, _ = module.load_data(counterfactual=True, data_base=str(tmp_path))
 
     assert list(queue_with.columns) == ["q", "bar_q_sim_0", "bar_q_sim_1"]
     assert list(queue_without.columns) == ["bar_q", "q_sim_0", "q_sim_1"]
@@ -45,8 +46,8 @@ def test_aggressive_plot_queue_diff_keeps_bar_q_minus_q(monkeypatch, tmp_path):
     module = _load_module(
         monkeypatch,
         tmp_path,
-        "plot_utils_propagator_diff_test",
-        "experiments/agressive_impact/load_experiments/utils/plot_utils_propagator.py",
+        "plot_utils_aggressive_diff_test",
+        "experiments/agressive_impact/load_experiments/utils/plot_utils_aggressive.py",
     )
 
     with_df = pd.DataFrame([[10, 12, 13]], columns=["q", "bar_q_sim_0", "bar_q_sim_1"])
@@ -60,8 +61,8 @@ def test_aggressive_plot_shades_respects_y_lim(monkeypatch, tmp_path):
     module = _load_module(
         monkeypatch,
         tmp_path,
-        "plot_utils_propagator_ylim_test",
-        "experiments/agressive_impact/load_experiments/utils/plot_utils_propagator.py",
+        "plot_utils_aggressive_ylim_test",
+        "experiments/agressive_impact/load_experiments/utils/plot_utils_aggressive.py",
     )
     df = pd.DataFrame(
         [[10.0, 12.0], [11.0, 13.0]],
@@ -89,8 +90,8 @@ def test_aggressive_auto_y_lim_uses_robust_headroom(monkeypatch, tmp_path):
     module = _load_module(
         monkeypatch,
         tmp_path,
-        "plot_utils_propagator_auto_ylim_test",
-        "experiments/agressive_impact/load_experiments/utils/plot_utils_propagator.py",
+        "plot_utils_aggressive_auto_ylim_test",
+        "experiments/agressive_impact/load_experiments/utils/plot_utils_aggressive.py",
     )
     values = np.tile(np.linspace(0.0, 10.0, 10)[:, None], (1, 100))
     values[-1, -1] = 1000.0
