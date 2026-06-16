@@ -6,6 +6,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+
 
 def _queue_layout(counterfactual=False):
     if counterfactual:
@@ -28,11 +30,24 @@ def _queue_layout(counterfactual=False):
 
 
 def _default_output_dir(counterfactual):
-    return 'images_without_us' if counterfactual else 'images'
+    dirname = 'images_without_us' if counterfactual else 'images'
+    return os.path.join(SCRIPT_DIR, dirname)
 
 
 def load_data(mode='single', data_mode='efficient', counterfactual=False, data_base=None):
-    base = data_base or f'./data/{mode}/{data_mode}'
+    if data_base is None:
+        base_root = os.path.join(SCRIPT_DIR, 'data', mode, data_mode)
+        scenario = 'without' if counterfactual else 'with'
+        scenario_base = os.path.join(base_root, scenario)
+        if (
+            os.path.exists(os.path.join(scenario_base, 'times.npy'))
+            and os.path.exists(os.path.join(scenario_base, 'queue_paths.npy'))
+        ):
+            base = scenario_base
+        else:
+            base = base_root
+    else:
+        base = data_base
     times = np.load(f'{base}/times.npy')
     queue = np.load(f'{base}/queue_paths.npy')
     n_sims = queue.shape[1] - 1
@@ -50,7 +65,7 @@ def plot_queue_shades(
     counterfactual=False,
     meta_end=None,
     save_path=None,
-    include_title=True,
+    include_title=False,
 ):
     fig, ax = plt.subplots(figsize=(12, 6))
     layout = _queue_layout(counterfactual)
@@ -82,11 +97,11 @@ def plot_queue_shades(
 def generate_all_plots(
     mode='single',
     data_mode='efficient',
-    meta_end=80.0,
+    meta_end=60.0,
     counterfactual=False,
     data_base=None,
     output_dir=None,
-    include_title=True,
+    include_title=False,
 ):
     df = load_data(
         mode,
@@ -108,15 +123,19 @@ def parse_args():
     p = argparse.ArgumentParser(description='Generate queue simulation plots.')
     p.add_argument('--mode', default='single', choices=['single', 'double'])
     p.add_argument('--data-mode', default='efficient')
-    p.add_argument('--meta-end', type=float, default=80.0)
+    p.add_argument('--meta-end', type=float, default=60.0)
     p.add_argument('--counterfactual', action='store_true',
                    help='Interpret queue_paths.npy as without-us output: first column bar_q, simulations q.')
     p.add_argument('--data-base', default=None,
                    help='Directory containing times.npy and queue_paths.npy.')
     p.add_argument('--output-dir', default=None,
                    help='Directory where images should be written.')
-    p.add_argument('--no-title', action='store_true',
-                   help='Do not draw titles on generated PNG images.')
+    title_group = p.add_mutually_exclusive_group()
+    title_group.add_argument('--title', dest='include_title', action='store_true',
+                             help='Draw titles on generated PNG images.')
+    title_group.add_argument('--no-title', dest='include_title', action='store_false',
+                             help='Do not draw titles on generated PNG images.')
+    p.set_defaults(include_title=False)
     return p.parse_args()
 
 
@@ -129,5 +148,5 @@ if __name__ == '__main__':
         counterfactual=args.counterfactual,
         data_base=args.data_base,
         output_dir=args.output_dir,
-        include_title=not args.no_title,
+        include_title=args.include_title,
     )

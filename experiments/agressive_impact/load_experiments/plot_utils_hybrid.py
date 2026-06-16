@@ -3,7 +3,8 @@ import pandas as pd
 import numpy as np
 import os
 
-DATA_BASE = './data/hybrid'
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+DATA_BASE = os.path.join(SCRIPT_DIR, 'data', 'hybrid')
 
 
 def _queue_layout(counterfactual=False):
@@ -25,7 +26,8 @@ def _queue_layout(counterfactual=False):
 
 
 def _default_output_dir(counterfactual):
-    return 'images_hybrid_without_us' if counterfactual else 'images_hybrid'
+    dirname = 'images_hybrid_without_us' if counterfactual else 'images_hybrid'
+    return os.path.join(SCRIPT_DIR, dirname)
 
 
 def _queue_diffs(queue_df, counterfactual=False):
@@ -92,7 +94,7 @@ def plot_shades(
     ref_col=None,
     save_path=None,
     mean_label='Mean',
-    include_title=True,
+    include_title=False,
 ):
     """Plot individual simulation paths as transparent lines with mean overlay."""
     fig, ax = plt.subplots(figsize=(12, 6))
@@ -135,7 +137,7 @@ def plot_impact_decomposition(
     bar_kappa,
     meta_end=None,
     save_path=None,
-    include_title=True,
+    include_title=False,
 ):
     """Plot mean impact at market order vs metaorder times to show the two contributions."""
     fig, ax = plt.subplots(figsize=(12, 6))
@@ -177,7 +179,7 @@ def plot_queue_diff(
     counterfactual=False,
     meta_end=None,
     save_path=None,
-    include_title=True,
+    include_title=False,
 ):
     """Plot the queue difference bar_q - q over time with quantile bands."""
     fig, ax = plt.subplots(figsize=(12, 6))
@@ -219,7 +221,7 @@ def generate_all_plots(
     data_base=None,
     output_dir=None,
     bar_kappa=None,
-    include_title=True,
+    include_title=False,
 ):
     """Generate and save all analysis plots."""
     impact_df, queue_df, is_market, meta_end, bar_kappa = load_data(

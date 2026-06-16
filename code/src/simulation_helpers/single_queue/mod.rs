@@ -8,6 +8,6 @@ pub use events::{
 
 pub use runners::{
     extract_event_type, extract_events_by_dim, extract_market_orders, sample_queue_at_times,
-    write_memory_efficient_results, write_results, MemoryEfficientResults, ParallelSimulator,
-    SimulationResults,
+    write_memory_efficient_results, write_queue_samples, write_results, MemoryEfficientResults,
+    ParallelSimulator, SimulationResults,
 };

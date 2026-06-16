@@ -17,7 +17,7 @@ fn main() {
     // ==========================================================================
     // Configuration
     // ==========================================================================
-    let time_horizon = 100.0;
+    let time_horizon = 90.0;
     let n_simulations = 500;
     let initial_q_a: u32 = 350;
     let initial_q_b: u32 = 350;
@@ -40,9 +40,9 @@ fn main() {
     let beta = vec![0.15, 0.60, 2.5, 10.0];
 
     // Meta orders configuration (on ask side only)
-    let n_meta: u32 = 375;
+    let n_meta: u32 = 270;
     let meta_start = 1.0;
-    let meta_end = 3.0 * time_horizon / 4.0;
+    let meta_end = 2.0 * time_horizon / 3.0;
     let meta_side = Side::Ask;
 
     println!("=== Bid-Ask Paths WITH Us (Memory-Efficient) ===");

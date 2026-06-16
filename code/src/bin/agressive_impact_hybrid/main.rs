@@ -18,7 +18,7 @@ fn main() {
     // ==========================================================================
     // Configuration (same queue/Hawkes parameters as aggressive_impact)
     // ==========================================================================
-    let time_horizon = 100.0;
+    let time_horizon = 90.0;
     let n_simulations = 500;
     let initial_queue_size: u32 = 200;
 
@@ -34,9 +34,9 @@ fn main() {
     let beta = vec![0.15, 0.60, 2.5, 10.0];
 
     // Meta orders configuration (aggressive: dim=2, reduce queue)
-    let n_meta: u32 = 1000;
-    let meta_start = 1.0;
-    let meta_end = 4.0 * time_horizon / 5.0;
+    let n_meta: u32 = 270;
+    let meta_start = 0.0;
+    let meta_end = 2.0 * time_horizon / 3.0;
 
     // Kappa function: kappa(q) = -c_kappa * q  (purely linear, no constant)
     let c_kappa = 0.1_f64;

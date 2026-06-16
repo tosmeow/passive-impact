@@ -92,7 +92,7 @@ class LifecyclePassiveCostConfig:
 def run_lifecycle_passive_cost_pipeline(
     cfg: LifecyclePassiveCostConfig,
     *,
-    include_title: bool = True,
+    include_title: bool = False,
 ) -> dict[str, Any]:
     """Run looped passive lifecycle cost paths and write outputs."""
     _validate_config(cfg)
@@ -541,7 +541,7 @@ def _plot_lifecycle_paths(
     _active_summary: pd.DataFrame,
     cfg: LifecyclePassiveCostConfig,
     *,
-    include_title: bool = True,
+    include_title: bool = False,
 ) -> None:
     _setup_matplotlib()
     import matplotlib.pyplot as plt
@@ -595,7 +595,7 @@ def _plot_representative_step_paths(
     *,
     n_windows: int = 3,
     shared_y: bool = False,
-    include_title: bool = True,
+    include_title: bool = False,
 ) -> None:
     _setup_matplotlib()
     import matplotlib.pyplot as plt
@@ -893,11 +893,20 @@ def _parse_args() -> argparse.Namespace:
         default=None,
         help="Override the config and randomly sample candidate episodes.",
     )
-    parser.add_argument(
-        "--no-title",
+    title_group = parser.add_mutually_exclusive_group()
+    title_group.add_argument(
+        "--title",
+        dest="include_title",
         action="store_true",
+        help="Draw titles on generated PNG images.",
+    )
+    title_group.add_argument(
+        "--no-title",
+        dest="include_title",
+        action="store_false",
         help="Do not draw titles on generated PNG images.",
     )
+    parser.set_defaults(include_title=False)
     return parser.parse_args()
 
 
@@ -916,7 +925,7 @@ def main() -> None:
     )
     summary = run_lifecycle_passive_cost_pipeline(
         cfg,
-        include_title=not args.no_title,
+        include_title=args.include_title,
     )
     print(
         json.dumps(

@@ -4,12 +4,14 @@ import numpy as np
 import os
 from scipy.interpolate import interp1d
 
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+
 # Compact color scheme
 COLORS = {'ask': '#2563eb', 'bid': '#ea580c', 'impact': '#16a34a', 'sim': '#9ca3af'}
 
 # Data directory - can be 'general' or 'efficient'
 DATA_MODE = 'efficient'  # Change to 'general' for non-memory-efficient data
-DATA_BASE = f'./data/double/{DATA_MODE}'
+DATA_BASE = os.path.join(SCRIPT_DIR, 'data', 'double', DATA_MODE)
 
 
 def load_bidask_data(data_mode=None):
@@ -24,7 +26,7 @@ def load_bidask_data(data_mode=None):
             - 'ask_times', 'bid_times': Time arrays
             - 'ask_times_without', 'bid_times_without': Time arrays for without scenario
     """
-    data_base = f'./data/double/{data_mode}' if data_mode else DATA_BASE
+    data_base = os.path.join(SCRIPT_DIR, 'data', 'double', data_mode) if data_mode else DATA_BASE
     # Load times
     ask_times = np.load(f'{data_base}/with/ask_times.npy')
     bid_times = np.load(f'{data_base}/with/bid_times.npy')
@@ -110,7 +112,7 @@ def load_bidask_data(data_mode=None):
 
 def plot_dual_queue_shades(ask_df, bid_df, ask_sim_col, bid_sim_col,
                            title, ask_ref_col=None, bid_ref_col=None,
-                           save_path=None, include_title=True):
+                           save_path=None, include_title=False):
     """Plot both ask and bid queues on the same graph with shaded simulations.
 
     Args:
@@ -170,7 +172,7 @@ def plot_dual_queue_shades(ask_df, bid_df, ask_sim_col, bid_sim_col,
 
 
 def plot_impact_shades(df, title, label='Price Impact', color='green',
-                       save_path=None, include_title=True):
+                       save_path=None, include_title=False):
     """Plot impact paths with shaded simulations.
 
     Args:
@@ -207,7 +209,7 @@ def plot_impact_shades(df, title, label='Price Impact', color='green',
 
 
 def plot_triple_impact(ask_df, bid_df, title_prefix, scenario='with',
-                       save_path=None, include_title=True):
+                       save_path=None, include_title=False):
     """Plot the merged price impact (ask - bid) interpolated onto common grid.
 
     The price impact is ask - bid:
@@ -270,7 +272,7 @@ def compute_impact_difference(ask_df, bid_df):
     return diff_df, common_times
 
 
-def plot_impact_difference(ask_df, bid_df, title, save_path=None, include_title=True):
+def plot_impact_difference(ask_df, bid_df, title, save_path=None, include_title=False):
     """Plot the difference of impacts (Ask - Bid) with all simulations.
 
     Args:
@@ -313,7 +315,7 @@ def plot_impact_difference(ask_df, bid_df, title, save_path=None, include_title=
         plt.show()
 
 
-def plot_dashboard(data, save_path=None, include_title=True):
+def plot_dashboard(data, save_path=None, include_title=False):
     """3x2 dashboard: queues, individual impacts, and combined impact.
 
     Layout:
@@ -366,7 +368,7 @@ def plot_dashboard(data, save_path=None, include_title=True):
 
 
 def _plot_queue_panel(ax, ask_df, bid_df, sim_prefix_a, sim_prefix_b,
-                      ref_col_a, ref_col_b, title, include_title=True):
+                      ref_col_a, ref_col_b, title, include_title=False):
     """Helper: plot queues on a single axis."""
     # Simulation paths (thin, transparent)
     ask_sim_cols = [c for c in ask_df.columns if c.startswith(sim_prefix_a)]
@@ -396,7 +398,7 @@ def _plot_queue_panel(ax, ask_df, bid_df, sim_prefix_a, sim_prefix_b,
     ax.legend(loc='best', fontsize=8)
 
 
-def _plot_individual_impact_panel(ax, ask_df, bid_df, title, include_title=True):
+def _plot_individual_impact_panel(ax, ask_df, bid_df, title, include_title=False):
     """Helper: plot ask and bid impacts separately on a single axis."""
     ask_sim_cols = [c for c in ask_df.columns if c.startswith('sim_')]
     bid_sim_cols = [c for c in bid_df.columns if c.startswith('sim_')]
@@ -429,7 +431,7 @@ def _plot_individual_impact_panel(ax, ask_df, bid_df, title, include_title=True)
     ax.legend(loc='best', fontsize=8)
 
 
-def _plot_impact_panel(ax, ask_df, bid_df, title, include_title=True):
+def _plot_impact_panel(ax, ask_df, bid_df, title, include_title=False):
     """Helper: plot merged impact (ask - bid) on a single axis."""
     diff_df, _ = compute_impact_difference(ask_df, bid_df)
     sim_cols = [c for c in diff_df.columns if c.startswith('sim_')]
@@ -453,13 +455,14 @@ def _plot_impact_panel(ax, ask_df, bid_df, title, include_title=True):
     ax.legend(loc='best', fontsize=8)
 
 
-def generate_all_plots(data_mode=None, meta_end=None, include_title=True):
+def generate_all_plots(data_mode=None, meta_end=None, include_title=False):
     """Generate and save all bid-ask analysis plots."""
 
     print("Loading bid-ask simulation data...")
     data = load_bidask_data(data_mode)
 
-    os.makedirs('images', exist_ok=True)
+    image_dir = os.path.join(SCRIPT_DIR, 'images')
+    os.makedirs(image_dir, exist_ok=True)
 
     print("\nGenerating plots...")
 
@@ -474,7 +477,7 @@ def generate_all_plots(data_mode=None, meta_end=None, include_title=True):
         title='Bid-Ask Queues: Counterfactual given base queue q',
         ask_ref_col='q_a',
         bid_ref_col='q_b',
-        save_path='images/bidask_queue_given_q.png',
+        save_path=os.path.join(image_dir, 'bidask_queue_given_q.png'),
         include_title=include_title,
     )
 
@@ -487,7 +490,7 @@ def generate_all_plots(data_mode=None, meta_end=None, include_title=True):
         title='Bid-Ask Queues: Counterfactual given impacted queue q̄',
         ask_ref_col='bar_q_a',
         bid_ref_col='bar_q_b',
-        save_path='images/bidask_queue_given_qbar.png',
+        save_path=os.path.join(image_dir, 'bidask_queue_given_qbar.png'),
         include_title=include_title,
     )
 
@@ -498,7 +501,7 @@ def generate_all_plots(data_mode=None, meta_end=None, include_title=True):
         data['ask_impact_with'],
         data['bid_impact_with'],
         title='Total Price Impact (Ask - Bid) given base queue q',
-        save_path='images/bidask_impact_given_q.png',
+        save_path=os.path.join(image_dir, 'bidask_impact_given_q.png'),
         include_title=include_title,
     )
 
@@ -506,7 +509,7 @@ def generate_all_plots(data_mode=None, meta_end=None, include_title=True):
         data['ask_impact_without'],
         data['bid_impact_without'],
         title='Total Price Impact (Ask - Bid) given impacted queue q̄',
-        save_path='images/bidask_impact_given_qbar.png',
+        save_path=os.path.join(image_dir, 'bidask_impact_given_qbar.png'),
         include_title=include_title,
     )
 
@@ -517,7 +520,7 @@ def generate_all_plots(data_mode=None, meta_end=None, include_title=True):
         data['ask_impact_with'],
         title='Ask Side Impact I^a(t) given base queue q',
         color='blue',
-        save_path='images/ask_impact_given_q.png',
+        save_path=os.path.join(image_dir, 'ask_impact_given_q.png'),
         include_title=include_title,
     )
 
@@ -525,7 +528,7 @@ def generate_all_plots(data_mode=None, meta_end=None, include_title=True):
         data['bid_impact_with'],
         title='Bid Side Impact I^b(t) given base queue q',
         color='orange',
-        save_path='images/bid_impact_given_q.png',
+        save_path=os.path.join(image_dir, 'bid_impact_given_q.png'),
         include_title=include_title,
     )
 
@@ -533,7 +536,7 @@ def generate_all_plots(data_mode=None, meta_end=None, include_title=True):
         data['ask_impact_without'],
         title='Ask Side Impact I^a(t) given impacted queue q̄',
         color='blue',
-        save_path='images/ask_impact_given_qbar.png',
+        save_path=os.path.join(image_dir, 'ask_impact_given_qbar.png'),
         include_title=include_title,
     )
 
@@ -541,7 +544,7 @@ def generate_all_plots(data_mode=None, meta_end=None, include_title=True):
         data['bid_impact_without'],
         title='Bid Side Impact I^b(t) given impacted queue q̄',
         color='orange',
-        save_path='images/bid_impact_given_qbar.png',
+        save_path=os.path.join(image_dir, 'bid_impact_given_qbar.png'),
         include_title=include_title,
     )
 

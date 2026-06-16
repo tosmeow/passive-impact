@@ -4,6 +4,8 @@ import pandas as pd
 import numpy as np
 import os
 
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+
 
 def parse_args():
     parser = argparse.ArgumentParser(description='Plot single-queue passive impact results.')
@@ -12,19 +14,25 @@ def parse_args():
         help='Which simulation backend results to load (default: efficient).'
     )
     parser.add_argument(
-        '--meta-end', type=float, default=80.0,
-        help='Time at which the metaorder ends, drawn as a vertical line (default: 80.0).'
+        '--meta-end', type=float, default=60.0,
+        help='Time at which the metaorder ends, drawn as a vertical line (default: 60.0).'
     )
-    parser.add_argument(
-        '--no-title', action='store_true',
+    title_group = parser.add_mutually_exclusive_group()
+    title_group.add_argument(
+        '--no-title', dest='include_title', action='store_true',
+        help='Draw titles on generated PNG images.'
+    )
+    title_group.add_argument(
+        '--no-title', dest='include_title', action='store_false',
         help='Do not draw titles on generated PNG images.'
     )
+    parser.set_defaults(include_title=False)
     return parser.parse_args()
 
 
 def load_data(data_mode):
     """Load simulation results from .npy files into pandas DataFrames."""
-    data_base = f'./data/single/{data_mode}'
+    data_base = os.path.join(SCRIPT_DIR, 'data', 'single', data_mode)
 
     times = np.load(f'{data_base}/with/times.npy')
     times_without = np.load(f'{data_base}/without/times.npy')
@@ -75,7 +83,7 @@ def plot_queue_shades(
     meta_end=None,
     ref_col=None,
     save_path=None,
-    include_title=True,
+    include_title=False,
 ):
     fig, ax = plt.subplots(figsize=(12, 6))
 
@@ -108,12 +116,13 @@ def plot_queue_shades(
         plt.show()
 
 
-def generate_all_plots(data_mode, meta_end, include_title=True):
+def generate_all_plots(data_mode, meta_end, include_title=False):
     """Generate and save all four analysis plots."""
 
     path_with, path_without, queue_with, queue_without = load_data(data_mode)
 
-    os.makedirs('images', exist_ok=True)
+    image_dir = os.path.join(SCRIPT_DIR, 'images')
+    os.makedirs(image_dir, exist_ok=True)
 
     print("\nGenerating plots...")
 
@@ -124,7 +133,7 @@ def generate_all_plots(data_mode, meta_end, include_title=True):
         label='Price Impact',
         meta_end=meta_end,
         ref_col=None,
-        save_path='images/impact_given_q.png',
+        save_path=os.path.join(image_dir, 'impact_given_q.png'),
         include_title=include_title,
     )
 
@@ -135,7 +144,7 @@ def generate_all_plots(data_mode, meta_end, include_title=True):
         label='Queue Size',
         meta_end=meta_end,
         ref_col='q',
-        save_path='images/queue_given_q.png',
+        save_path=os.path.join(image_dir, 'queue_given_q.png'),
         include_title=include_title,
     )
 
@@ -146,7 +155,7 @@ def generate_all_plots(data_mode, meta_end, include_title=True):
         label='Price Impact',
         meta_end=meta_end,
         ref_col=None,
-        save_path='images/impact_given_qbar.png',
+        save_path=os.path.join(image_dir, 'impact_given_qbar.png'),
         include_title=include_title,
     )
 
@@ -157,11 +166,11 @@ def generate_all_plots(data_mode, meta_end, include_title=True):
         label='Queue Size',
         meta_end=meta_end,
         ref_col='bar_q',
-        save_path='images/queue_given_qbar.png',
+        save_path=os.path.join(image_dir, 'queue_given_qbar.png'),
         include_title=include_title,
     )
 
 
 if __name__ == '__main__':
     args = parse_args()
-    generate_all_plots(args.data_mode, args.meta_end, include_title=not args.no_title)
+    generate_all_plots(args.data_mode, args.meta_end, include_title=args.include_title)

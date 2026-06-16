@@ -18,7 +18,7 @@ fn main() {
     // ==========================================================================
     // Configuration (same queue/Hawkes parameters as single_queue)
     // ==========================================================================
-    let time_horizon = 100.0;
+    let time_horizon = 90.0;
     let n_simulations = 500;
     let initial_queue_size: u32 = 200;
 
@@ -34,9 +34,9 @@ fn main() {
     let beta = vec![0.15, 0.60, 2.5, 10.0];
 
     // Meta orders configuration (aggressive: dim=2, reduce queue)
-    let n_meta: u32 = 200;
-    let meta_start = 1.0;
-    let meta_end = 3.0 * time_horizon / 4.0;
+    let n_meta: u32 = 270;
+    let meta_start = 0.0;
+    let meta_end = 2.0 * time_horizon / 3.0;
 
     // Kappa function from paper: kappa(q) = c1 * sqrt(log(e^{-c2*q} + 1))
     // This gives kappa(q) ~ c3 * q^{1/2} for large q (decreasing, concave).

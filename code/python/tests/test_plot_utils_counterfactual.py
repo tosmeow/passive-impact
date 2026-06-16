@@ -18,6 +18,7 @@ def _load_module(monkeypatch, tmp_path, name, relative_path):
 
 
 def _write_queue_fixture(path):
+    path.mkdir(parents=True, exist_ok=True)
     np.save(path / "times.npy", np.array([0.0, 1.0]))
     np.save(path / "queue_paths.npy", np.array([[10, 12, 13], [11, 14, 15]], dtype=np.uint32))
 
@@ -69,6 +70,31 @@ def test_queue_plot_loader_labels_counterfactual_direction(monkeypatch, tmp_path
 
     assert list(queue_with.columns) == ["q", "bar_q_sim_0", "bar_q_sim_1"]
     assert list(queue_without.columns) == ["bar_q", "q_sim_0", "q_sim_1"]
+
+
+def test_queue_plot_loader_prefers_scenario_subdirectories(monkeypatch, tmp_path):
+    module = _load_module(
+        monkeypatch,
+        tmp_path,
+        "queue_plot_utils_scenario_dirs_test",
+        "experiments/queue_simulation/load_experiments/plot_utils.py",
+    )
+    monkeypatch.setattr(module, "SCRIPT_DIR", str(tmp_path))
+    with_dir = tmp_path / "data" / "single" / "efficient" / "with"
+    without_dir = tmp_path / "data" / "single" / "efficient" / "without"
+    _write_queue_fixture(with_dir)
+    without_dir.mkdir(parents=True, exist_ok=True)
+    np.save(without_dir / "times.npy", np.array([0.0, 1.0]))
+    np.save(
+        without_dir / "queue_paths.npy",
+        np.array([[20, 18, 17], [21, 19, 18]], dtype=np.uint32),
+    )
+
+    queue_with = module.load_data(counterfactual=False)
+    queue_without = module.load_data(counterfactual=True)
+
+    assert queue_with.iloc[0, 0] == 10
+    assert queue_without.iloc[0, 0] == 20
 
 
 def test_queue_plot_can_suppress_title(monkeypatch, tmp_path):

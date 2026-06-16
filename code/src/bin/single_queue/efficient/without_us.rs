@@ -3,7 +3,7 @@ use simulation_project::models::{AffineQueueProcess, MultiExponentialHawkes};
 use simulation_project::simulation::{simulate, simulate_with_externals};
 use simulation_project::simulation_helpers::{
     create_meta_orders, extract_events_by_dim, hawkes_to_market_orders, merge_events,
-    sample_queue_at_times, write_memory_efficient_results, ParallelSimulator,
+    sample_queue_at_times, write_memory_efficient_results, write_queue_samples, ParallelSimulator,
 };
 
 use std::time::Instant;
@@ -14,7 +14,7 @@ fn main() {
     // ==========================================================================
     // Configuration
     // ==========================================================================
-    let time_horizon = 100.0;
+    let time_horizon = 90.0;
     let n_simulations = 500;
     let initial_queue_size: u32 = 200;
 
@@ -33,9 +33,9 @@ fn main() {
     let beta = vec![0.15, 0.60, 2.5, 10.0];
 
     // Meta orders configuration
-    let n_meta: u32 = 375;
-    let meta_start = 1.0;
-    let meta_end = 4.0 * time_horizon / 5.0;
+    let n_meta: u32 = 270;
+    let meta_start = 0.0;
+    let meta_end = 2.0 * time_horizon / 3.0;
 
     // Output file suffix
 
@@ -151,6 +151,13 @@ fn main() {
         &bar_q_at_market_orders,
         &market_orders,
         "experiments/passive_impact/load_experiments/data/single/efficient/without",
+    )
+    .unwrap();
+    write_queue_samples(
+        &results.queue_samples,
+        &bar_q_at_market_orders,
+        &market_orders,
+        "experiments/queue_simulation/load_experiments/data/single/efficient/without",
     )
     .unwrap();
     println!("[TIMING] Data write: {:?}", t0.elapsed());

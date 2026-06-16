@@ -215,6 +215,34 @@ pub fn write_results(
     Ok(())
 }
 
+pub fn write_queue_samples(
+    queue_samples: &[Vec<u32>],
+    reference_queue_samples: &[u32],
+    times: &[f64],
+    output_dir: &str,
+) -> std::io::Result<()> {
+    std::fs::create_dir_all(output_dir)?;
+    let n_times = times.len();
+    let n_simulations = queue_samples.len();
+
+    let queue_data: Vec<u32> = (0..n_times)
+        .flat_map(|t_idx| {
+            std::iter::once(reference_queue_samples[t_idx])
+                .chain(queue_samples.iter().map(move |samples| samples[t_idx]))
+        })
+        .collect();
+    write_npy_u32(
+        &format!("{}/queue_paths.npy", output_dir),
+        &queue_data,
+        n_times,
+        n_simulations + 1,
+    )?;
+
+    write_npy_f64_1d(&format!("{}/times.npy", output_dir), times)?;
+
+    Ok(())
+}
+
 pub fn write_memory_efficient_results(
     results: &MemoryEfficientResults,
     reference_queue_samples: &[u32],

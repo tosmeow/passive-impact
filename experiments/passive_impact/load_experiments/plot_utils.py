@@ -5,7 +5,7 @@ Loads pre-saved baseline data from ./data/{single,double}/{efficient,general}/{w
 Usage:
     python plot_utils.py --mode single --data-mode efficient --meta-end 80.0
     python plot_utils.py --mode double --data-mode efficient
-    python plot_utils.py --mode single --no-title
+    python plot_utils.py --mode single --title
 """
 import argparse
 
@@ -33,12 +33,16 @@ def parse_args():
     p.add_argument('--meta-end', type=float, default=80.0,
                    help='Time at which the metaorder ends, drawn as a vertical line (default: 80.0). '
                         'Only used for single-queue mode.')
-    p.add_argument('--no-title', action='store_true',
-                   help='Do not draw titles on generated PNG images.')
+    title_group = p.add_mutually_exclusive_group()
+    title_group.add_argument('--title', dest='include_title', action='store_true',
+                             help='Draw titles on generated PNG images.')
+    title_group.add_argument('--no-title', dest='include_title', action='store_false',
+                             help='Do not draw titles on generated PNG images.')
+    p.set_defaults(include_title=False)
     return p.parse_args()
 
 
-def generate_all_plots(mode, data_mode, meta_end=80.0, include_title=True):
+def generate_all_plots(mode, data_mode, meta_end=80.0, include_title=False):
     """Generate all plots for the given mode.
 
     Args:
@@ -59,5 +63,5 @@ if __name__ == '__main__':
         args.mode,
         args.data_mode,
         args.meta_end,
-        include_title=not args.no_title,
+        include_title=args.include_title,
     )

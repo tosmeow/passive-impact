@@ -29,7 +29,7 @@ else:
 def generate_all_plots(
     config_path: str | Path = DEFAULT_CONFIG_PATH,
     *,
-    include_title: bool = True,
+    include_title: bool = False,
 ) -> list[Path]:
     """Regenerate all canonical lifecycle plots from saved output tables."""
     cfg = load_lifecycle_config(config_path)
@@ -88,17 +88,26 @@ def _read_csv(path: Path) -> pd.DataFrame:
 def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--config", default=str(DEFAULT_CONFIG_PATH))
-    parser.add_argument(
-        "--no-title",
+    title_group = parser.add_mutually_exclusive_group()
+    title_group.add_argument(
+        "--title",
+        dest="include_title",
         action="store_true",
+        help="Draw titles on generated PNG images.",
+    )
+    title_group.add_argument(
+        "--no-title",
+        dest="include_title",
+        action="store_false",
         help="Do not draw titles on generated PNG images.",
     )
+    parser.set_defaults(include_title=False)
     return parser.parse_args()
 
 
 def main() -> None:
     args = _parse_args()
-    for path in generate_all_plots(args.config, include_title=not args.no_title):
+    for path in generate_all_plots(args.config, include_title=args.include_title):
         print(path)
 
 

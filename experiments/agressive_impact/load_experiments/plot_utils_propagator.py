@@ -3,7 +3,8 @@ import pandas as pd
 import numpy as np
 import os
 
-DATA_BASE = './data/propagator'
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+DATA_BASE = os.path.join(SCRIPT_DIR, 'data', 'propagator')
 
 
 def _queue_layout(counterfactual=False):
@@ -25,7 +26,8 @@ def _queue_layout(counterfactual=False):
 
 
 def _default_output_dir(counterfactual):
-    return 'images_without_us' if counterfactual else 'images'
+    dirname = 'images_without_us' if counterfactual else 'images'
+    return os.path.join(SCRIPT_DIR, dirname)
 
 
 def _queue_diffs(queue_df, counterfactual=False):
@@ -86,7 +88,7 @@ def plot_shades(
     ref_col=None,
     save_path=None,
     mean_label='Mean',
-    include_title=True,
+    include_title=False,
 ):
     """Plot individual simulation paths as transparent lines with mean overlay."""
     fig, ax = plt.subplots(figsize=(12, 6))
@@ -128,7 +130,7 @@ def plot_impact_by_event_type(
     is_market,
     meta_end=None,
     save_path=None,
-    include_title=True,
+    include_title=False,
 ):
     """Plot mean impact separately at market order and meta order times."""
     fig, ax = plt.subplots(figsize=(12, 6))
@@ -169,7 +171,7 @@ def plot_queue_diff(
     counterfactual=False,
     meta_end=None,
     save_path=None,
-    include_title=True,
+    include_title=False,
 ):
     """Plot the queue difference bar_q - q over time with quantile bands."""
     fig, ax = plt.subplots(figsize=(12, 6))
@@ -210,7 +212,7 @@ def generate_all_plots(
     counterfactual=False,
     data_base=None,
     output_dir=None,
-    include_title=True,
+    include_title=False,
 ):
     """Generate and save all analysis plots."""
     impact_df, queue_df, is_market, meta_end = load_data(

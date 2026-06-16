@@ -9,9 +9,8 @@ use simulation_project::simulation::{
 };
 use simulation_project::simulation_helpers::{
     create_meta_orders, extract_events_by_dim, hawkes_to_market_orders, merge_events,
-    sample_queue_at_times,
+    sample_queue_at_times, write_queue_samples,
 };
-use simulation_project::utils::{write_npy_f64_1d, write_npy_u32};
 
 use rayon::prelude::*;
 use std::time::Instant;
@@ -20,7 +19,7 @@ fn main() {
     let t_total = Instant::now();
 
     // ===== Configuration =====
-    let time_horizon = 100.0;
+    let time_horizon = 90.0;
     let n_simulations = 500;
     let initial_queue_size: u32 = 200;
 
@@ -33,9 +32,9 @@ fn main() {
     let alpha = vec![0.065, 0.2, 0.325, 0.65];
     let beta = vec![0.15, 0.60, 2.5, 10.0];
 
-    let n_meta: u32 = 375;
-    let meta_start = 1.0;
-    let meta_end = 4.0 * time_horizon / 5.0;
+    let n_meta: u32 = 270;
+    let meta_start = 0.0;
+    let meta_end = 2.0 * time_horizon / 3.0;
 
     println!("=== Queue Simulation (single, efficient) ===");
 
@@ -91,24 +90,20 @@ fn main() {
     );
 
     // ===== Output =====
-    let output_dir = "experiments/queue_simulation/load_experiments/data/single/efficient";
-    std::fs::create_dir_all(output_dir).unwrap();
-
-    // Queue paths: (n_times, n_simulations + 1) — first column = q, rest = bar_q_sim_i
-    let queue_data: Vec<u32> = (0..n_times)
-        .flat_map(|t_idx| {
-            std::iter::once(q_at_times[t_idx])
-                .chain(bar_q_paths.iter().map(move |bar_q| bar_q[t_idx]))
-        })
-        .collect();
-    write_npy_u32(
-        &format!("{}/queue_paths.npy", output_dir),
-        &queue_data,
-        n_times,
-        n_simulations + 1,
+    write_queue_samples(
+        &bar_q_paths,
+        &q_at_times,
+        &times,
+        "experiments/queue_simulation/load_experiments/data/single/efficient/with",
     )
     .unwrap();
-    write_npy_f64_1d(&format!("{}/times.npy", output_dir), &times).unwrap();
+    write_queue_samples(
+        &bar_q_paths,
+        &q_at_times,
+        &times,
+        "experiments/queue_simulation/load_experiments/data/single/efficient",
+    )
+    .unwrap();
 
     println!("[TIMING] TOTAL: {:?}", t_total.elapsed());
 }
