@@ -96,143 +96,83 @@ python experiments/passive_impact/custom_experiment/main.py
 
 The same shape applies to `agressive_impact` and `queue_simulation` — each has its own config dataclass (`AggressiveImpactConfig`, `QueueSimulationConfig`) and `main.py` template. The empirical passive execution-cost workflow lives under [`experiments/impact_cost/`](experiments/impact_cost/) and is driven by the canonical lifecycle config in `load_experiments/config.toml`.
 
+
 ## Mathematical Background
 
 ### Hawkes Process
 
 A Hawkes process is a self-exciting Poisson process with intensity
 
-$$\lambda_t = \mu + \int_0^{t-} \varphi(t-s)\,dN_s.$$
+$$\lambda_t = \mu + \int_0^{t-} \phi(t-s)dN_s$$
 
-Here $\mu$ is the baseline exogenous intensity and $\varphi$ is the
-self-exciting kernel. In this library we mostly use sum-of-exponentials
-kernels:
+where $\mu$ is the baseline exogeneous intensity and $\phi$ is the nonincreasing self-exciting kernel. In the current framework, we will mostly used sum-of-exponentials kernel of the form
 
-$$
-\lambda_t = \mu + \sum_{i=1}^{k} R^i_t,
-\qquad
-\varphi(s) = \sum_{i=1}^{k} \alpha_i e^{-\beta_i s}.
-$$
+$$ \lambda_t = \mu + \sum_{i=1}^{k} R^i_t, \quad \varphi(s) = \sum_{i=1}^{k} \alpha_i e^{-\beta_i s}$$
 
-The Markovian states
-$R^i_t := \int_0^{t-} \alpha_i e^{-\beta_i(t-s)} dN_s$
-enable constant-time intensity updates. Power-law kernels can also be
-approximated by sums of exponentials, so this representation remains flexible.
+with Markovian states $R^i_t := \int_0^{t-} \alpha_i e^{-\beta_i(t-s)} dN_s$ enabling O(1) intensity updates.
+
+Note that power-law kernels can be accurately approximated by sums of exponentials, so the framework extends to this class of kernels as well.
+
 
 ### Aggregate Queue Dynamics
 
-The aggregate ask and bid queues are modeled as
+The aggregate queues $q^a$ and $q^b$ are given by
 
-$$
-q^a = L^a - C^a - N^a,
-\qquad
-q^b = L^b - C^b - N^b.
-$$
+$$q^a = L^a - C^a - N^a, \qquad \text{and} \qquad q^b = L^b - C^b - N^b$$
 
-For $x \in \{a,b\}$, the processes $L^x$ and $C^x$ represent limit orders and
-cancellations with queue-reactive affine intensities:
+where for $x \in \{a,b\}$, $L^{x}$ and $C^{x}$ are point processes representing the limit orders and cancellations with state-dependent intensities
 
-$$
-\lambda^{L,x}(q) = a_l + b_l q,
-\qquad
-\lambda^{C,x}(q) = a_c + b_c q,
-$$
+$$\lambda^{L,x}(q) = a_l + b_l \cdot q, \qquad \lambda^{C,x}(q) = a_c + b_c \cdot q$$
 
-with $b_l < 0$ and $b_c > 0$. Market-order flows $N^a$ and $N^b$ are modeled
-with Hawkes processes.
+with $b_l < 0$ and $b_c > 0$.
+
+For market orders, $N^a$ and $N^b$ are modeled using two Hawkes process with the same baseline intensity and same kernel.
+
 
 ### Price Process
 
-The price is the anticipation of future order flow, allowing each market
-order's contribution to depend on available liquidity:
+The price is defined as the anticipation of future order flow, while allowing the contribution of each market order to depend on available liquidity. 
 
 $$
-P_t =
-P_0 + \lim_{T\to\infty}
-\mathbb{E}\left[
-\int_0^T \kappa(q^a_s)\,dN^a_s
-- \int_0^T \kappa(q^b_s)\,dN^b_s
-\middle| \mathcal{F}_t
-\right].
+P_t=P_0+\lim_{T\to\infty}\mathbb{E} \left[\int_0^T \kappa(q^a_s) \mathrm{d}N^a_s-\int_0^T \kappa(q^b_s) \mathrm{d}N^b_s\ \middle|\ \mathcal F_t\right].
 $$
 
-Here $\kappa$ is the liquidity-dependent impact function.
+for a given impact function $\kappa$.
+
 
 ### Conditional Impact
 
-For a metaorder $X^o$ executed on the ask side, the observed ask queue and
-price can be written as
+If one executes a given metaorder $X^o$ at the ask side, the observed dynamics for the ask queue and price are
 
-$$
-\bar{q}^{a,t}_s
-= q^a_0 + \bar{L}^{a,t}_s - \bar{C}^{a,t}_s - N^a_s + X^{o,t}_s,
-\qquad s \ge 0,
-$$
+$$ \overline{q}^{a,t}_s = q_0^a+\overline{L}^{a,t}_s-\overline{C}^{a,t}_s-N^a_s+X_s^{o,t}, \qquad s\ge 0, \qquad \text{and} \qquad \overline{P}_t = P_0+\lim_{T\to\infty}\mathbb{E}\left[\int_0^T \kappa(\overline{q}^{a,t}_s) \mathrm{d}N^a_s - \int_0^T \kappa(q^b_s) \mathrm{d}N^b_s \ \middle|\ \mathcal F_t\right]$$
 
-with $X^{o,t}_s := X^o_{s \wedge t}$. This covers passive metaorders
-($X^o=L^o$) and aggressive metaorders ($X^o=-N^o$). The market impact is
+where $X_s^{o,t}:=X_{s \wedge t}^{o}, s \geq 0$ can be understood as a sequence of limit orders ($X^o = L^o$) or market orders ($X^o = -N^o$).
 
-$$
-MI(t) = \bar{P}_t - P_t.
-$$
+The impact is then given by:
 
-Conditional simulation gives a distribution of $MI(t)$ by comparing the
-observed and counterfactual queue paths under the same market history.
+$$ MI(t) = \overline{P}_t  - P_t$$
+
+
 
 ### Passive Market Impact
 
-For a passive metaorder executed through limit orders, affine queue
-intensities, affine impact $\kappa(q)=c_\kappa q + d_\kappa$, and a
-sum-of-exponentials Hawkes kernel, the passive impact admits a closed form
-based on the resolvent operator $(\delta_0-\varphi)^{-1}$.
+Accurately simulating price impact reduces to simulating the counterfactual price trajectory — or, more concretely, the counterfactual queue trajectories that would have been observed had the metaorder not been sent. This is what our framework achieves — see the paper for the theory and the code below for the implementation. Thus, under the following specifications:
+- Passive metaorder $L^o$ executed exclusively using limit orders ($X = L^o$),
+- Affine intensities $\lambda^L$ and $\lambda^C$,
+- Affine impact function $\kappa(q) = c_\kappa \dot q + d_\kappa$,
+- Sum-of-exponentials Hawkes kernel,
 
-In the single-queue notation used by the implementation, with
-$c_\lambda := b_c - b_l$, the impact has the form
+we obtain a closed formula for the distribution of passive market impact, and we implement:
 
-$$
-I(t)
-= c_\kappa \int_0^t (\bar{q}_s - q_s)\,dN_s
-+ c_\kappa(\bar{q}_t - q_t)\mathcal{I}_t,
-$$
+$$\mathrm{MI}(t) = c_\kappa \int_0^t (\overline{q}_s - q_s) \mathrm{d}N_s + c_\kappa (\overline{q}_t - q_t) \cdot \mathrm{MI}_t$$
 
-where
+thus providing the following solution relying on the resolvent operator $(\delta_0 - \varphi)^{-1}$:
 
-$$
-\mathcal{I}_t =
-\int_t^\infty e^{-c_\lambda(s-t)}\mathbb{E}_t[\lambda_s]\,ds.
-$$
-
-For fitted tail-propagator experiments, the calibrated input is a price
-propagator rather than a Hawkes kernel:
-
-$$
-G(u)=\kappa_s+\sum_{i=1}^m w_i e^{-\beta_i u}
-=\kappa_s\,\xi(u),
-\qquad
-\xi(u)=1+\sum_{i=1}^m a_i e^{-\beta_i u}.
-$$
-
-The propagator-implied response kernel gives the passive continuation kernel
-
-$$
-K_C(a)=\int_0^\infty e^{-C_\lambda u}r(a+u)\,du
-=\sum_{i=1}^m \eta_i e^{-\beta_i a},
-\qquad
-\eta_i=\frac{\beta_i w_i}{\kappa_s(\beta_i+C_\lambda)}.
-$$
-
-With signed queue displacement $U_t=s(\bar q_t-q_t)$ and fitted queue slope
-$\kappa_1$, the evaluated impact is written in the same realized-plus-tail
-form:
-
-$$
-MI(t)
-=\kappa_1\int_0^t U_s\,dN_s
-+\kappa_1 U_t
-\left(
-\zeta+\int_0^t K_C(t-s)\,dN_s
-\right).
-$$
+```math
+\mathrm{MI}_t = c_{\kappa} \int_0^t (\overline{q}^{a,t}_s - q^{a}_s)\,\mathrm{d} N^a_s
++ c_{\kappa} (\overline{q}^{a,t}_t - q^{a}_t)\Big(\zeta + \int_0^t \sum_{i=1}^m \gamma_i e^{-\beta_i (t-s)}\,\mathrm{d}N^a_s\Big).
+```
+for some constants $(\gamma_i)_{1\le i\le m}$ and $\zeta$.
 
 The config-level mapping is documented in
 [`experiments/impact_cost/load_experiments/FORMULAS.md`](experiments/impact_cost/load_experiments/FORMULAS.md).
