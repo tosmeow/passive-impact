@@ -11,9 +11,30 @@ use simulation_project::utils::{write_npy_f64, write_npy_f64_1d, write_npy_u32};
 
 use rayon::prelude::*;
 use std::time::Instant;
+use std::{env, process};
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Direction {
+    WithUs,
+    WithoutUs,
+}
+
+impl Direction {
+    fn is_counterfactual(self) -> bool {
+        matches!(self, Self::WithoutUs)
+    }
+
+    fn label(self) -> &'static str {
+        match self {
+            Self::WithUs => "with us",
+            Self::WithoutUs => "without us",
+        }
+    }
+}
 
 fn main() {
     let t_total = Instant::now();
+    let direction = parse_direction();
 
     // ==========================================================================
     // Configuration (same queue/Hawkes parameters as aggressive_impact)
@@ -34,18 +55,21 @@ fn main() {
     let beta = vec![0.15, 0.60, 2.5, 10.0];
 
     // Meta orders configuration (aggressive: dim=2, reduce queue)
-    let n_meta: u32 = 270;
+    let n_meta: u32 = 156;
     let meta_start = 0.0;
     let meta_end = 2.0 * time_horizon / 3.0;
 
     // Kappa function: kappa(q) = -c_kappa * q  (purely linear, no constant)
-    let c_kappa = 0.1_f64;
+    let c_kappa = 0.001_f64;
     let kappa = |q: f64| -c_kappa * q;
 
     // bar_kappa: constant weight for the propagator term (fixed small value)
-    let bar_kappa = 1.0_f64;
+    let bar_kappa = 0.01_f64;
 
-    println!("=== Aggressive Impact Hybrid Experiment ===");
+    println!(
+        "=== Aggressive Impact Hybrid Experiment ({}) ===",
+        direction.label()
+    );
     println!(
         "Time horizon: {}, Simulations: {}, Initial queue: {}",
         time_horizon, n_simulations, initial_queue_size
@@ -72,22 +96,6 @@ fn main() {
         "[TIMING] Hawkes pre-simulation: {:?} ({} events)",
         t0.elapsed(),
         hawkes_result.events.len()
-    );
-
-    // ==========================================================================
-    // Simulate q path (base queue, no meta orders)
-    // ==========================================================================
-    let t0 = Instant::now();
-
-    let process = AffineQueueProcess::new_queue(initial_queue_size as f64, a_l, b_l, a_c, b_c);
-    let q_result_internal =
-        simulate_with_externals(&process, time_horizon, &hawkes_as_market, Some(42));
-    let q_result = merge_events(&q_result_internal, &hawkes_as_market);
-    let q_path = AffineQueueProcess::result_to_queue_path(&q_result, initial_queue_size);
-    println!(
-        "[TIMING] q simulation: {:?} ({} events)",
-        t0.elapsed(),
-        q_path.events.len()
     );
 
     // ==========================================================================
@@ -127,15 +135,63 @@ fn main() {
     println!("Evaluation times (merged): {}", eval_times.len());
 
     // ==========================================================================
-    // Sample q at evaluation times (shared across all simulations)
+    // Build conditioning path and externals
     // ==========================================================================
-    let q_at_eval_times = sample_queue_at_times(&q_path, &eval_times);
-
-    // ==========================================================================
-    // Build conditioning events and externals
-    // ==========================================================================
-    let q_events_by_dim = extract_events_by_dim(&q_result_internal, 3, Some(2));
+    let process = AffineQueueProcess::new_queue(initial_queue_size as f64, a_l, b_l, a_c, b_c);
     let bar_q_external = merge_events(&meta_orders, &hawkes_as_market);
+
+    let (
+        conditioning_events_by_dim,
+        cond_external_events,
+        new_external_events,
+        reference_samples,
+        simulating_bar_q,
+    ) = if direction.is_counterfactual() {
+        // without_us: condition on bar_q (with meta orders), simulate q (without meta orders).
+        let t0 = Instant::now();
+        let bar_q_result_internal =
+            simulate_with_externals(&process, time_horizon, &bar_q_external, Some(42));
+        let bar_q_result = merge_events(&bar_q_result_internal, &bar_q_external);
+        let bar_q_path =
+            AffineQueueProcess::result_to_queue_path(&bar_q_result, initial_queue_size);
+        println!(
+            "[TIMING] bar_q conditioning simulation: {:?} ({} events)",
+            t0.elapsed(),
+            bar_q_path.events.len()
+        );
+        (
+            extract_events_by_dim(&bar_q_result_internal, 3, Some(2)),
+            &bar_q_external,
+            &hawkes_as_market,
+            sample_queue_at_times(&bar_q_path, &eval_times),
+            false,
+        )
+    } else {
+        // with_us: condition on q (without meta orders), simulate bar_q (with meta orders).
+        let t0 = Instant::now();
+        let q_result_internal =
+            simulate_with_externals(&process, time_horizon, &hawkes_as_market, Some(42));
+        let q_result = merge_events(&q_result_internal, &hawkes_as_market);
+        let q_path = AffineQueueProcess::result_to_queue_path(&q_result, initial_queue_size);
+        println!(
+            "[TIMING] q conditioning simulation: {:?} ({} events)",
+            t0.elapsed(),
+            q_path.events.len()
+        );
+        (
+            extract_events_by_dim(&q_result_internal, 3, Some(2)),
+            &hawkes_as_market,
+            &bar_q_external,
+            sample_queue_at_times(&q_path, &eval_times),
+            true,
+        )
+    };
+
+    println!(
+        "Conditioning on {}; simulating {}",
+        if simulating_bar_q { "q" } else { "bar_q" },
+        if simulating_bar_q { "bar_q" } else { "q" }
+    );
 
     // ==========================================================================
     // Run parallel conditional simulations
@@ -147,13 +203,13 @@ fn main() {
         .map(|sim_idx| {
             let ctx = ConditionalSimulationContext::new(
                 &process,
-                &q_events_by_dim,
-                Some(&hawkes_as_market),
-                Some(&bar_q_external),
+                &conditioning_events_by_dim,
+                Some(cond_external_events),
+                Some(new_external_events),
                 time_horizon,
             );
 
-            let q_bar_samples = ctx.simulate_queue_at_times(
+            let sim_samples = ctx.simulate_queue_at_times(
                 &eval_times,
                 initial_queue_size,
                 None,
@@ -162,17 +218,29 @@ fn main() {
 
             // Hybrid impact: metaorders through propagator with bar_kappa,
             // market orders contribute instantaneous queue-dependent correction.
-            let impact_path = AggressiveImpactPath::from_queue_samples_hybrid(
-                &q_at_eval_times,
-                &q_bar_samples,
-                &eval_times,
-                &is_market_order,
-                &hawkes_model,
-                &kappa,
-                bar_kappa,
-            );
+            let impact_path = if simulating_bar_q {
+                AggressiveImpactPath::from_queue_samples_hybrid(
+                    &reference_samples,
+                    &sim_samples,
+                    &eval_times,
+                    &is_market_order,
+                    &hawkes_model,
+                    &kappa,
+                    bar_kappa,
+                )
+            } else {
+                AggressiveImpactPath::from_queue_samples_hybrid(
+                    &sim_samples,
+                    &reference_samples,
+                    &eval_times,
+                    &is_market_order,
+                    &hawkes_model,
+                    &kappa,
+                    bar_kappa,
+                )
+            };
 
-            (q_bar_samples, impact_path.impact_path)
+            (sim_samples, impact_path.impact_path)
         })
         .collect();
 
@@ -186,9 +254,74 @@ fn main() {
     // Output
     // ==========================================================================
     let t0 = Instant::now();
-    let output_dir = "experiments/agressive_impact/load_experiments/data/hybrid";
-    std::fs::create_dir_all(output_dir).expect("Failed to create output directory");
+    let output_dirs = output_dirs_for(
+        "experiments/agressive_impact/load_experiments/data/hybrid",
+        direction,
+    );
+    write_aggressive_outputs(
+        &output_dirs,
+        &eval_times,
+        &is_market_order,
+        &reference_samples,
+        &results,
+        n_simulations,
+        bar_kappa,
+    );
 
+    println!("[TIMING] Data write: {:?}", t0.elapsed());
+    println!("[TIMING] TOTAL: {:?}", t_total.elapsed());
+}
+
+fn parse_direction() -> Direction {
+    let mut direction = Direction::WithUs;
+    for arg in env::args().skip(1) {
+        match arg.as_str() {
+            "--counterfactual" | "--without-us" => direction = Direction::WithoutUs,
+            "--with-us" => direction = Direction::WithUs,
+            "-h" | "--help" => {
+                print_help();
+                process::exit(0);
+            }
+            other => {
+                eprintln!("Unknown argument: {other}");
+                print_help();
+                process::exit(2);
+            }
+        }
+    }
+    direction
+}
+
+fn print_help() {
+    println!(
+        "\
+Usage: agressive_impact_hybrid [--with-us | --without-us | --counterfactual]
+
+Options:
+  --with-us          Condition on q and simulate bar_q. This is the default.
+  --without-us      Condition on bar_q and simulate q.
+  --counterfactual  Alias for --without-us.
+  -h, --help        Show this help message.
+"
+    );
+}
+
+fn output_dirs_for(base_output_dir: &str, direction: Direction) -> Vec<String> {
+    match direction {
+        Direction::WithUs => vec![format!("{base_output_dir}/with")],
+        Direction::WithoutUs => vec![format!("{base_output_dir}/without")],
+    }
+}
+
+fn write_aggressive_outputs(
+    output_dirs: &[String],
+    eval_times: &[f64],
+    is_market_order: &[bool],
+    reference_samples: &[u32],
+    results: &[(Vec<u32>, Vec<f64>)],
+    n_simulations: usize,
+    bar_kappa: f64,
+) {
     let n_times = eval_times.len();
 
     // Impact paths: (n_times, n_simulations)
@@ -199,42 +332,44 @@ fn main() {
                 .map(move |(_, impact)| impact.get(t_idx).copied().unwrap_or(f64::NAN))
         })
         .collect();
-    write_npy_f64(
-        &format!("{}/impact_paths.npy", output_dir),
-        &impact_data,
-        n_times,
-        n_simulations,
-    )
-    .unwrap();
 
-    // Queue paths: (n_times, n_simulations + 1) [first col = q, rest = bar_q_sim_i]
+    // Queue paths: (n_times, n_simulations + 1)
+    // with_us: first col = q, rest = bar_q_sim_i
+    // without_us: first col = bar_q, rest = q_sim_i
     let queue_data: Vec<u32> = (0..n_times)
         .flat_map(|t_idx| {
-            std::iter::once(q_at_eval_times[t_idx])
-                .chain(results.iter().map(move |(q_bar, _)| q_bar[t_idx]))
+            std::iter::once(reference_samples[t_idx]).chain(
+                results
+                    .iter()
+                    .map(move |(sim_samples, _)| sim_samples[t_idx]),
+            )
         })
         .collect();
-    write_npy_u32(
-        &format!("{}/queue_paths.npy", output_dir),
-        &queue_data,
-        n_times,
-        n_simulations + 1,
-    )
-    .unwrap();
-
-    // Times
-    write_npy_f64_1d(&format!("{}/times.npy", output_dir), &eval_times).unwrap();
 
     // Event types: 1.0 for market order, 0.0 for meta order
     let event_types: Vec<f64> = is_market_order
         .iter()
         .map(|&b| if b { 1.0 } else { 0.0 })
         .collect();
-    write_npy_f64_1d(&format!("{}/event_types.npy", output_dir), &event_types).unwrap();
 
-    // bar_kappa value used (scalar, stored as 1-element array for easy Python loading)
-    write_npy_f64_1d(&format!("{}/bar_kappa.npy", output_dir), &[bar_kappa]).unwrap();
-
-    println!("[TIMING] Data write: {:?}", t0.elapsed());
-    println!("[TIMING] TOTAL: {:?}", t_total.elapsed());
+    for output_dir in output_dirs {
+        std::fs::create_dir_all(output_dir).expect("Failed to create output directory");
+        write_npy_f64(
+            &format!("{}/impact_paths.npy", output_dir),
+            &impact_data,
+            n_times,
+            n_simulations,
+        )
+        .unwrap();
+        write_npy_u32(
+            &format!("{}/queue_paths.npy", output_dir),
+            &queue_data,
+            n_times,
+            n_simulations + 1,
+        )
+        .unwrap();
+        write_npy_f64_1d(&format!("{}/times.npy", output_dir), eval_times).unwrap();
+        write_npy_f64_1d(&format!("{}/event_types.npy", output_dir), &event_types).unwrap();
+        write_npy_f64_1d(&format!("{}/bar_kappa.npy", output_dir), &[bar_kappa]).unwrap();
+    }
 }

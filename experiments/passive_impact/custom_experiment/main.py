@@ -10,10 +10,12 @@ config = pi.PassiveImpactConfig(
     initial_queue_size=200,
     mode="single",                # "single" | "double"
     counterfactual=False,         # False: with us | True: without us
+    side="ask",                   # "ask" keeps sign; "bid" flips impact sign
     mu=1.0,
     alpha=[0.065, 0.2, 0.325, 0.65],
     beta=[0.15, 0.60, 2.5, 10.0],
     a_l=100.0, b_l=-0.275, a_c=2.0, b_c=0.125,
+    c_kappa_effective=-0.00001713,
     # Metaorder accepts:
     #   int N         → N evenly-spaced orders inside metaorder_window
     #   list/ndarray  → explicit list of arrival times (window ignored)

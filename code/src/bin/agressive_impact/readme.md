@@ -5,9 +5,12 @@ Simulates aggressive market impact under the propagator price model.
 ## What it does
 
 1. Pre-simulates a Hawkes process (market orders) with a fixed seed.
-2. Simulates a baseline queue path `q` (no metaorder).
+2. Simulates the conditioning queue path.
+   - Default/with-us: condition on baseline `q` (no metaorder).
+   - `--counterfactual`/without-us: condition on `bar_q` (with metaorder).
 3. Injects a deterministic metaorder `N^o` (aggressive market orders that reduce the queue).
-4. Runs `n_simulations` conditional simulations of the counterfactual queue `bar_q` given the observed `q`, with the metaorder present.
+4. Runs `n_simulations` conditional simulations of the symmetric counterfactual queue:
+   `bar_q` given `q` by default, or `q` given `bar_q` with `--counterfactual`.
 5. Computes the aggressive market impact path at each simulation using `AggressiveImpactPath`.
 6. Writes results to `data/agressive_impact/`.
 
@@ -30,18 +33,22 @@ $$MI_t = \int_0^t [\kappa(\bar{q}^a_s) - \kappa(q^a_s)]\, G(t-s)\, dN^a_s + \int
 
 ## Output files
 
-Written to `data/agressive_impact/`:
+Written to `experiments/agressive_impact/load_experiments/data/propagator/with/`.
+The `--counterfactual` flag writes the symmetric data to
+`experiments/agressive_impact/load_experiments/data/propagator/without/`.
 
 | File | Shape | Contents |
 |---|---|---|
 | `impact_paths.npy` | `(n_times, n_sims)` | $MI(t)$ per simulation |
-| `queue_paths.npy` | `(n_times, n_sims + 1)` | First col = $q$; remaining = $\bar{q}$ per simulation |
+| `queue_paths.npy` | `(n_times, n_sims + 1)` | With-us: first col = $q$, remaining = $\bar{q}$ per simulation. Without-us: first col = $\bar{q}$, remaining = $q$ per simulation |
 | `times.npy` | `(n_times,)` | Evaluation times (merged market + metaorder times) |
 | `event_types.npy` | `(n_times,)` | 1.0 = market order, 0.0 = metaorder |
 
 ## Visualization
 
 ```bash
-cd python/experiments/agressive_impact
-python plot_utils.py
+cargo run --release --bin agressive_impact
+cargo run --release --bin agressive_impact -- --counterfactual
+python experiments/agressive_impact/load_experiments/plot_utils.py --model propagator
+python experiments/agressive_impact/load_experiments/plot_utils.py --model propagator --counterfactual
 ```

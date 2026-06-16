@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import sys
 from dataclasses import asdict, dataclass, fields
 from pathlib import Path
 from typing import Any
@@ -11,34 +12,70 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
-from ..core.cost_utils import MARKET, event_seconds
-from ..core.experiment_utils import (
-    candidate_episodes,
-    load_aggregated_depth,
-    queue_to_u32,
-    sample_previous_value,
-    timestamp_like,
-    window_from_aggregated,
-)
-from ..core.level_execution import market_side_for_queue
-from ..core.passive_impact import (
-    PassiveImpactModelConfig,
-    execution_cost_jump_series,
-    passive_impact_path_from_queue_samples,
-    validate_passive_impact_model_config,
-)
-from ..core.passive_lifecycle import (
-    PassiveLifecycleConfig,
-    active_displacement_at_times,
-    generate_passive_lifecycle,
-    validate_passive_lifecycle_config,
-)
-from ..core.reduced_form_impact import (
-    DEFAULT_PROPAGATOR_BETA,
-    DEFAULT_PROPAGATOR_GAMMA,
-    DEFAULT_PROPAGATOR_KAPPA,
-    DEFAULT_PROPAGATOR_WEIGHTS,
-)
+if __package__ in {None, ""}:
+    repo_root = Path(__file__).resolve().parents[3]
+    if str(repo_root) not in sys.path:
+        sys.path.insert(0, str(repo_root))
+
+    from experiments.plot_utils_common import add_title_argument
+    from experiments.impact_cost.core.cost_utils import MARKET, event_seconds
+    from experiments.impact_cost.core.experiment_utils import (
+        candidate_episodes,
+        load_aggregated_depth,
+        queue_to_u32,
+        sample_previous_value,
+        timestamp_like,
+        window_from_aggregated,
+    )
+    from experiments.impact_cost.core.level_execution import market_side_for_queue
+    from experiments.impact_cost.core.passive_impact import (
+        PassiveImpactModelConfig,
+        execution_cost_jump_series,
+        passive_impact_path_from_queue_samples,
+        validate_passive_impact_model_config,
+    )
+    from experiments.impact_cost.core.passive_lifecycle import (
+        PassiveLifecycleConfig,
+        active_displacement_at_times,
+        generate_passive_lifecycle,
+        validate_passive_lifecycle_config,
+    )
+    from experiments.impact_cost.core.reduced_form_impact import (
+        DEFAULT_PROPAGATOR_BETA,
+        DEFAULT_PROPAGATOR_GAMMA,
+        DEFAULT_PROPAGATOR_KAPPA,
+        DEFAULT_PROPAGATOR_WEIGHTS,
+    )
+else:
+    from ...plot_utils_common import add_title_argument
+    from ..core.cost_utils import MARKET, event_seconds
+    from ..core.experiment_utils import (
+        candidate_episodes,
+        load_aggregated_depth,
+        queue_to_u32,
+        sample_previous_value,
+        timestamp_like,
+        window_from_aggregated,
+    )
+    from ..core.level_execution import market_side_for_queue
+    from ..core.passive_impact import (
+        PassiveImpactModelConfig,
+        execution_cost_jump_series,
+        passive_impact_path_from_queue_samples,
+        validate_passive_impact_model_config,
+    )
+    from ..core.passive_lifecycle import (
+        PassiveLifecycleConfig,
+        active_displacement_at_times,
+        generate_passive_lifecycle,
+        validate_passive_lifecycle_config,
+    )
+    from ..core.reduced_form_impact import (
+        DEFAULT_PROPAGATOR_BETA,
+        DEFAULT_PROPAGATOR_GAMMA,
+        DEFAULT_PROPAGATOR_KAPPA,
+        DEFAULT_PROPAGATOR_WEIGHTS,
+    )
 
 
 DEFAULT_CONFIG_PATH = Path(__file__).with_name("config.toml")
@@ -893,20 +930,7 @@ def _parse_args() -> argparse.Namespace:
         default=None,
         help="Override the config and randomly sample candidate episodes.",
     )
-    title_group = parser.add_mutually_exclusive_group()
-    title_group.add_argument(
-        "--title",
-        dest="include_title",
-        action="store_true",
-        help="Draw titles on generated PNG images.",
-    )
-    title_group.add_argument(
-        "--no-title",
-        dest="include_title",
-        action="store_false",
-        help="Do not draw titles on generated PNG images.",
-    )
-    parser.set_defaults(include_title=False)
+    add_title_argument(parser, default=False)
     return parser.parse_args()
 
 

@@ -18,6 +18,26 @@ pub struct MemoryEfficientResults {
     pub impact_paths: Vec<Vec<f64>>,
 }
 
+impl SimulationResults {
+    pub fn scale_impact_paths(&mut self, scale: f64) {
+        for path in &mut self.impact_paths {
+            for value in path {
+                *value *= scale;
+            }
+        }
+    }
+}
+
+impl MemoryEfficientResults {
+    pub fn scale_impact_paths(&mut self, scale: f64) {
+        for path in &mut self.impact_paths {
+            for value in path {
+                *value *= scale;
+            }
+        }
+    }
+}
+
 pub fn extract_event_type(result: &MultivariateSimulationResult, dim: usize) -> Vec<f64> {
     result
         .events

@@ -3,23 +3,44 @@
 Loads pre-saved baseline data from ./data/{single,double}/{efficient,general}/{with,without}/.
 
 Usage:
-    python plot_utils.py --mode single --data-mode efficient --meta-end 80.0
+    python plot_utils.py --mode single --data-mode efficient --meta-end 60.0
     python plot_utils.py --mode double --data-mode efficient
     python plot_utils.py --mode single --title
 """
 import argparse
+import sys
+from pathlib import Path
 
-from plot_utils_single import (
-    generate_all_plots as gen_single,
-    load_data,
-    plot_queue_shades,
-)
-from plot_utils_double import (
-    generate_all_plots as gen_double,
-    load_bidask_data,
-    plot_dashboard,
-    plot_impact_difference,
-)
+if __package__ in {None, ""}:
+    repo_root = Path(__file__).resolve().parents[3]
+    if str(repo_root) not in sys.path:
+        sys.path.insert(0, str(repo_root))
+
+    from plot_utils_single import (
+        generate_all_plots as gen_single,
+        load_data,
+        plot_queue_shades,
+    )
+    from plot_utils_double import (
+        generate_all_plots as gen_double,
+        load_bidask_data,
+        plot_dashboard,
+        plot_impact_difference,
+    )
+    from experiments.plot_utils_common import add_title_argument
+else:
+    from .plot_utils_single import (
+        generate_all_plots as gen_single,
+        load_data,
+        plot_queue_shades,
+    )
+    from .plot_utils_double import (
+        generate_all_plots as gen_double,
+        load_bidask_data,
+        plot_dashboard,
+        plot_impact_difference,
+    )
+    from ...plot_utils_common import add_title_argument
 
 
 def parse_args():
@@ -30,19 +51,14 @@ def parse_args():
                    help='Queue model: single (one-sided) or double (bid-ask).')
     p.add_argument('--data-mode', choices=['general', 'efficient'], default='efficient',
                    help='Which simulation backend results to load (default: efficient).')
-    p.add_argument('--meta-end', type=float, default=80.0,
-                   help='Time at which the metaorder ends, drawn as a vertical line (default: 80.0). '
+    p.add_argument('--meta-end', type=float, default=60.0,
+                   help='Time at which the metaorder ends, drawn as a vertical line (default: 60.0). '
                         'Only used for single-queue mode.')
-    title_group = p.add_mutually_exclusive_group()
-    title_group.add_argument('--title', dest='include_title', action='store_true',
-                             help='Draw titles on generated PNG images.')
-    title_group.add_argument('--no-title', dest='include_title', action='store_false',
-                             help='Do not draw titles on generated PNG images.')
-    p.set_defaults(include_title=False)
+    add_title_argument(p, default=False)
     return p.parse_args()
 
 
-def generate_all_plots(mode, data_mode, meta_end=80.0, include_title=False):
+def generate_all_plots(mode, data_mode, meta_end=60.0, include_title=False):
     """Generate all plots for the given mode.
 
     Args:

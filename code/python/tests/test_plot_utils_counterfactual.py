@@ -28,7 +28,7 @@ def test_aggressive_plot_loader_labels_counterfactual_direction(monkeypatch, tmp
         monkeypatch,
         tmp_path,
         "plot_utils_propagator_test",
-        "experiments/agressive_impact/load_experiments/plot_utils_propagator.py",
+        "experiments/agressive_impact/load_experiments/utils/plot_utils_propagator.py",
     )
     _write_queue_fixture(tmp_path)
     np.save(tmp_path / "impact_paths.npy", np.array([[0.0, 0.0], [1.0, 2.0]]))
@@ -46,7 +46,7 @@ def test_aggressive_plot_queue_diff_keeps_bar_q_minus_q(monkeypatch, tmp_path):
         monkeypatch,
         tmp_path,
         "plot_utils_propagator_diff_test",
-        "experiments/agressive_impact/load_experiments/plot_utils_propagator.py",
+        "experiments/agressive_impact/load_experiments/utils/plot_utils_propagator.py",
     )
 
     with_df = pd.DataFrame([[10, 12, 13]], columns=["q", "bar_q_sim_0", "bar_q_sim_1"])
@@ -54,6 +54,53 @@ def test_aggressive_plot_queue_diff_keeps_bar_q_minus_q(monkeypatch, tmp_path):
 
     assert module._queue_diffs(with_df, counterfactual=False).iloc[0].tolist() == [2, 3]
     assert module._queue_diffs(without_df, counterfactual=True).iloc[0].tolist() == [2, 3]
+
+
+def test_aggressive_plot_shades_respects_y_lim(monkeypatch, tmp_path):
+    module = _load_module(
+        monkeypatch,
+        tmp_path,
+        "plot_utils_propagator_ylim_test",
+        "experiments/agressive_impact/load_experiments/utils/plot_utils_propagator.py",
+    )
+    df = pd.DataFrame(
+        [[10.0, 12.0], [11.0, 13.0]],
+        index=pd.Index([0.0, 1.0], name="time"),
+        columns=["q", "sim_0"],
+    )
+
+    monkeypatch.setattr(module.plt, "show", lambda: None)
+    module.plot_shades(
+        df,
+        sim_prefix="sim_",
+        title="test",
+        ylabel="value",
+        ref_col="q",
+        save_path=None,
+        y_lim=(0.0, 20.0),
+    )
+
+    ax = module.plt.gcf().axes[0]
+    assert ax.get_ylim() == (0.0, 20.0)
+    module.plt.close("all")
+
+
+def test_aggressive_auto_y_lim_uses_robust_headroom(monkeypatch, tmp_path):
+    module = _load_module(
+        monkeypatch,
+        tmp_path,
+        "plot_utils_propagator_auto_ylim_test",
+        "experiments/agressive_impact/load_experiments/utils/plot_utils_propagator.py",
+    )
+    values = np.tile(np.linspace(0.0, 10.0, 10)[:, None], (1, 100))
+    values[-1, -1] = 1000.0
+    df = pd.DataFrame(values, columns=[f"sim_{i}" for i in range(values.shape[1])])
+
+    lower, upper = module._plot_ylim(df, "sim_")
+    visible_max = float(df.mean(axis=1).max())
+
+    assert upper < 30.0
+    assert np.isclose((upper - visible_max) / (upper - lower), 0.20)
 
 
 def test_queue_plot_loader_labels_counterfactual_direction(monkeypatch, tmp_path):

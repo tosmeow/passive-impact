@@ -3,7 +3,8 @@ use simulation_project::models::{AffineQueueProcess, MultiExponentialHawkes};
 use simulation_project::simulation::{simulate, simulate_with_externals};
 use simulation_project::simulation_helpers::{
     create_meta_orders, extract_events_by_dim, extract_market_orders, hawkes_to_market_orders,
-    merge_events, sample_queue_at_times, write_queue_samples, write_results, ParallelSimulator,
+    merge_events, passive_c_kappa_effective_from_env, passive_single_queue_side_from_env,
+    sample_queue_at_times, write_queue_samples, write_results, ParallelSimulator,
 };
 
 use std::time::Instant;
@@ -27,6 +28,10 @@ fn main() {
     let a_c = 2.0; // λ^C(q) = a_c + b_c * q
     let b_c = 0.125;
 
+    // Effective price-impact slope multiplying the normalized passive impact.
+    let c_kappa_effective = passive_c_kappa_effective_from_env();
+    let passive_side = passive_single_queue_side_from_env();
+
     // Hawkes parameters for market orders: these parameters are set to be close to a t ** -1.5 power-law for the kernel.
     let mu = 1.0;
     let alpha = vec![0.065, 0.2, 0.325, 0.65];
@@ -47,6 +52,12 @@ fn main() {
 
     let _c_lambda = AffineQueueProcess::c_lambda(b_l, b_c);
     println!("c_lambda = {}", _c_lambda);
+    println!("c_kappa_effective = {}", c_kappa_effective);
+    println!(
+        "single_queue_side = {:?}, impact_sign = {}",
+        passive_side,
+        passive_side.impact_sign()
+    );
 
     // ==========================================================================
     // Create process and simulate bar_q path (with meta orders)
@@ -183,7 +194,8 @@ fn main() {
         market_orders: &market_orders,
         simulating_bar_q: false,
     };
-    let results = simulator.run(n_simulations);
+    let mut results = simulator.run(n_simulations);
+    results.scale_impact_paths(c_kappa_effective * passive_side.impact_sign());
     println!(
         "[TIMING] Parallel simulations ({}x): {:?}",
         n_simulations,

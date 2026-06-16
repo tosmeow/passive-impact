@@ -6,8 +6,8 @@ use simulation_project::simulation::{simulate, simulate_with_externals};
 use simulation_project::simulation_helpers::{
     create_bidask_meta_orders, extract_ask_market_orders, extract_bid_market_orders,
     extract_bidask_events_by_dim, hawkes_pair_to_market_orders, merge_bidask_events,
-    sample_ask_queue_at_times, sample_bid_queue_at_times, write_bidask_results,
-    BidAskParallelSimulator, Side,
+    passive_c_kappa_effective_from_env, sample_ask_queue_at_times, sample_bid_queue_at_times,
+    write_bidask_results, BidAskParallelSimulator, Side,
 };
 
 use std::time::Instant;
@@ -36,6 +36,9 @@ fn main() {
     let b_c_own = 0.10; // own queue large → more cancellations
     let b_c_cross = 0.02; // other queue large → slightly more cancellations
 
+    // Effective price-impact slope multiplying the normalized passive impact.
+    let c_kappa_effective = passive_c_kappa_effective_from_env();
+
     // Hawkes parameters (same for both sides)
     let mu = 1.0;
     let alpha = vec![0.065, 0.2, 0.325, 0.65];
@@ -62,6 +65,7 @@ fn main() {
     // Build C matrix for impact computation
     let c_matrix = SymmetricCMatrix::from_affine_symmetric(b_l_own, b_l_cross, b_c_own, b_c_cross);
     println!("C matrix: c={}, a={}", c_matrix.c, c_matrix.a);
+    println!("c_kappa_effective = {}", c_kappa_effective);
 
     // ==========================================================================
     // Create process and simulate bar_q paths (with meta orders)
@@ -235,7 +239,8 @@ fn main() {
         bid_market_orders: &bid_market_orders,
         simulating_bar_q: false, // Simulating q (without meta orders)
     };
-    let results = simulator.run(n_simulations);
+    let mut results = simulator.run(n_simulations);
+    results.scale_impact_paths(c_kappa_effective);
     println!(
         "[TIMING] Parallel simulations ({}x): {:?}",
         n_simulations,

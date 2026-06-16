@@ -28,6 +28,28 @@ pub struct BidAskMemoryEfficientResults {
     pub bid_impact_paths: Vec<Vec<f64>>,
 }
 
+impl BidAskSimulationResults {
+    pub fn scale_impact_paths(&mut self, scale: f64) {
+        scale_paths(&mut self.ask_impact_paths, scale);
+        scale_paths(&mut self.bid_impact_paths, scale);
+    }
+}
+
+impl BidAskMemoryEfficientResults {
+    pub fn scale_impact_paths(&mut self, scale: f64) {
+        scale_paths(&mut self.ask_impact_paths, scale);
+        scale_paths(&mut self.bid_impact_paths, scale);
+    }
+}
+
+fn scale_paths(paths: &mut [Vec<f64>], scale: f64) {
+    for path in paths {
+        for value in path {
+            *value *= scale;
+        }
+    }
+}
+
 pub fn extract_ask_market_orders(result: &MultivariateSimulationResult) -> Vec<f64> {
     result
         .events

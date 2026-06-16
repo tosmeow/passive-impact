@@ -3,13 +3,26 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 from pathlib import Path
 
-from .lifecycle_passive_cost import (
-    LifecyclePassiveCostConfig,
-    load_lifecycle_config,
-    run_lifecycle_passive_cost_pipeline,
-)
+if __package__ in {None, ""}:
+    repo_root = Path(__file__).resolve().parents[3]
+    if str(repo_root) not in sys.path:
+        sys.path.insert(0, str(repo_root))
+    from experiments.plot_utils_common import add_title_argument
+    from experiments.impact_cost.load_experiments.lifecycle_passive_cost import (
+        LifecyclePassiveCostConfig,
+        load_lifecycle_config,
+        run_lifecycle_passive_cost_pipeline,
+    )
+else:
+    from ...plot_utils_common import add_title_argument
+    from .lifecycle_passive_cost import (
+        LifecyclePassiveCostConfig,
+        load_lifecycle_config,
+        run_lifecycle_passive_cost_pipeline,
+    )
 
 
 def load_config(
@@ -38,20 +51,7 @@ def _parse_args() -> argparse.Namespace:
         default=None,
         help="Override the image directory stored in the config.",
     )
-    title_group = parser.add_mutually_exclusive_group()
-    title_group.add_argument(
-        "--title",
-        dest="include_title",
-        action="store_true",
-        help="Draw titles on generated PNG images.",
-    )
-    title_group.add_argument(
-        "--no-title",
-        dest="include_title",
-        action="store_false",
-        help="Do not draw titles on generated PNG images.",
-    )
-    parser.set_defaults(include_title=False)
+    add_title_argument(parser, default=False)
     return parser.parse_args()
 
 

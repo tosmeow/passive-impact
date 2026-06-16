@@ -1,17 +1,28 @@
 import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
-import os
+import sys
+from pathlib import Path
 from scipy.interpolate import interp1d
 
-SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+if __package__ in {None, ""}:
+    repo_root = Path(__file__).resolve().parents[3]
+    if str(repo_root) not in sys.path:
+        sys.path.insert(0, str(repo_root))
+
+from experiments.plot_utils_common import (
+    data_dir,
+    image_dir as default_image_dir,
+    maybe_set_title,
+    save_or_show,
+)
 
 # Compact color scheme
 COLORS = {'ask': '#2563eb', 'bid': '#ea580c', 'impact': '#16a34a', 'sim': '#9ca3af'}
 
 # Data directory - can be 'general' or 'efficient'
 DATA_MODE = 'efficient'  # Change to 'general' for non-memory-efficient data
-DATA_BASE = os.path.join(SCRIPT_DIR, 'data', 'double', DATA_MODE)
+DATA_BASE = data_dir(__file__, 'double', DATA_MODE)
 
 
 def load_bidask_data(data_mode=None):
@@ -26,24 +37,24 @@ def load_bidask_data(data_mode=None):
             - 'ask_times', 'bid_times': Time arrays
             - 'ask_times_without', 'bid_times_without': Time arrays for without scenario
     """
-    data_base = os.path.join(SCRIPT_DIR, 'data', 'double', data_mode) if data_mode else DATA_BASE
+    data_base = data_dir(__file__, 'double', data_mode) if data_mode else DATA_BASE
     # Load times
-    ask_times = np.load(f'{data_base}/with/ask_times.npy')
-    bid_times = np.load(f'{data_base}/with/bid_times.npy')
-    ask_times_without = np.load(f'{data_base}/without/ask_times.npy')
-    bid_times_without = np.load(f'{data_base}/without/bid_times.npy')
+    ask_times = np.load(data_base / 'with' / 'ask_times.npy')
+    bid_times = np.load(data_base / 'with' / 'bid_times.npy')
+    ask_times_without = np.load(data_base / 'without' / 'ask_times.npy')
+    bid_times_without = np.load(data_base / 'without' / 'bid_times.npy')
 
     # Load impact paths (n_times x n_simulations)
-    ask_impact_with = np.load(f'{data_base}/with/ask_impact_paths.npy')
-    ask_impact_without = np.load(f'{data_base}/without/ask_impact_paths.npy')
-    bid_impact_with = np.load(f'{data_base}/with/bid_impact_paths.npy')
-    bid_impact_without = np.load(f'{data_base}/without/bid_impact_paths.npy')
+    ask_impact_with = np.load(data_base / 'with' / 'ask_impact_paths.npy')
+    ask_impact_without = np.load(data_base / 'without' / 'ask_impact_paths.npy')
+    bid_impact_with = np.load(data_base / 'with' / 'bid_impact_paths.npy')
+    bid_impact_without = np.load(data_base / 'without' / 'bid_impact_paths.npy')
 
     # Load queue paths (n_times x (1 + n_simulations))
-    ask_queue_with = np.load(f'{data_base}/with/ask_queue_paths.npy')
-    ask_queue_without = np.load(f'{data_base}/without/ask_queue_paths.npy')
-    bid_queue_with = np.load(f'{data_base}/with/bid_queue_paths.npy')
-    bid_queue_without = np.load(f'{data_base}/without/bid_queue_paths.npy')
+    ask_queue_with = np.load(data_base / 'with' / 'ask_queue_paths.npy')
+    ask_queue_without = np.load(data_base / 'without' / 'ask_queue_paths.npy')
+    bid_queue_with = np.load(data_base / 'with' / 'bid_queue_paths.npy')
+    bid_queue_without = np.load(data_base / 'without' / 'bid_queue_paths.npy')
 
     n_sims_with = ask_impact_with.shape[1]
     n_sims_without = ask_impact_without.shape[1]
@@ -158,17 +169,11 @@ def plot_dual_queue_shades(ask_df, bid_df, ask_sim_col, bid_sim_col,
 
     ax.set_xlabel('Time')
     ax.set_ylabel('Queue Size')
-    if include_title:
-        ax.set_title(title)
+    maybe_set_title(ax, title, include_title)
     ax.legend(loc='best')
     plt.tight_layout()
 
-    if save_path:
-        fig.savefig(save_path, dpi=150, bbox_inches='tight')
-        plt.close(fig)
-        print(f"Saved: {save_path}")
-    else:
-        plt.show()
+    save_or_show(fig, save_path, dpi=150)
 
 
 def plot_impact_shades(df, title, label='Price Impact', color='green',
@@ -195,17 +200,11 @@ def plot_impact_shades(df, title, label='Price Impact', color='green',
     ax.axhline(y=0, color='black', linestyle=':', alpha=0.5)
     ax.set_xlabel('Time')
     ax.set_ylabel(label)
-    if include_title:
-        ax.set_title(title)
+    maybe_set_title(ax, title, include_title)
     ax.legend()
     plt.tight_layout()
 
-    if save_path:
-        fig.savefig(save_path, dpi=150, bbox_inches='tight')
-        plt.close(fig)
-        print(f"Saved: {save_path}")
-    else:
-        plt.show()
+    save_or_show(fig, save_path, dpi=150)
 
 
 def plot_triple_impact(ask_df, bid_df, title_prefix, scenario='with',
@@ -302,17 +301,11 @@ def plot_impact_difference(ask_df, bid_df, title, save_path=None, include_title=
     ax.axhline(y=0, color='black', linestyle=':', alpha=0.5)
     ax.set_xlabel('Time')
     ax.set_ylabel('Price Impact (Ask - Bid)')
-    if include_title:
-        ax.set_title(title)
+    maybe_set_title(ax, title, include_title)
     ax.legend()
     plt.tight_layout()
 
-    if save_path:
-        fig.savefig(save_path, dpi=150, bbox_inches='tight')
-        plt.close(fig)
-        print(f"Saved: {save_path}")
-    else:
-        plt.show()
+    save_or_show(fig, save_path, dpi=150)
 
 
 def plot_dashboard(data, save_path=None, include_title=False):
@@ -360,11 +353,7 @@ def plot_dashboard(data, save_path=None, include_title=False):
 
     plt.tight_layout()
 
-    if save_path:
-        fig.savefig(save_path, dpi=150, bbox_inches='tight')
-        plt.close(fig)
-    else:
-        plt.show()
+    save_or_show(fig, save_path, dpi=150)
 
 
 def _plot_queue_panel(ax, ask_df, bid_df, sim_prefix_a, sim_prefix_b,
@@ -393,8 +382,7 @@ def _plot_queue_panel(ax, ask_df, bid_df, sim_prefix_a, sim_prefix_b,
 
     ax.set_xlabel('Time')
     ax.set_ylabel('Queue Size')
-    if include_title:
-        ax.set_title(title)
+    maybe_set_title(ax, title, include_title)
     ax.legend(loc='best', fontsize=8)
 
 
@@ -426,8 +414,7 @@ def _plot_individual_impact_panel(ax, ask_df, bid_df, title, include_title=False
     ax.axhline(0, color='black', ls=':', alpha=0.5)
     ax.set_xlabel('Time')
     ax.set_ylabel('Impact')
-    if include_title:
-        ax.set_title(title)
+    maybe_set_title(ax, title, include_title)
     ax.legend(loc='best', fontsize=8)
 
 
@@ -450,8 +437,7 @@ def _plot_impact_panel(ax, ask_df, bid_df, title, include_title=False):
     ax.axhline(0, color='black', ls=':', alpha=0.5)
     ax.set_xlabel('Time')
     ax.set_ylabel('Impact (Ask - Bid)')
-    if include_title:
-        ax.set_title(title)
+    maybe_set_title(ax, title, include_title)
     ax.legend(loc='best', fontsize=8)
 
 
@@ -461,8 +447,7 @@ def generate_all_plots(data_mode=None, meta_end=None, include_title=False):
     print("Loading bid-ask simulation data...")
     data = load_bidask_data(data_mode)
 
-    image_dir = os.path.join(SCRIPT_DIR, 'images')
-    os.makedirs(image_dir, exist_ok=True)
+    image_dir = default_image_dir(__file__, 'images_double')
 
     print("\nGenerating plots...")
 
@@ -477,7 +462,7 @@ def generate_all_plots(data_mode=None, meta_end=None, include_title=False):
         title='Bid-Ask Queues: Counterfactual given base queue q',
         ask_ref_col='q_a',
         bid_ref_col='q_b',
-        save_path=os.path.join(image_dir, 'bidask_queue_given_q.png'),
+        save_path=image_dir / 'bidask_queue_given_q.png',
         include_title=include_title,
     )
 
@@ -490,7 +475,7 @@ def generate_all_plots(data_mode=None, meta_end=None, include_title=False):
         title='Bid-Ask Queues: Counterfactual given impacted queue q̄',
         ask_ref_col='bar_q_a',
         bid_ref_col='bar_q_b',
-        save_path=os.path.join(image_dir, 'bidask_queue_given_qbar.png'),
+        save_path=image_dir / 'bidask_queue_given_qbar.png',
         include_title=include_title,
     )
 
@@ -501,7 +486,7 @@ def generate_all_plots(data_mode=None, meta_end=None, include_title=False):
         data['ask_impact_with'],
         data['bid_impact_with'],
         title='Total Price Impact (Ask - Bid) given base queue q',
-        save_path=os.path.join(image_dir, 'bidask_impact_given_q.png'),
+        save_path=image_dir / 'bidask_impact_given_q.png',
         include_title=include_title,
     )
 
@@ -509,7 +494,7 @@ def generate_all_plots(data_mode=None, meta_end=None, include_title=False):
         data['ask_impact_without'],
         data['bid_impact_without'],
         title='Total Price Impact (Ask - Bid) given impacted queue q̄',
-        save_path=os.path.join(image_dir, 'bidask_impact_given_qbar.png'),
+        save_path=image_dir / 'bidask_impact_given_qbar.png',
         include_title=include_title,
     )
 
@@ -520,7 +505,7 @@ def generate_all_plots(data_mode=None, meta_end=None, include_title=False):
         data['ask_impact_with'],
         title='Ask Side Impact I^a(t) given base queue q',
         color='blue',
-        save_path=os.path.join(image_dir, 'ask_impact_given_q.png'),
+        save_path=image_dir / 'ask_impact_given_q.png',
         include_title=include_title,
     )
 
@@ -528,7 +513,7 @@ def generate_all_plots(data_mode=None, meta_end=None, include_title=False):
         data['bid_impact_with'],
         title='Bid Side Impact I^b(t) given base queue q',
         color='orange',
-        save_path=os.path.join(image_dir, 'bid_impact_given_q.png'),
+        save_path=image_dir / 'bid_impact_given_q.png',
         include_title=include_title,
     )
 
@@ -536,7 +521,7 @@ def generate_all_plots(data_mode=None, meta_end=None, include_title=False):
         data['ask_impact_without'],
         title='Ask Side Impact I^a(t) given impacted queue q̄',
         color='blue',
-        save_path=os.path.join(image_dir, 'ask_impact_given_qbar.png'),
+        save_path=image_dir / 'ask_impact_given_qbar.png',
         include_title=include_title,
     )
 
@@ -544,7 +529,7 @@ def generate_all_plots(data_mode=None, meta_end=None, include_title=False):
         data['bid_impact_without'],
         title='Bid Side Impact I^b(t) given impacted queue q̄',
         color='orange',
-        save_path=os.path.join(image_dir, 'bid_impact_given_qbar.png'),
+        save_path=image_dir / 'bid_impact_given_qbar.png',
         include_title=include_title,
     )
 

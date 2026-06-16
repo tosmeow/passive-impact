@@ -7,6 +7,7 @@ Extends passive impact to a full bid-ask queue pair. A limit-order metaorder is 
 - **Bid-ask queues**: Independent dynamics on each side, same affine intensities as single queue
 - **Market orders**: Independent Hawkes processes $N^a$, $N^b$ with identical parameters
 - **Metaorder**: Limit orders on the ask side only
+- **Impact scale**: normalized passive impact multiplied by `c_kappa_effective = -0.00001713`
 - **Paths**: 500 conditional simulations, horizon $T = 100$s
 
 ## Results
@@ -45,3 +46,5 @@ cargo run --release --bin double_queue_efficient_with_us
 cargo run --release --bin double_queue_efficient_without_us
 python plot_utils.py
 ```
+
+Override the impact scale with `C_KAPPA_EFFECTIVE=<value> cargo run --release --bin ...`.

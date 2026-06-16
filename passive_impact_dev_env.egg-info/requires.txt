@@ -1,9 +1,0 @@
-
-[dev]
-maturin<2.0,>=1.5
-pytest>=8
-jupyter>=1
-ipykernel>=6
-nbconvert>=7
-pyarrow>=14
-scipy>=1.10

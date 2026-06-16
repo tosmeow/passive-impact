@@ -57,3 +57,68 @@ def test_passive_impact_with_without_use_opposite_conditioning_paths():
         with_result["queue_paths"][:, 0],
         without_result["queue_paths"][:, 0],
     )
+
+
+def test_passive_impact_scales_by_c_kappa_effective():
+    base_kwargs = dict(
+        time_horizon=3.0,
+        n_simulations=2,
+        initial_queue_size=200,
+        mode="single",
+        counterfactual=False,
+        metaorder=8,
+        metaorder_window=(0.1, 2.5),
+        seed=42,
+    )
+
+    normalized = run(PassiveImpactConfig(**base_kwargs, c_kappa_effective=1.0))
+    scaled = run(PassiveImpactConfig(**base_kwargs, c_kappa_effective=-0.25))
+
+    np.testing.assert_array_equal(normalized["times"], scaled["times"])
+    np.testing.assert_array_equal(normalized["queue_paths"], scaled["queue_paths"])
+    np.testing.assert_allclose(
+        scaled["impact_paths"],
+        -0.25 * normalized["impact_paths"],
+    )
+
+
+def test_passive_impact_bid_side_flips_impact_sign():
+    base_kwargs = dict(
+        time_horizon=3.0,
+        n_simulations=2,
+        initial_queue_size=200,
+        mode="single",
+        counterfactual=False,
+        metaorder=8,
+        metaorder_window=(0.1, 2.5),
+        seed=42,
+    )
+
+    ask = run(PassiveImpactConfig(**base_kwargs, side="ask"))
+    bid = run(PassiveImpactConfig(**base_kwargs, side="bid"))
+
+    np.testing.assert_array_equal(ask["times"], bid["times"])
+    np.testing.assert_array_equal(ask["queue_paths"], bid["queue_paths"])
+    np.testing.assert_allclose(bid["impact_paths"], -ask["impact_paths"])
+
+
+def test_passive_impact_rejects_nonfinite_c_kappa_effective():
+    cfg = PassiveImpactConfig(time_horizon=1.0, n_simulations=1, c_kappa_effective=np.nan)
+
+    try:
+        run(cfg)
+    except ValueError as exc:
+        assert "c_kappa_effective" in str(exc)
+    else:
+        raise AssertionError("expected nonfinite c_kappa_effective to be rejected")
+
+
+def test_passive_impact_rejects_unknown_side():
+    cfg = PassiveImpactConfig(time_horizon=1.0, n_simulations=1, side="middle")
+
+    try:
+        run(cfg)
+    except ValueError as exc:
+        assert "side" in str(exc)
+    else:
+        raise AssertionError("expected unknown side to be rejected")

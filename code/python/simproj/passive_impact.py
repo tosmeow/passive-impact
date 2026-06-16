@@ -22,6 +22,7 @@ class PassiveImpactConfig:
     initial_queue_size: int = 200
     mode: str = "single"            # "single" | "double"
     counterfactual: bool = False     # False: with us | True: without us
+    side: str = "ask"                # "ask" keeps sign; "bid" flips impact sign
 
     # Hawkes
     mu: float = 1.0
@@ -33,6 +34,10 @@ class PassiveImpactConfig:
     b_l: float = -0.275
     a_c: float = 2.0
     b_c: float = 0.125
+
+    # Effective price-impact slope multiplying the normalized passive impact.
+    # This is the reduced-form analogue of c_kappa / propagator_gamma.
+    c_kappa_effective: float = 1.0
 
     # Metaorder: int → evenly-spaced inside metaorder_window;
     #            list[float] / np.ndarray → explicit times (window ignored)
@@ -53,6 +58,15 @@ def _make_meta_orders(cfg: PassiveImpactConfig):
         return _native.create_meta_orders(cfg.metaorder, *cfg.metaorder_window)
     times = np.asarray(cfg.metaorder, dtype=np.float64)
     return _native.create_meta_orders_from_times(times, target_dim=0, total_dims=3)
+
+
+def _side_sign(side: str) -> float:
+    normalized = side.lower()
+    if normalized == "ask":
+        return 1.0
+    if normalized == "bid":
+        return -1.0
+    raise ValueError(f"side must be 'ask' or 'bid'; got {side!r}")
 
 
 def _run_single_direction(cfg, direction: str) -> dict:
@@ -138,6 +152,8 @@ def _run_single_direction(cfg, direction: str) -> dict:
     else:
         raise ValueError(f"direction must be 'with' or 'without'; got {direction!r}")
 
+    impact_paths *= float(cfg.c_kappa_effective) * _side_sign(cfg.side)
+
     return {
         "times": np.asarray(market_times, dtype=np.float64),
         "queue_paths": queue_paths,
@@ -154,6 +170,9 @@ def run(config: PassiveImpactConfig) -> dict:
     """
     if config.mode not in ("single", "double"):
         raise ValueError(f"mode must be 'single' or 'double'; got {config.mode!r}")
+    _side_sign(config.side)
+    if not np.isfinite(float(config.c_kappa_effective)):
+        raise ValueError("c_kappa_effective must be finite")
     if config.mode == "double":
         raise NotImplementedError("double-queue facade — wired in a follow-up")
     return _run_single_direction(config, "without" if config.counterfactual else "with")

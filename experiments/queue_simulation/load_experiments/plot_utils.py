@@ -1,12 +1,25 @@
 """Plot utilities for queue-only counterfactual experiments."""
 import argparse
-import os
+import sys
+from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+if __package__ in {None, ""}:
+    repo_root = Path(__file__).resolve().parents[3]
+    if str(repo_root) not in sys.path:
+        sys.path.insert(0, str(repo_root))
+
+from experiments.plot_utils_common import (
+    add_title_argument,
+    maybe_set_title,
+    save_or_show,
+    script_dir,
+)
+
+SCRIPT_DIR = script_dir(__file__)
 
 
 def _queue_layout(counterfactual=False):
@@ -31,25 +44,25 @@ def _queue_layout(counterfactual=False):
 
 def _default_output_dir(counterfactual):
     dirname = 'images_without_us' if counterfactual else 'images'
-    return os.path.join(SCRIPT_DIR, dirname)
+    return Path(SCRIPT_DIR) / dirname
 
 
 def load_data(mode='single', data_mode='efficient', counterfactual=False, data_base=None):
     if data_base is None:
-        base_root = os.path.join(SCRIPT_DIR, 'data', mode, data_mode)
+        base_root = Path(SCRIPT_DIR) / 'data' / mode / data_mode
         scenario = 'without' if counterfactual else 'with'
-        scenario_base = os.path.join(base_root, scenario)
+        scenario_base = base_root / scenario
         if (
-            os.path.exists(os.path.join(scenario_base, 'times.npy'))
-            and os.path.exists(os.path.join(scenario_base, 'queue_paths.npy'))
+            (scenario_base / 'times.npy').exists()
+            and (scenario_base / 'queue_paths.npy').exists()
         ):
             base = scenario_base
         else:
             base = base_root
     else:
         base = data_base
-    times = np.load(f'{base}/times.npy')
-    queue = np.load(f'{base}/queue_paths.npy')
+    times = np.load(Path(base) / 'times.npy')
+    queue = np.load(Path(base) / 'queue_paths.npy')
     n_sims = queue.shape[1] - 1
     layout = _queue_layout(counterfactual)
     df = pd.DataFrame(
@@ -81,17 +94,10 @@ def plot_queue_shades(
         ax.axvline(x=meta_end, color='green', linestyle='--', label='End of metaorder')
     ax.set_xlabel('Time (seconds)')
     ax.set_ylabel('Queue size')
-    if include_title:
-        ax.set_title(layout['title'])
+    maybe_set_title(ax, layout['title'], include_title)
     ax.legend()
     plt.tight_layout()
-    if save_path:
-        os.makedirs(os.path.dirname(save_path) or '.', exist_ok=True)
-        fig.savefig(save_path, dpi=300, bbox_inches='tight')
-        plt.close(fig)
-        print(f'Saved: {save_path}')
-    else:
-        plt.show()
+    save_or_show(fig, save_path, dpi=300)
 
 
 def generate_all_plots(
@@ -109,12 +115,12 @@ def generate_all_plots(
         counterfactual=counterfactual,
         data_base=data_base,
     )
-    output_dir = output_dir or _default_output_dir(counterfactual)
+    output_dir = Path(output_dir) if output_dir is not None else _default_output_dir(counterfactual)
     plot_queue_shades(
         df,
         counterfactual=counterfactual,
         meta_end=meta_end,
-        save_path=os.path.join(output_dir, f'queue_paths_{mode}.png'),
+        save_path=output_dir / f'queue_paths_{mode}.png',
         include_title=include_title,
     )
 
@@ -130,12 +136,7 @@ def parse_args():
                    help='Directory containing times.npy and queue_paths.npy.')
     p.add_argument('--output-dir', default=None,
                    help='Directory where images should be written.')
-    title_group = p.add_mutually_exclusive_group()
-    title_group.add_argument('--title', dest='include_title', action='store_true',
-                             help='Draw titles on generated PNG images.')
-    title_group.add_argument('--no-title', dest='include_title', action='store_false',
-                             help='Do not draw titles on generated PNG images.')
-    p.set_defaults(include_title=False)
+    add_title_argument(p, default=False)
     return p.parse_args()
 
 

@@ -11,6 +11,7 @@ if __package__ in {None, ""}:
     repo_root = Path(__file__).resolve().parents[3]
     if str(repo_root) not in sys.path:
         sys.path.insert(0, str(repo_root))
+    from experiments.plot_utils_common import add_title_argument
     from experiments.impact_cost.load_experiments.lifecycle_passive_cost import (
         DEFAULT_CONFIG_PATH,
         _plot_lifecycle_paths,
@@ -18,6 +19,7 @@ if __package__ in {None, ""}:
         load_lifecycle_config,
     )
 else:
+    from ...plot_utils_common import add_title_argument
     from .lifecycle_passive_cost import (
         DEFAULT_CONFIG_PATH,
         _plot_lifecycle_paths,
@@ -88,20 +90,7 @@ def _read_csv(path: Path) -> pd.DataFrame:
 def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--config", default=str(DEFAULT_CONFIG_PATH))
-    title_group = parser.add_mutually_exclusive_group()
-    title_group.add_argument(
-        "--title",
-        dest="include_title",
-        action="store_true",
-        help="Draw titles on generated PNG images.",
-    )
-    title_group.add_argument(
-        "--no-title",
-        dest="include_title",
-        action="store_false",
-        help="Do not draw titles on generated PNG images.",
-    )
-    parser.set_defaults(include_title=False)
+    add_title_argument(parser, default=False)
     return parser.parse_args()
 
 
