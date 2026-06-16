@@ -8,6 +8,7 @@ Usage:
     python plot_utils.py --model propagator
     python plot_utils.py --model hybrid
     python plot_utils.py --model propagator --counterfactual
+    python plot_utils.py --model propagator --no-title
 """
 import argparse
 
@@ -43,10 +44,19 @@ def parse_args():
                    help='Directory where images should be written.')
     p.add_argument('--bar-kappa', type=float, default=None,
                    help='Hybrid-only value used when data-base does not contain bar_kappa.npy.')
+    p.add_argument('--no-title', action='store_true',
+                   help='Do not draw titles on generated PNG images.')
     return p.parse_args()
 
 
-def generate_all_plots(model, counterfactual=False, data_base=None, output_dir=None, bar_kappa=None):
+def generate_all_plots(
+    model,
+    counterfactual=False,
+    data_base=None,
+    output_dir=None,
+    bar_kappa=None,
+    include_title=True,
+):
     """Generate all plots for the given model.
 
     Args:
@@ -57,6 +67,7 @@ def generate_all_plots(model, counterfactual=False, data_base=None, output_dir=N
             counterfactual=counterfactual,
             data_base=data_base,
             output_dir=output_dir,
+            include_title=include_title,
         )
     else:
         gen_hybrid(
@@ -64,6 +75,7 @@ def generate_all_plots(model, counterfactual=False, data_base=None, output_dir=N
             data_base=data_base,
             output_dir=output_dir,
             bar_kappa=bar_kappa,
+            include_title=include_title,
         )
 
 
@@ -75,4 +87,5 @@ if __name__ == '__main__':
         data_base=args.data_base,
         output_dir=args.output_dir,
         bar_kappa=args.bar_kappa,
+        include_title=not args.no_title,
     )

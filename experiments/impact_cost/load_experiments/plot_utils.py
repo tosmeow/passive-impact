@@ -26,7 +26,11 @@ else:
     )
 
 
-def generate_all_plots(config_path: str | Path = DEFAULT_CONFIG_PATH) -> list[Path]:
+def generate_all_plots(
+    config_path: str | Path = DEFAULT_CONFIG_PATH,
+    *,
+    include_title: bool = True,
+) -> list[Path]:
     """Regenerate all canonical lifecycle plots from saved output tables."""
     cfg = load_lifecycle_config(config_path)
     data_dir = Path(cfg.output_dir)
@@ -51,8 +55,16 @@ def generate_all_plots(config_path: str | Path = DEFAULT_CONFIG_PATH) -> list[Pa
         impact_summary,
         active_summary,
         cfg,
+        include_title=include_title,
     )
-    _plot_representative_step_paths(step_path, samples, jumps, path_summary, cfg)
+    _plot_representative_step_paths(
+        step_path,
+        samples,
+        jumps,
+        path_summary,
+        cfg,
+        include_title=include_title,
+    )
     _plot_representative_step_paths(
         shared_step_path,
         samples,
@@ -60,6 +72,7 @@ def generate_all_plots(config_path: str | Path = DEFAULT_CONFIG_PATH) -> list[Pa
         path_summary,
         cfg,
         shared_y=True,
+        include_title=include_title,
     )
     return [plot_path, step_path, shared_step_path]
 
@@ -75,15 +88,19 @@ def _read_csv(path: Path) -> pd.DataFrame:
 def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--config", default=str(DEFAULT_CONFIG_PATH))
+    parser.add_argument(
+        "--no-title",
+        action="store_true",
+        help="Do not draw titles on generated PNG images.",
+    )
     return parser.parse_args()
 
 
 def main() -> None:
     args = _parse_args()
-    for path in generate_all_plots(args.config):
+    for path in generate_all_plots(args.config, include_title=not args.no_title):
         print(path)
 
 
 if __name__ == "__main__":
     main()
-

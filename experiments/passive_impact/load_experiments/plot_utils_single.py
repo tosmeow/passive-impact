@@ -15,6 +15,10 @@ def parse_args():
         '--meta-end', type=float, default=80.0,
         help='Time at which the metaorder ends, drawn as a vertical line (default: 80.0).'
     )
+    parser.add_argument(
+        '--no-title', action='store_true',
+        help='Do not draw titles on generated PNG images.'
+    )
     return parser.parse_args()
 
 
@@ -63,7 +67,16 @@ def load_data(data_mode):
     return path_with, path_without, queue_with_df, queue_without_df
 
 
-def plot_queue_shades(df, sim_col, title, label, meta_end=None, ref_col=None, save_path=None):
+def plot_queue_shades(
+    df,
+    sim_col,
+    title,
+    label,
+    meta_end=None,
+    ref_col=None,
+    save_path=None,
+    include_title=True,
+):
     fig, ax = plt.subplots(figsize=(12, 6))
 
     sim_cols = [col for col in df.columns if col.startswith(sim_col)]
@@ -82,7 +95,8 @@ def plot_queue_shades(df, sim_col, title, label, meta_end=None, ref_col=None, sa
 
     ax.set_xlabel('Time (seconds)')
     ax.set_ylabel(label)
-    ax.set_title(title)
+    if include_title:
+        ax.set_title(title)
     ax.legend()
     plt.tight_layout()
 
@@ -94,7 +108,7 @@ def plot_queue_shades(df, sim_col, title, label, meta_end=None, ref_col=None, sa
         plt.show()
 
 
-def generate_all_plots(data_mode, meta_end):
+def generate_all_plots(data_mode, meta_end, include_title=True):
     """Generate and save all four analysis plots."""
 
     path_with, path_without, queue_with, queue_without = load_data(data_mode)
@@ -110,7 +124,8 @@ def generate_all_plots(data_mode, meta_end):
         label='Price Impact',
         meta_end=meta_end,
         ref_col=None,
-        save_path='images/impact_given_q.png'
+        save_path='images/impact_given_q.png',
+        include_title=include_title,
     )
 
     plot_queue_shades(
@@ -120,7 +135,8 @@ def generate_all_plots(data_mode, meta_end):
         label='Queue Size',
         meta_end=meta_end,
         ref_col='q',
-        save_path='images/queue_given_q.png'
+        save_path='images/queue_given_q.png',
+        include_title=include_title,
     )
 
     plot_queue_shades(
@@ -130,7 +146,8 @@ def generate_all_plots(data_mode, meta_end):
         label='Price Impact',
         meta_end=meta_end,
         ref_col=None,
-        save_path='images/impact_given_qbar.png'
+        save_path='images/impact_given_qbar.png',
+        include_title=include_title,
     )
 
     plot_queue_shades(
@@ -140,10 +157,11 @@ def generate_all_plots(data_mode, meta_end):
         label='Queue Size',
         meta_end=meta_end,
         ref_col='bar_q',
-        save_path='images/queue_given_qbar.png'
+        save_path='images/queue_given_qbar.png',
+        include_title=include_title,
     )
 
 
 if __name__ == '__main__':
     args = parse_args()
-    generate_all_plots(args.data_mode, args.meta_end)
+    generate_all_plots(args.data_mode, args.meta_end, include_title=not args.no_title)

@@ -92,6 +92,7 @@ def plot_shades(
     ref_col=None,
     save_path=None,
     mean_label='Mean',
+    include_title=True,
 ):
     """Plot individual simulation paths as transparent lines with mean overlay."""
     fig, ax = plt.subplots(figsize=(12, 6))
@@ -115,7 +116,8 @@ def plot_shades(
 
     ax.set_xlabel('Time (seconds)')
     ax.set_ylabel(ylabel)
-    ax.set_title(title)
+    if include_title:
+        ax.set_title(title)
     ax.legend()
     plt.tight_layout()
 
@@ -127,7 +129,14 @@ def plot_shades(
         plt.show()
 
 
-def plot_impact_decomposition(impact_df, is_market, bar_kappa, meta_end=None, save_path=None):
+def plot_impact_decomposition(
+    impact_df,
+    is_market,
+    bar_kappa,
+    meta_end=None,
+    save_path=None,
+    include_title=True,
+):
     """Plot mean impact at market order vs metaorder times to show the two contributions."""
     fig, ax = plt.subplots(figsize=(12, 6))
 
@@ -150,7 +159,8 @@ def plot_impact_decomposition(impact_df, is_market, bar_kappa, meta_end=None, sa
 
     ax.set_xlabel('Time (seconds)')
     ax.set_ylabel('Mean Impact MI(t)')
-    ax.set_title('Hybrid Aggressive Impact by Event Type')
+    if include_title:
+        ax.set_title('Hybrid Aggressive Impact by Event Type')
     ax.legend()
     plt.tight_layout()
 
@@ -162,7 +172,13 @@ def plot_impact_decomposition(impact_df, is_market, bar_kappa, meta_end=None, sa
         plt.show()
 
 
-def plot_queue_diff(queue_df, counterfactual=False, meta_end=None, save_path=None):
+def plot_queue_diff(
+    queue_df,
+    counterfactual=False,
+    meta_end=None,
+    save_path=None,
+    include_title=True,
+):
     """Plot the queue difference bar_q - q over time with quantile bands."""
     fig, ax = plt.subplots(figsize=(12, 6))
 
@@ -185,7 +201,8 @@ def plot_queue_diff(queue_df, counterfactual=False, meta_end=None, save_path=Non
 
     ax.set_xlabel('Time (seconds)')
     ax.set_ylabel('Queue difference $\\bar{q} - q$')
-    ax.set_title('Queue depletion from aggressive meta orders')
+    if include_title:
+        ax.set_title('Queue depletion from aggressive meta orders')
     ax.legend()
     plt.tight_layout()
 
@@ -197,7 +214,13 @@ def plot_queue_diff(queue_df, counterfactual=False, meta_end=None, save_path=Non
         plt.show()
 
 
-def generate_all_plots(counterfactual=False, data_base=None, output_dir=None, bar_kappa=None):
+def generate_all_plots(
+    counterfactual=False,
+    data_base=None,
+    output_dir=None,
+    bar_kappa=None,
+    include_title=True,
+):
     """Generate and save all analysis plots."""
     impact_df, queue_df, is_market, meta_end, bar_kappa = load_data(
         counterfactual=counterfactual,
@@ -222,7 +245,8 @@ def generate_all_plots(counterfactual=False, data_base=None, output_dir=None, ba
         title=r'Aggressive Market Impact MI(t)',
         ylabel='Price Impact',
         meta_end=meta_end,
-        save_path=os.path.join(output_dir, 'impact_paths.png')
+        save_path=os.path.join(output_dir, 'impact_paths.png'),
+        include_title=include_title,
     )
 
     plot_shades(
@@ -234,6 +258,7 @@ def generate_all_plots(counterfactual=False, data_base=None, output_dir=None, ba
         ref_col=layout['ref_col'],
         save_path=os.path.join(output_dir, 'queue_paths.png'),
         mean_label=layout['mean_label'],
+        include_title=include_title,
     )
 
     plot_impact_decomposition(
@@ -241,14 +266,16 @@ def generate_all_plots(counterfactual=False, data_base=None, output_dir=None, ba
         is_market,
         bar_kappa,
         meta_end=meta_end,
-        save_path=os.path.join(output_dir, 'impact_by_event_type.png')
+        save_path=os.path.join(output_dir, 'impact_by_event_type.png'),
+        include_title=include_title,
     )
 
     plot_queue_diff(
         queue_df,
         counterfactual=counterfactual,
         meta_end=meta_end,
-        save_path=os.path.join(output_dir, 'queue_diff.png')
+        save_path=os.path.join(output_dir, 'queue_diff.png'),
+        include_title=include_title,
     )
 
 

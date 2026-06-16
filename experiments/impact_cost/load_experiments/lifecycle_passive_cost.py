@@ -89,7 +89,11 @@ class LifecyclePassiveCostConfig:
     b_c: float = 0.0000989
 
 
-def run_lifecycle_passive_cost_pipeline(cfg: LifecyclePassiveCostConfig) -> dict[str, Any]:
+def run_lifecycle_passive_cost_pipeline(
+    cfg: LifecyclePassiveCostConfig,
+    *,
+    include_title: bool = True,
+) -> dict[str, Any]:
     """Run looped passive lifecycle cost paths and write outputs."""
     _validate_config(cfg)
     output_dir = Path(cfg.output_dir)
@@ -352,6 +356,7 @@ def run_lifecycle_passive_cost_pipeline(cfg: LifecyclePassiveCostConfig) -> dict
         impact_summary,
         active_summary,
         cfg,
+        include_title=include_title,
     )
     _plot_representative_step_paths(
         image_dir / "lifecycle_representative_cost_steps.png",
@@ -359,6 +364,7 @@ def run_lifecycle_passive_cost_pipeline(cfg: LifecyclePassiveCostConfig) -> dict
         jumps,
         path_summary,
         cfg,
+        include_title=include_title,
     )
     _plot_representative_step_paths(
         image_dir / "lifecycle_representative_cost_steps_shared_y.png",
@@ -367,6 +373,7 @@ def run_lifecycle_passive_cost_pipeline(cfg: LifecyclePassiveCostConfig) -> dict
         path_summary,
         cfg,
         shared_y=True,
+        include_title=include_title,
     )
 
     with open(output_dir / "lifecycle_passive_cost_config.json", "w", encoding="utf-8") as f:
@@ -533,6 +540,8 @@ def _plot_lifecycle_paths(
     impact_summary: pd.DataFrame,
     _active_summary: pd.DataFrame,
     cfg: LifecyclePassiveCostConfig,
+    *,
+    include_title: bool = True,
 ) -> None:
     _setup_matplotlib()
     import matplotlib.pyplot as plt
@@ -563,7 +572,8 @@ def _plot_lifecycle_paths(
 
     ax.axhline(0.0, color="black", linewidth=0.8, alpha=0.45)
     ax.set_xlim(0.0, float(cfg.horizon_seconds))
-    ax.set_title("Looped passive lifecycle mean impact cost")
+    if include_title:
+        ax.set_title("Looped passive lifecycle mean impact cost")
     ax.set_xlabel("seconds from first post")
     ax.set_ylabel("cumulative impact cost")
     ax_impact.set_ylabel("price impact")
@@ -585,6 +595,7 @@ def _plot_representative_step_paths(
     *,
     n_windows: int = 3,
     shared_y: bool = False,
+    include_title: bool = True,
 ) -> None:
     _setup_matplotlib()
     import matplotlib.pyplot as plt
@@ -648,15 +659,16 @@ def _plot_representative_step_paths(
             ax.set_ylim(min(0.0, -0.04 * y_max), 1.08 * y_max)
         ax.grid(True, alpha=0.25)
         ax.set_ylabel("cost")
-        ax.set_title(
-            "window {episode}, policy path {policy}, fills {fills}, final {final:.6g}".format(
-                episode=episode_id,
-                policy=policy_path_id,
-                fills=int(row.n_filled_orders),
-                final=float(row.final_cost),
-            ),
-            fontsize=10,
-        )
+        if include_title:
+            ax.set_title(
+                "window {episode}, policy path {policy}, fills {fills}, final {final:.6g}".format(
+                    episode=episode_id,
+                    policy=policy_path_id,
+                    fills=int(row.n_filled_orders),
+                    final=float(row.final_cost),
+                ),
+                fontsize=10,
+            )
         ax.legend(loc="best")
 
     axes[-1].set_xlabel("seconds from first post")
@@ -664,7 +676,8 @@ def _plot_representative_step_paths(
     title = "Representative individual lifecycle cost paths"
     if shared_y:
         title += " (shared y-axis)"
-    fig.suptitle(title, y=0.995)
+    if include_title:
+        fig.suptitle(title, y=0.995)
     fig.tight_layout()
     fig.savefig(path, dpi=170)
     plt.close(fig)
@@ -880,6 +893,11 @@ def _parse_args() -> argparse.Namespace:
         default=None,
         help="Override the config and randomly sample candidate episodes.",
     )
+    parser.add_argument(
+        "--no-title",
+        action="store_true",
+        help="Do not draw titles on generated PNG images.",
+    )
     return parser.parse_args()
 
 
@@ -896,7 +914,10 @@ def main() -> None:
             "randomize_episodes": args.randomize_episodes,
         },
     )
-    summary = run_lifecycle_passive_cost_pipeline(cfg)
+    summary = run_lifecycle_passive_cost_pipeline(
+        cfg,
+        include_title=not args.no_title,
+    )
     print(
         json.dumps(
             {k: str(v) if isinstance(v, Path) else v for k, v in summary.items()},

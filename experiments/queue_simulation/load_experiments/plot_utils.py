@@ -45,7 +45,13 @@ def load_data(mode='single', data_mode='efficient', counterfactual=False, data_b
     return df
 
 
-def plot_queue_shades(df, counterfactual=False, meta_end=None, save_path=None):
+def plot_queue_shades(
+    df,
+    counterfactual=False,
+    meta_end=None,
+    save_path=None,
+    include_title=True,
+):
     fig, ax = plt.subplots(figsize=(12, 6))
     layout = _queue_layout(counterfactual)
     sim_cols = [c for c in df.columns if c.startswith(layout['sim_prefix'])]
@@ -60,7 +66,8 @@ def plot_queue_shades(df, counterfactual=False, meta_end=None, save_path=None):
         ax.axvline(x=meta_end, color='green', linestyle='--', label='End of metaorder')
     ax.set_xlabel('Time (seconds)')
     ax.set_ylabel('Queue size')
-    ax.set_title(layout['title'])
+    if include_title:
+        ax.set_title(layout['title'])
     ax.legend()
     plt.tight_layout()
     if save_path:
@@ -79,6 +86,7 @@ def generate_all_plots(
     counterfactual=False,
     data_base=None,
     output_dir=None,
+    include_title=True,
 ):
     df = load_data(
         mode,
@@ -92,6 +100,7 @@ def generate_all_plots(
         counterfactual=counterfactual,
         meta_end=meta_end,
         save_path=os.path.join(output_dir, f'queue_paths_{mode}.png'),
+        include_title=include_title,
     )
 
 
@@ -106,6 +115,8 @@ def parse_args():
                    help='Directory containing times.npy and queue_paths.npy.')
     p.add_argument('--output-dir', default=None,
                    help='Directory where images should be written.')
+    p.add_argument('--no-title', action='store_true',
+                   help='Do not draw titles on generated PNG images.')
     return p.parse_args()
 
 
@@ -118,4 +129,5 @@ if __name__ == '__main__':
         counterfactual=args.counterfactual,
         data_base=args.data_base,
         output_dir=args.output_dir,
+        include_title=not args.no_title,
     )

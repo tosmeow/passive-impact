@@ -69,3 +69,24 @@ def test_queue_plot_loader_labels_counterfactual_direction(monkeypatch, tmp_path
 
     assert list(queue_with.columns) == ["q", "bar_q_sim_0", "bar_q_sim_1"]
     assert list(queue_without.columns) == ["bar_q", "q_sim_0", "q_sim_1"]
+
+
+def test_queue_plot_can_suppress_title(monkeypatch, tmp_path):
+    module = _load_module(
+        monkeypatch,
+        tmp_path,
+        "queue_plot_utils_no_title_test",
+        "experiments/queue_simulation/load_experiments/plot_utils.py",
+    )
+    df = pd.DataFrame(
+        [[10, 12], [11, 13]],
+        index=pd.Index([0.0, 1.0], name="time"),
+        columns=["q", "bar_q_sim_0"],
+    )
+
+    monkeypatch.setattr(module.plt, "show", lambda: None)
+    module.plot_queue_shades(df, save_path=None, include_title=False)
+
+    ax = module.plt.gcf().axes[0]
+    assert ax.get_title() == ""
+    module.plt.close("all")

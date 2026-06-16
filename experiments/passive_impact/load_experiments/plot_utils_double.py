@@ -110,7 +110,7 @@ def load_bidask_data(data_mode=None):
 
 def plot_dual_queue_shades(ask_df, bid_df, ask_sim_col, bid_sim_col,
                            title, ask_ref_col=None, bid_ref_col=None,
-                           save_path=None):
+                           save_path=None, include_title=True):
     """Plot both ask and bid queues on the same graph with shaded simulations.
 
     Args:
@@ -156,7 +156,8 @@ def plot_dual_queue_shades(ask_df, bid_df, ask_sim_col, bid_sim_col,
 
     ax.set_xlabel('Time')
     ax.set_ylabel('Queue Size')
-    ax.set_title(title)
+    if include_title:
+        ax.set_title(title)
     ax.legend(loc='best')
     plt.tight_layout()
 
@@ -169,7 +170,7 @@ def plot_dual_queue_shades(ask_df, bid_df, ask_sim_col, bid_sim_col,
 
 
 def plot_impact_shades(df, title, label='Price Impact', color='green',
-                       save_path=None):
+                       save_path=None, include_title=True):
     """Plot impact paths with shaded simulations.
 
     Args:
@@ -192,7 +193,8 @@ def plot_impact_shades(df, title, label='Price Impact', color='green',
     ax.axhline(y=0, color='black', linestyle=':', alpha=0.5)
     ax.set_xlabel('Time')
     ax.set_ylabel(label)
-    ax.set_title(title)
+    if include_title:
+        ax.set_title(title)
     ax.legend()
     plt.tight_layout()
 
@@ -205,7 +207,7 @@ def plot_impact_shades(df, title, label='Price Impact', color='green',
 
 
 def plot_triple_impact(ask_df, bid_df, title_prefix, scenario='with',
-                       save_path=None):
+                       save_path=None, include_title=True):
     """Plot the merged price impact (ask - bid) interpolated onto common grid.
 
     The price impact is ask - bid:
@@ -225,7 +227,8 @@ def plot_triple_impact(ask_df, bid_df, title_prefix, scenario='with',
     # Use the merged difference function
     plot_impact_difference(ask_df, bid_df,
                           title=f'{title_prefix} - Total Price Impact (Ask - Bid)',
-                          save_path=save_path)
+                          save_path=save_path,
+                          include_title=include_title)
 
 
 def compute_impact_difference(ask_df, bid_df):
@@ -267,7 +270,7 @@ def compute_impact_difference(ask_df, bid_df):
     return diff_df, common_times
 
 
-def plot_impact_difference(ask_df, bid_df, title, save_path=None):
+def plot_impact_difference(ask_df, bid_df, title, save_path=None, include_title=True):
     """Plot the difference of impacts (Ask - Bid) with all simulations.
 
     Args:
@@ -297,7 +300,8 @@ def plot_impact_difference(ask_df, bid_df, title, save_path=None):
     ax.axhline(y=0, color='black', linestyle=':', alpha=0.5)
     ax.set_xlabel('Time')
     ax.set_ylabel('Price Impact (Ask - Bid)')
-    ax.set_title(title)
+    if include_title:
+        ax.set_title(title)
     ax.legend()
     plt.tight_layout()
 
@@ -309,7 +313,7 @@ def plot_impact_difference(ask_df, bid_df, title, save_path=None):
         plt.show()
 
 
-def plot_dashboard(data, save_path=None):
+def plot_dashboard(data, save_path=None, include_title=True):
     """3x2 dashboard: queues, individual impacts, and combined impact.
 
     Layout:
@@ -323,28 +327,34 @@ def plot_dashboard(data, save_path=None):
     _plot_queue_panel(axes[0, 0], data['ask_queue_with'], data['bid_queue_with'],
                       sim_prefix_a='bar_q_a', sim_prefix_b='bar_q_b',
                       ref_col_a='q_a', ref_col_b='q_b',
-                      title='Queues given base q')
+                      title='Queues given base q',
+                      include_title=include_title)
 
     _plot_queue_panel(axes[0, 1], data['ask_queue_without'], data['bid_queue_without'],
                       sim_prefix_a='q_a_sim', sim_prefix_b='q_b_sim',
                       ref_col_a='bar_q_a', ref_col_b='bar_q_b',
-                      title='Queues given impacted q̄')
+                      title='Queues given impacted q̄',
+                      include_title=include_title)
 
     # ===== Row 1: Individual Ask & Bid impacts =====
     _plot_individual_impact_panel(axes[1, 0],
                                   data['ask_impact_with'], data['bid_impact_with'],
-                                  title='Ask & Bid Impact given base q')
+                                  title='Ask & Bid Impact given base q',
+                                  include_title=include_title)
 
     _plot_individual_impact_panel(axes[1, 1],
                                   data['ask_impact_without'], data['bid_impact_without'],
-                                  title='Ask & Bid Impact given impacted q̄')
+                                  title='Ask & Bid Impact given impacted q̄',
+                                  include_title=include_title)
 
     # ===== Row 2: Combined impact (Ask - Bid) =====
     _plot_impact_panel(axes[2, 0], data['ask_impact_with'], data['bid_impact_with'],
-                       title='Price Impact (Ask − Bid) given base q')
+                       title='Price Impact (Ask − Bid) given base q',
+                       include_title=include_title)
 
     _plot_impact_panel(axes[2, 1], data['ask_impact_without'], data['bid_impact_without'],
-                       title='Price Impact (Ask − Bid) given impacted q̄')
+                       title='Price Impact (Ask − Bid) given impacted q̄',
+                       include_title=include_title)
 
     plt.tight_layout()
 
@@ -356,7 +366,7 @@ def plot_dashboard(data, save_path=None):
 
 
 def _plot_queue_panel(ax, ask_df, bid_df, sim_prefix_a, sim_prefix_b,
-                      ref_col_a, ref_col_b, title):
+                      ref_col_a, ref_col_b, title, include_title=True):
     """Helper: plot queues on a single axis."""
     # Simulation paths (thin, transparent)
     ask_sim_cols = [c for c in ask_df.columns if c.startswith(sim_prefix_a)]
@@ -381,11 +391,12 @@ def _plot_queue_panel(ax, ask_df, bid_df, sim_prefix_a, sim_prefix_b,
 
     ax.set_xlabel('Time')
     ax.set_ylabel('Queue Size')
-    ax.set_title(title)
+    if include_title:
+        ax.set_title(title)
     ax.legend(loc='best', fontsize=8)
 
 
-def _plot_individual_impact_panel(ax, ask_df, bid_df, title):
+def _plot_individual_impact_panel(ax, ask_df, bid_df, title, include_title=True):
     """Helper: plot ask and bid impacts separately on a single axis."""
     ask_sim_cols = [c for c in ask_df.columns if c.startswith('sim_')]
     bid_sim_cols = [c for c in bid_df.columns if c.startswith('sim_')]
@@ -413,11 +424,12 @@ def _plot_individual_impact_panel(ax, ask_df, bid_df, title):
     ax.axhline(0, color='black', ls=':', alpha=0.5)
     ax.set_xlabel('Time')
     ax.set_ylabel('Impact')
-    ax.set_title(title)
+    if include_title:
+        ax.set_title(title)
     ax.legend(loc='best', fontsize=8)
 
 
-def _plot_impact_panel(ax, ask_df, bid_df, title):
+def _plot_impact_panel(ax, ask_df, bid_df, title, include_title=True):
     """Helper: plot merged impact (ask - bid) on a single axis."""
     diff_df, _ = compute_impact_difference(ask_df, bid_df)
     sim_cols = [c for c in diff_df.columns if c.startswith('sim_')]
@@ -436,11 +448,12 @@ def _plot_impact_panel(ax, ask_df, bid_df, title):
     ax.axhline(0, color='black', ls=':', alpha=0.5)
     ax.set_xlabel('Time')
     ax.set_ylabel('Impact (Ask - Bid)')
-    ax.set_title(title)
+    if include_title:
+        ax.set_title(title)
     ax.legend(loc='best', fontsize=8)
 
 
-def generate_all_plots(data_mode=None, meta_end=None):
+def generate_all_plots(data_mode=None, meta_end=None, include_title=True):
     """Generate and save all bid-ask analysis plots."""
 
     print("Loading bid-ask simulation data...")
@@ -461,7 +474,8 @@ def generate_all_plots(data_mode=None, meta_end=None):
         title='Bid-Ask Queues: Counterfactual given base queue q',
         ask_ref_col='q_a',
         bid_ref_col='q_b',
-        save_path='images/bidask_queue_given_q.png'
+        save_path='images/bidask_queue_given_q.png',
+        include_title=include_title,
     )
 
     # Queue plots (without scenario: bar_q is reference, q is counterfactual)
@@ -473,7 +487,8 @@ def generate_all_plots(data_mode=None, meta_end=None):
         title='Bid-Ask Queues: Counterfactual given impacted queue q̄',
         ask_ref_col='bar_q_a',
         bid_ref_col='bar_q_b',
-        save_path='images/bidask_queue_given_qbar.png'
+        save_path='images/bidask_queue_given_qbar.png',
+        include_title=include_title,
     )
 
     # =========================================================================
@@ -483,14 +498,16 @@ def generate_all_plots(data_mode=None, meta_end=None):
         data['ask_impact_with'],
         data['bid_impact_with'],
         title='Total Price Impact (Ask - Bid) given base queue q',
-        save_path='images/bidask_impact_given_q.png'
+        save_path='images/bidask_impact_given_q.png',
+        include_title=include_title,
     )
 
     plot_impact_difference(
         data['ask_impact_without'],
         data['bid_impact_without'],
         title='Total Price Impact (Ask - Bid) given impacted queue q̄',
-        save_path='images/bidask_impact_given_qbar.png'
+        save_path='images/bidask_impact_given_qbar.png',
+        include_title=include_title,
     )
 
     # =========================================================================
@@ -500,28 +517,32 @@ def generate_all_plots(data_mode=None, meta_end=None):
         data['ask_impact_with'],
         title='Ask Side Impact I^a(t) given base queue q',
         color='blue',
-        save_path='images/ask_impact_given_q.png'
+        save_path='images/ask_impact_given_q.png',
+        include_title=include_title,
     )
 
     plot_impact_shades(
         data['bid_impact_with'],
         title='Bid Side Impact I^b(t) given base queue q',
         color='orange',
-        save_path='images/bid_impact_given_q.png'
+        save_path='images/bid_impact_given_q.png',
+        include_title=include_title,
     )
 
     plot_impact_shades(
         data['ask_impact_without'],
         title='Ask Side Impact I^a(t) given impacted queue q̄',
         color='blue',
-        save_path='images/ask_impact_given_qbar.png'
+        save_path='images/ask_impact_given_qbar.png',
+        include_title=include_title,
     )
 
     plot_impact_shades(
         data['bid_impact_without'],
         title='Bid Side Impact I^b(t) given impacted queue q̄',
         color='orange',
-        save_path='images/bid_impact_given_qbar.png'
+        save_path='images/bid_impact_given_qbar.png',
+        include_title=include_title,
     )
 
     print("\nAll plots generated!")

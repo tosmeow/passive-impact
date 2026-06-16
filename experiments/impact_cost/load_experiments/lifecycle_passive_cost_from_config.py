@@ -38,6 +38,11 @@ def _parse_args() -> argparse.Namespace:
         default=None,
         help="Override the image directory stored in the config.",
     )
+    parser.add_argument(
+        "--no-title",
+        action="store_true",
+        help="Do not draw titles on generated PNG images.",
+    )
     return parser.parse_args()
 
 
@@ -48,7 +53,10 @@ def main() -> None:
         output_dir=args.output_dir,
         image_dir=args.image_dir,
     )
-    summary = run_lifecycle_passive_cost_pipeline(cfg)
+    summary = run_lifecycle_passive_cost_pipeline(
+        cfg,
+        include_title=not args.no_title,
+    )
     print(
         json.dumps(
             {k: str(v) if isinstance(v, Path) else v for k, v in summary.items()},
