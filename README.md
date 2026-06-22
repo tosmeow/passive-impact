@@ -177,7 +177,7 @@ for some constants $(\gamma_i)_{1\le i\le m}$ and $\zeta$.
 ### Aggressive Market Impact
 
 For aggressive metaorders, the strategy consumes liquidity directly through
-market orders. We propose the following aggressive impact model
+market orders. We propose the following aggressive impact model for an aggressive mtaorder at the ask
 
 $$\mathrm{MI}_t
     =
@@ -185,7 +185,7 @@ $$\mathrm{MI}_t
     +
     \int_0^t
     \left(
-    \overline{\kappa}\,\xi(t-s)+\kappa(\wb q^{a}_s)-\overline{\kappa}
+    \overline{\kappa}\,\xi(t-s)+\kappa(\overline{q}^{a}_s)-\overline{\kappa}
     \right)\,\mathrm{d} N^o_s$$
 
 where $N^o$ represents the jump times of the aggressive metaorder, The first term is the indirect queue-feedback effect on ordinary ask-side market orders. The second term is the direct contribution of the metaorder itself: the factor $\overline{\kappa}\xi(t-s)$ is the propagator response of an additional buy market order, and $\kappa(\overline{q}^a_s)-\overline{\kappa}$ corrects this response for the contemporaneous ask-queue state.
