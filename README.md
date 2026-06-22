@@ -164,7 +164,8 @@ Accurately simulating price impact reduces to simulating the counterfactual pric
 
 we obtain a closed formula for the distribution of passive market impact, and we implement:
 
-$$\mathrm{MI}(t) = c_\kappa \int_0^t (\overline{q}_s - q_s) \mathrm{d}N_s + c_\kappa (\overline{q}_t - q_t) \cdot \mathrm{MI}_t$$
+$$\mathrm{MI}(t) = c_\kappa \int_0^t (\overline{q}_s - q_s) \mathrm{d}N_s + c_\kappa (\overline{q}_t - q_t) \cdot \mathrm{MI}_t
+\tag{1}$$
 
 thus providing the following solution relying on the resolvent operator $(\delta_0 - \varphi)^{-1}$:
 
@@ -186,7 +187,8 @@ $$\mathrm{MI}_t
     \int_0^t
     \left(
     \overline{\kappa}\,\xi(t-s)+\kappa(\overline{q}^{a}_s)-\overline{\kappa}
-    \right)\,\mathrm{d} N^o_s$$
+    \right)\,\mathrm{d} N^o_s
+    \tag{2}$$
 
 where $N^o$ represents the jump times of the aggressive metaorder, The first term is the indirect queue-feedback effect on ordinary ask-side market orders. The second term is the direct contribution of the metaorder itself: the factor $\overline{\kappa}\xi(t-s)$ is the propagator response of an additional buy market order, and $\kappa(\overline{q}^a_s)-\overline{\kappa}$ corrects this response for the contemporaneous ask-queue state.
 
@@ -194,6 +196,16 @@ The hybrid aggressive-impact model in `conditional_impact`
 compares the impacted queue path against the no-metaorder counterfactual,
 propagates deterministic metaorder flow with constant `bar_kappa`, and adds the
 queue-dependent market-order correction instantaneously.
+
+
+### On real data applications
+Concretely, what to do in order to properly estimate your trading strategies impact? One must proceeed as follows:
+
+- First, calibrate the intensity functions $\lambda^L$ and $\lambda^C$, the Hawkes parameters $\mu$ and $\varphi$, and the impact function $\kappa$ from the observed trading history.
+- Conditionally on the observed trajectory $\bar q$, draw i.i.d.\ baseline trajectories $(q^{(m)})_{1\le m \le M}$.
+- Estimate the impact using Equations (1)-(2) (or, more generally, Equations (12)-(14) from [link], or any model reflecting one's own view of the market).
+- Finally, estimate the execution costs of the strategy.
+
 
 ## Modules
 
