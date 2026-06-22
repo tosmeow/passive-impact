@@ -140,9 +140,9 @@ $$
 for a given impact function $\kappa$.
 
 
-### Conditional Impact
+### Conditional (Passive) Impact
 
-If one executes a given metaorder $X^o$ at the ask side, the observed dynamics for the ask queue and price are
+If one executes a given passive metaorder $X^o$ at the ask side, the observed dynamics for the ask queue and price are
 
 $$ \overline{q}^{a,t}_s = q_0^a+\overline{L}^{a,t}_s-\overline{C}^{a,t}_s-N^a_s+X_s^{o,t}, \qquad s\ge 0, \qquad \text{and} \qquad \overline{P}_t = P_0+\lim_{T\to\infty}\mathbb{E}\left[\int_0^T \kappa(\overline{q}^{a,t}_s) \mathrm{d}N^a_s - \int_0^T \kappa(q^b_s) \mathrm{d}N^b_s \ \middle|\ \mathcal F_t\right]$$
 
