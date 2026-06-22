@@ -19,14 +19,14 @@ A high-performance Rust library for simulating and analyzing market impact using
 
 
 - **Exact conditional simulation of Poisson processes** given an observed initial trajectory, by either adding or removing jump times consistently with the conditioning.
-- **Counterfactual queue simulation.** Given an observed queue trajectory, simulate what the queue would have been under a different metaorder scenario:
-  - *Removing a metaorder.* Starting from an observed trajectory that contains a metaorder, simulate the counterfactual queue in which the metaorder was never sent.
-  - *Adding a metaorder.* Starting from an observed (baseline) trajectory, simulate the counterfactual queue in which an additional buy/sell metaorder is injected, executed as either limit or market orders.
-- **Conditional market impact.** Compare observed and counterfactual queues to recover the price impact attributable to a metaorder — covering both passive (limit-order) and aggressive (market-order) impact. This enables two complementary analyses on the *same* observed trajectory:
+- **Counterfactual LOB aggregated queue simulation.** Given an observed aggregated queue trajectory, simulate what the queue would have been under a different metaorder scenario:
+  - *Removing a sequence of orders.* Starting from an observed LOB trajectory containing a trader's orders, simulate the counterfactual queue in which those orders were never submitted.
+  - *Adding a sequence of orders.* Starting from an observed (baseline) trajectory, simulate the counterfactual queue in which additional buy or sell orders are injected and executed either as limit orders or market orders.
+- **Conditional market impact simulation.** Compare observed and counterfactual queues to recover the price impact attributable to a metaorder — covering both passive (limit-order) and aggressive (market-order) impact. This enables two complementary analyses on the *same* observed trajectory:
   - *Ex-post (a posteriori) impact of an executed strategy.* For a trading strategy that was actually executed, recover the full **distribution** of its market impact conditional on the observed market data.
   - *Impact of alternative strategies.* On the same observed trajectory, estimate the impact that a different, hypothetical strategy would have had — enabling realistic backtesting and side-by-side comparison of strategies against the same realised market conditions.
-- **Closed-form market impact** under a Hawkes market-order flow with a sum-of-exponentials kernel, enabling impact estimation without nested Monte Carlo.
-- **Impact-cost experiments** that replay from real queue snapshots and own order postings with the associated execution flags.
+- **Closed-form market impact** under a Hawkes market-order flow with a sum-of-exponentials kernel, enabling impact estimation without nested Monte Carlo simulations.
+- **Impact-cost experiments** of trading strategies.
 - **Flexible architecture** supporting both single-queue and bid-ask queue-pair scenarios, with optimized ("efficient") and general simulation variants.
 
 ## Setup
