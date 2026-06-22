@@ -202,7 +202,7 @@ queue-dependent market-order correction instantaneously.
 Concretely, what to do in order to properly estimate your trading strategies impact? One must proceeed as follows:
 
 - First, calibrate the intensity functions $\lambda^L$ and $\lambda^C$, the Hawkes parameters $\mu$ and $\varphi$, and the impact function $\kappa$ from the observed trading history.
-- Conditionally on the observed trajectory $\bar q$, draw i.i.d.\ baseline trajectories $(q^{(m)})_{1\le m \le M}$.
+- Conditionally on the observed trajectory $\overline{q}$, draw i.i.d.\ baseline trajectories $(q^{(m)})_{1\le m \le M}$ (Or the inverse).
 - Estimate the impact using Equations (1)-(2) (or, more generally, Equations (12)-(14) from [link], or any model reflecting one's own view of the market).
 - Finally, estimate the execution costs of the strategy.
 
