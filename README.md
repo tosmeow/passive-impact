@@ -201,7 +201,7 @@ queue-dependent market-order correction instantaneously.
 ### On real data applications
 Concretely, what to do in order to properly estimate your trading strategies impact? One must proceeed as follows:
 
-- First, calibrate the intensity functions $\lambda^L$ and $\lambda^C$, the Hawkes parameters $\mu$ and $\varphi$, and the impact function $\kappa$ from the observed trading history.
+- First, calibrate the intensity functions $\lambda^L$ and $\lambda^C$, the Hawkes parameters $\mu$ and $\varphi$ (or potentially any $\lambda^N$ instead of the Hawkes one), and the impact function $\kappa$ from the observed trading history.
 - Conditionally on the observed trajectory $\overline{q}$, draw i.i.d.\ baseline trajectories $(q^{(m)})_{1\le m \le M}$ (Or the inverse).
 - Estimate the impact using Equations (1)-(2) (or, more generally, Equations (12)-(14) from [link], or any model reflecting one's own view of the market).
 - Finally, estimate the execution costs of the strategy.
@@ -224,7 +224,7 @@ Four top-level experiment categories live under `experiments/`:
 
 | Category | What it shows | Entry points |
 |---|---|---|
-| **Passive Impact** | Conditional impact from limit-order metaorders (where the intensity function depend on a single or both queues) | [`load_experiments/analysis.ipynb`](experiments/passive_impact/load_experiments/analysis.ipynb), [`custom_experiment/main.py`](experiments/passive_impact/custom_experiment/main.py) |
+| **Passive Impact** | Conditional impact from limit-order metaorders (where the orders arrivals intensity functions depend on a single or both queues) | [`load_experiments/analysis.ipynb`](experiments/passive_impact/load_experiments/analysis.ipynb), [`custom_experiment/main.py`](experiments/passive_impact/custom_experiment/main.py) |
 | **Aggressive Impact** | Hybrid market-order impact from aggressive metaorders | [`load_experiments/analysis.ipynb`](experiments/agressive_impact/load_experiments/analysis.ipynb), [`custom_experiment/main.py`](experiments/agressive_impact/custom_experiment/main.py) |
 | **Queue Simulation** | Counterfactual queue paths under a metaorder (no impact curve) | [`load_experiments/analysis.ipynb`](experiments/queue_simulation/load_experiments/analysis.ipynb), [`custom_experiment/main.py`](experiments/queue_simulation/custom_experiment/main.py) |
 | **Impact Cost** | Empirical passive lifecycle execution-cost workflow using aggregate queue snapshots and tail-propagator price impact | [`README.md`](experiments/impact_cost/README.md), [`COMPONENTS.md`](experiments/impact_cost/COMPONENTS.md), [`load_experiments/`](experiments/impact_cost/load_experiments/) |
