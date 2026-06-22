@@ -177,7 +177,20 @@ for some constants $(\gamma_i)_{1\le i\le m}$ and $\zeta$.
 ### Aggressive Market Impact
 
 For aggressive metaorders, the strategy consumes liquidity directly through
-market orders. The hybrid aggressive-impact model in `conditional_impact`
+market orders. We propose the following aggressive impact model
+
+$$\mathrm{MI}_t
+    =
+    \int_0^t \left(\kappa(\wb q^{a}_s) - \kappa(q^a_s)\right)\,\dd N^a_s
+    +
+    \int_0^t
+    \left(
+    \widebar{\kappa}\,\xi(t-s)+\kappa(\wb q^{a}_s)-\widebar{\kappa}
+    \right)\,\dd N^o_s$$
+
+where $N^o$ represents the jump times of the aggressive metaorder, The first term in \eqref{eq:impact_aggressive} is the indirect queue-feedback effect on ordinary ask-side market orders. The second term is the direct contribution of the metaorder itself: the factor $\widebar{\kappa}\xi(t-s)$ is the propagator response of an additional buy market order, and $\kappa(\wb q^a_s)-\widebar{\kappa}$ corrects this response for the contemporaneous ask-queue state.
+
+The hybrid aggressive-impact model in `conditional_impact`
 compares the impacted queue path against the no-metaorder counterfactual,
 propagates deterministic metaorder flow with constant `bar_kappa`, and adds the
 queue-dependent market-order correction instantaneously.
