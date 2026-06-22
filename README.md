@@ -150,7 +150,7 @@ where $X_s^{o,t}:=X_{s \wedge t}^{o}, s \geq 0$ can be understood as a sequence 
 
 The impact is then given by:
 
-$$ MI(t) = \overline{P}_t  - P_t$$
+$$ MI(t) = \overline{P}_t  - P_t = \lim_{T\to\infty}\mathbb{E}\left[\int_0^T (\kappa(\overline{q}^{a,t}_s) - \kappa(q^a_s))\mathrm{d}N^a_s \ \middle|\ \mathcal F_t\right]$$
 
 
 
