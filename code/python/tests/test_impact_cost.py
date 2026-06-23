@@ -1,5 +1,6 @@
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 
 import numpy as np
 import pandas as pd
@@ -51,9 +52,6 @@ from experiments.impact_cost.core.reduced_form_impact import (
     propagator_impact_from_events,
 )
 from experiments.impact_cost.core.queue_replay import replay_consistency_report
-from experiments.impact_cost.archive.diagnostics.impact_series_pipeline import (
-    ImpactSeriesPipelineConfig,
-)
 
 
 def _toy_df():
@@ -127,14 +125,14 @@ def test_impact_series_selector_samples_limit_sequences_with_span_constraint():
             "source_row_pos": np.arange(7, dtype=np.int64),
         }
     )
-    cfg = ImpactSeriesPipelineConfig(
+    cfg = SimpleNamespace(
         n_orders_per_episode=3,
         n_episodes=10,
         post_span_seconds=0.25,
         horizon_seconds=1.0,
         raw_side="B",
-        queue_col="q_a",
-        market_side="B",
+        start_time=None,
+        end_time=None,
         seed=3,
     )
     episodes, orders = select_limit_sequences(df, cfg)
