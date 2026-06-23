@@ -1,6 +1,6 @@
 use numpy::{IntoPyArray, PyArray1, PyReadonlyArray1};
 use pyo3::prelude::*;
-use pyo3::types::PyDict;
+use pyo3::types::{PyDict, PyList};
 use simulation_project::conditional_impact::{AggressiveImpactPath, ImpactPath, TailImpact};
 use simulation_project::experiments::impact_cost::{
     build_execution_latency_grid as rs_build_execution_latency_grid,
@@ -17,7 +17,7 @@ use simulation_project::models::{
 };
 use simulation_project::simulation::simulate as rs_simulate;
 use simulation_project::simulation::simulate_with_externals as rs_simulate_with_externals;
-use simulation_project::simulation::ConditionalSimulationContext;
+use simulation_project::simulation::{ConditionalSimulationContext, SimulationConfig};
 use simulation_project::simulation_helpers::{
     create_meta_orders as rs_create_meta_orders, events_to_dim as rs_events_to_dim,
     extract_events_by_dim as rs_extract_events_by_dim,
@@ -69,6 +69,19 @@ fn simulate_hawkes<'py>(
     let result = rs_simulate(&hawkes.inner, t_max, seed);
     let times: Vec<f64> = result.events.iter().map(|e| e.time).collect();
     times.into_pyarray_bound(py)
+}
+
+/// Simulate the Hawkes process up to `t_max`, preserving the full
+/// SimulationResult wrapper rather than dropping dimension metadata.
+#[pyfunction]
+fn simulate_hawkes_result(
+    hawkes: &PyMultiExponentialHawkes,
+    t_max: f64,
+    seed: Option<u64>,
+) -> PySimulationResult {
+    PySimulationResult {
+        inner: rs_simulate(&hawkes.inner, t_max, seed),
+    }
 }
 
 /// Opaque wrapper for a MultivariateSimulationResult (a list of
@@ -193,6 +206,19 @@ fn simulate_hawkes_as_market_orders(
     let result = rs_simulate(&hawkes.inner, t_max, seed);
     PySimulationResult {
         inner: rs_hawkes_to_market_orders(&result),
+    }
+}
+
+/// Simulate Hawkes while forcing an external event stream into its state.
+#[pyfunction]
+fn simulate_hawkes_with_externals(
+    hawkes: &PyMultiExponentialHawkes,
+    t_max: f64,
+    externals: &PySimulationResult,
+    seed: Option<u64>,
+) -> PySimulationResult {
+    PySimulationResult {
+        inner: rs_simulate_with_externals(&hawkes.inner, t_max, &externals.inner, seed),
     }
 }
 
@@ -675,6 +701,111 @@ fn simulate_execution_latency_grid<'py>(
     Ok(out)
 }
 
+/// Conditional simulation context for one-dimensional MultiExponentialHawkes paths.
+/// Owns its inputs and rebuilds the borrowed Rust context on each call.
+#[pyclass(name = "ConditionalHawkesSimulationContext")]
+pub struct PyConditionalHawkesSimulationContext {
+    hawkes: Py<PyMultiExponentialHawkes>,
+    cond_events_by_dim: Vec<Vec<f64>>,
+    cond_externals: Option<MultivariateSimulationResult>,
+    new_externals: Option<MultivariateSimulationResult>,
+    t_max: f64,
+}
+
+#[pymethods]
+impl PyConditionalHawkesSimulationContext {
+    #[new]
+    #[pyo3(signature = (hawkes, cond_events_by_dim, t_max, *, cond_externals=None, new_externals=None))]
+    fn new(
+        hawkes: Py<PyMultiExponentialHawkes>,
+        cond_events_by_dim: Vec<Vec<f64>>,
+        t_max: f64,
+        cond_externals: Option<&PySimulationResult>,
+        new_externals: Option<&PySimulationResult>,
+    ) -> Self {
+        Self {
+            hawkes,
+            cond_events_by_dim,
+            cond_externals: cond_externals.map(|r| r.inner.clone()),
+            new_externals: new_externals.map(|r| r.inner.clone()),
+            t_max,
+        }
+    }
+
+    /// Single-shot conditional Hawkes simulation; returns the resulting event stream.
+    fn simulate(&self, py: Python, seed: Option<u64>) -> PySimulationResult {
+        let hawkes_borrow = self.hawkes.borrow(py);
+        let ctx = ConditionalSimulationContext::new(
+            &hawkes_borrow.inner,
+            &self.cond_events_by_dim,
+            self.cond_externals.as_ref(),
+            self.new_externals.as_ref(),
+            self.t_max,
+        );
+        PySimulationResult {
+            inner: ctx.simulate(None, seed),
+        }
+    }
+
+    /// Batched conditional Hawkes simulation. This avoids per-path Python calls
+    /// while preserving variable-length event streams.
+    #[pyo3(signature = (n_simulations, base_seed=None, shared_acceptance=false))]
+    fn simulate_many(
+        &self,
+        py: Python,
+        n_simulations: usize,
+        base_seed: Option<u64>,
+        shared_acceptance: bool,
+    ) -> Vec<PySimulationResult> {
+        let hawkes_borrow = self.hawkes.borrow(py);
+        let ctx = ConditionalSimulationContext::new(
+            &hawkes_borrow.inner,
+            &self.cond_events_by_dim,
+            self.cond_externals.as_ref(),
+            self.new_externals.as_ref(),
+            self.t_max,
+        );
+
+        if shared_acceptance {
+            let configs: Vec<SimulationConfig<'_, Vec<f64>>> = (0..n_simulations)
+                .map(|_| SimulationConfig::new(self.new_externals.as_ref(), None))
+                .collect();
+            return ctx
+                .simulate_multiple(&configs, base_seed.unwrap_or(0))
+                .into_iter()
+                .map(|inner| PySimulationResult { inner })
+                .collect();
+        }
+
+        (0..n_simulations)
+            .map(|sim_idx| {
+                let seed = base_seed.map(|s| s.wrapping_add(sim_idx as u64));
+                PySimulationResult {
+                    inner: ctx.simulate(None, seed),
+                }
+            })
+            .collect()
+    }
+
+    /// Batched conditional Hawkes simulation returning ragged time arrays.
+    #[pyo3(signature = (n_simulations, base_seed=None, shared_acceptance=false))]
+    fn simulate_many_times<'py>(
+        &self,
+        py: Python<'py>,
+        n_simulations: usize,
+        base_seed: Option<u64>,
+        shared_acceptance: bool,
+    ) -> PyResult<Bound<'py, PyList>> {
+        let results = self.simulate_many(py, n_simulations, base_seed, shared_acceptance);
+        let out = PyList::empty_bound(py);
+        for result in results {
+            let times: Vec<f64> = result.inner.events.iter().map(|e| e.time).collect();
+            out.append(times.into_pyarray_bound(py))?;
+        }
+        Ok(out)
+    }
+}
+
 /// Conditional simulation context. Owns its inputs (conditioning events + externals + process)
 /// and rebuilds the borrowed Rust context on each call.
 #[pyclass(name = "ConditionalSimulationContext")]
@@ -931,12 +1062,14 @@ fn _native(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add("__version__", "0.1.0")?;
     m.add_class::<PyMultiExponentialHawkes>()?;
     m.add_function(wrap_pyfunction!(simulate_hawkes, m)?)?;
+    m.add_function(wrap_pyfunction!(simulate_hawkes_result, m)?)?;
     m.add_class::<PySimulationResult>()?;
     m.add_class::<PyQueueProcess>()?;
     m.add_class::<PyAffineQueueProcess>()?;
     m.add_class::<PyAffineBidAskQueueProcess>()?;
     m.add_function(wrap_pyfunction!(simulate_with_externals, m)?)?;
     m.add_function(wrap_pyfunction!(simulate_hawkes_as_market_orders, m)?)?;
+    m.add_function(wrap_pyfunction!(simulate_hawkes_with_externals, m)?)?;
     m.add_function(wrap_pyfunction!(merge_events, m)?)?;
     m.add_function(wrap_pyfunction!(create_meta_orders, m)?)?;
     m.add_function(wrap_pyfunction!(create_meta_orders_from_times, m)?)?;
@@ -949,6 +1082,7 @@ fn _native(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(select_limit_flags_random_fraction, m)?)?;
     m.add_function(wrap_pyfunction!(track_passive_fills, m)?)?;
     m.add_function(wrap_pyfunction!(simulate_execution_latency_grid, m)?)?;
+    m.add_class::<PyConditionalHawkesSimulationContext>()?;
     m.add_class::<PyConditionalSimulationContext>()?;
     m.add_class::<PyTailImpact>()?;
     m.add_class::<PyAggressiveImpactPath>()?;

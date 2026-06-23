@@ -7,8 +7,10 @@ AffineQueueProcess = _native.AffineQueueProcess
 AffineBidAskQueueProcess = _native.AffineBidAskQueueProcess
 
 simulate_hawkes = _native.simulate_hawkes
+simulate_hawkes_result = _native.simulate_hawkes_result
 simulate_with_externals = _native.simulate_with_externals
 simulate_hawkes_as_market_orders = _native.simulate_hawkes_as_market_orders
+simulate_hawkes_with_externals = _native.simulate_hawkes_with_externals
 merge_events = _native.merge_events
 create_meta_orders = _native.create_meta_orders
 create_meta_orders_from_times = _native.create_meta_orders_from_times
@@ -21,6 +23,7 @@ select_limit_flags_indices = _native.select_limit_flags_indices
 select_limit_flags_random_fraction = _native.select_limit_flags_random_fraction
 track_passive_fills = _native.track_passive_fills
 simulate_execution_latency_grid = _native.simulate_execution_latency_grid
+ConditionalHawkesSimulationContext = _native.ConditionalHawkesSimulationContext
 ConditionalSimulationContext = _native.ConditionalSimulationContext
 TailImpact = _native.TailImpact
 AggressiveImpactPath = _native.AggressiveImpactPath
@@ -36,3 +39,4 @@ __version__ = _native.__version__
 from . import passive_impact
 from . import agressive_impact
 from . import queue_simulation
+from . import point_process_simulation
