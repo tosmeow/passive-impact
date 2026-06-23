@@ -16,9 +16,9 @@ Edit the `config` block at the top of [`custom_experiment/main.py`](custom_exper
 python experiments/passive_impact/custom_experiment/main.py
 ```
 
-Knobs: `time_horizon`, `n_simulations`, `initial_queue_size`, `mode` (`"single"` | `"double"`), `counterfactual` (`False` for with-us, `True` for without-us), `side` (`"ask"` keeps the single-queue sign, `"bid"` flips it), the Hawkes parameters `mu`/`alpha`/`beta`, the affine-queue parameters `a_l`/`b_l`/`a_c`/`b_c`, `c_kappa_effective` (the final multiplier on the normalized passive impact path, analogous to `propagator_gamma` in `impact_cost`), and the metaorder shape (either an integer count for evenly-spaced orders inside `metaorder_window`, or an explicit `list`/`np.ndarray` of arrival times).
+Knobs: `time_horizon`, `n_simulations`, `initial_queue_size`, `mode` (`"single"` | `"double"`), `counterfactual` (`False` for with-us, `True` for without-us), `side` (`"ask"` keeps the single-queue sign, `"bid"` flips it), the Hawkes parameters `mu`/`alpha`/`beta`, the affine-queue parameters `a_l`/`b_l`/`a_c`/`b_c`, `c_kappa_effective` (the final multiplier on the normalized passive impact path, analogous to `propagator_gamma` in `impact_cost`), and the metaorder shape (either an integer count for evenly-spaced orders inside `metaorder_window`, or an explicit `list`/`np.ndarray` of arrival times). Double mode additionally accepts `initial_ask_queue_size`, `initial_bid_queue_size`, `metaorder_side`, `b_l_cross`, and `b_c_cross`.
 
-Outputs (`times.npy`, `queue_paths.npy`, `impact_paths.npy`) land in `custom_experiment/output/with_us/` or `custom_experiment/output/without_us/` (gitignored).
+Single-mode outputs (`times.npy`, `queue_paths.npy`, `impact_paths.npy`) land in `custom_experiment/output/with_us/` or `custom_experiment/output/without_us/` (gitignored). Double-mode outputs are side-specific: `ask_times.npy`, `bid_times.npy`, `ask_queue_paths.npy`, `bid_queue_paths.npy`, `ask_impact_paths.npy`, and `bid_impact_paths.npy`.
 
 ## Pre-saved baselines — `load_experiments/`
 

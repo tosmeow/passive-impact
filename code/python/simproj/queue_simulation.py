@@ -3,11 +3,12 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass, field
-from typing import Union
+from typing import Optional, Union
 
 import numpy as np
 
 from . import _native
+from . import _bidask
 
 
 @dataclass
@@ -18,6 +19,9 @@ class QueueSimulationConfig:
     initial_queue_size: int = 200
     mode: str = "single"            # "single" | "double"
     counterfactual: bool = False     # False: with us | True: without us
+    initial_ask_queue_size: Optional[int] = None
+    initial_bid_queue_size: Optional[int] = None
+    metaorder_side: str = "ask"      # double mode: "ask" | "bid"
 
     mu: float = 1.0
     alpha: list = field(default_factory=lambda: [0.065, 0.2, 0.325, 0.65])
@@ -25,8 +29,10 @@ class QueueSimulationConfig:
 
     a_l: float = 100.0
     b_l: float = -0.275
+    b_l_cross: float = 0.0
     a_c: float = 2.0
     b_c: float = 0.125
+    b_c_cross: float = 0.0
 
     metaorder: Union[int, list, np.ndarray] = 375
     metaorder_window: tuple = (1.0, 80.0)
@@ -100,11 +106,68 @@ def _run_single_direction(cfg: QueueSimulationConfig, direction: str) -> dict:
     return {"times": times, "queue_paths": queue_paths}
 
 
+def _run_double_direction(cfg: QueueSimulationConfig, direction: str) -> dict:
+    q0_a, q0_b = _bidask.initial_sizes(cfg)
+    process = _bidask.make_bidask_process(cfg)
+    _ask_market, _bid_market, market = _bidask.make_bidask_market_orders(cfg)
+    meta = _bidask.make_bidask_meta_orders(cfg)
+    bar_q_external = _native.merge_events(meta, market)
+    q_external = market
+
+    times = np.linspace(0.0, cfg.time_horizon, cfg.n_eval_times).astype(np.float64)
+    ask_queue_paths = np.empty((cfg.n_eval_times, cfg.n_simulations + 1), dtype=np.uint32)
+    bid_queue_paths = np.empty((cfg.n_eval_times, cfg.n_simulations + 1), dtype=np.uint32)
+
+    if direction == "with":
+        q_internal = _native.simulate_with_externals(
+            process, cfg.time_horizon, q_external, cfg.seed,
+        )
+        q_full = _native.merge_events(q_internal, q_external)
+        cond_by_dim = _bidask.conditioning_events_without_market(q_internal)
+        ref_ask, ref_bid = _bidask.sample_bidask_at_times(q_full, q0_a, q0_b, times)
+        cond_externals = q_external
+        new_externals = bar_q_external
+    elif direction == "without":
+        bar_q_internal = _native.simulate_with_externals(
+            process, cfg.time_horizon, bar_q_external, cfg.seed,
+        )
+        bar_q_full = _native.merge_events(bar_q_internal, bar_q_external)
+        cond_by_dim = _bidask.conditioning_events_without_market(bar_q_internal)
+        ref_ask, ref_bid = _bidask.sample_bidask_at_times(bar_q_full, q0_a, q0_b, times)
+        cond_externals = bar_q_external
+        new_externals = q_external
+    else:
+        raise ValueError(f"direction must be 'with' or 'without'; got {direction!r}")
+
+    ask_queue_paths[:, 0] = ref_ask
+    bid_queue_paths[:, 0] = ref_bid
+
+    ctx = _native.ConditionalSimulationContext(
+        process, cond_by_dim,
+        cfg.time_horizon,
+        cond_externals=cond_externals,
+        new_externals=new_externals,
+    )
+    for sim_idx in range(cfg.n_simulations):
+        samples = ctx.simulate_bidask_queue_at_times(
+            times, q0_a, q0_b, seed=sim_idx,
+        )
+        ask_queue_paths[:, sim_idx + 1] = samples["ask"]
+        bid_queue_paths[:, sim_idx + 1] = samples["bid"]
+
+    return {
+        "times": times,
+        "ask_queue_paths": ask_queue_paths,
+        "bid_queue_paths": bid_queue_paths,
+    }
+
+
 def run(cfg: QueueSimulationConfig) -> dict:
     if cfg.mode not in ("single", "double"):
         raise ValueError(f"mode must be 'single' or 'double'; got {cfg.mode!r}")
+    _bidask.metaorder_dim(cfg.metaorder_side)
     if cfg.mode == "double":
-        raise NotImplementedError("double-queue queue_simulation — follow-up")
+        return _run_double_direction(cfg, "without" if cfg.counterfactual else "with")
     return _run_single_direction(cfg, "without" if cfg.counterfactual else "with")
 
 

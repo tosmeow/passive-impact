@@ -1,7 +1,10 @@
 use numpy::{IntoPyArray, PyArray1, PyReadonlyArray1};
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList};
-use simulation_project::conditional_impact::{AggressiveImpactPath, ImpactPath, TailImpact};
+use simulation_project::conditional_impact::{
+    AggressiveImpactPath, BidAskImpactPath, BidAskTailImpact, ImpactPath, SymmetricCMatrix,
+    TailImpact,
+};
 use simulation_project::experiments::impact_cost::{
     build_execution_latency_grid as rs_build_execution_latency_grid,
     select_first_limit_every as rs_select_first_limit_every,
@@ -373,6 +376,29 @@ fn sample_queue_at_times<'py>(
     let q_path = AffineQueueProcess::result_to_queue_path(&queue_path_events.inner, initial_q);
     let samples = rs_sample_queue_at_times(&q_path, times.as_slice().unwrap());
     samples.into_pyarray_bound(py)
+}
+
+#[pyfunction]
+fn sample_bidask_queue_at_times<'py>(
+    py: Python<'py>,
+    queue_path_events: &PySimulationResult,
+    initial_q_a: u32,
+    initial_q_b: u32,
+    times: PyReadonlyArray1<f64>,
+) -> PyResult<Bound<'py, PyDict>> {
+    let paths = AffineBidAskQueueProcess::result_to_queue_paths(
+        &queue_path_events.inner,
+        initial_q_a,
+        initial_q_b,
+    );
+    let time_slice = times.as_slice()?;
+    let ask_samples = rs_sample_queue_at_times(&paths.ask, time_slice);
+    let bid_samples = rs_sample_queue_at_times(&paths.bid, time_slice);
+
+    let out = PyDict::new_bound(py);
+    out.set_item("ask", ask_samples.into_pyarray_bound(py))?;
+    out.set_item("bid", bid_samples.into_pyarray_bound(py))?;
+    Ok(out)
 }
 
 /// Experiment-local anchored conditional queue simulation.
@@ -1055,6 +1081,38 @@ impl PyConditionalSimulationContext {
         samples.into_pyarray_bound(py)
     }
 
+    /// Memory-efficient bid-ask queue sampling at specified times. Returns a
+    /// dict with "ask" and "bid" arrays aligned with `times`.
+    fn simulate_bidask_queue_at_times<'py>(
+        &self,
+        py: Python<'py>,
+        times: PyReadonlyArray1<f64>,
+        initial_ask_queue_size: u32,
+        initial_bid_queue_size: u32,
+        seed: Option<u64>,
+    ) -> PyResult<Bound<'py, PyDict>> {
+        let process_borrow = self.process.borrow(py);
+        let ctx = ConditionalSimulationContext::new(
+            &process_borrow.inner,
+            &self.cond_events_by_dim,
+            self.cond_externals.as_ref(),
+            self.new_externals.as_ref(),
+            self.t_max,
+        );
+        let (ask_samples, bid_samples) = ctx.simulate_bidask_queue_at_times(
+            times.as_slice()?,
+            initial_ask_queue_size,
+            initial_bid_queue_size,
+            None,
+            seed,
+        );
+
+        let out = PyDict::new_bound(py);
+        out.set_item("ask", ask_samples.into_pyarray_bound(py))?;
+        out.set_item("bid", bid_samples.into_pyarray_bound(py))?;
+        Ok(out)
+    }
+
     /// Single-shot conditional simulate; returns the resulting event stream.
     fn simulate(&self, py: Python, seed: Option<u64>) -> PySimulationResult {
         let process_borrow = self.process.borrow(py);
@@ -1203,6 +1261,100 @@ fn passive_flow_impact_from_queue_samples<'py>(
     Ok(impact.into_pyarray_bound(py))
 }
 
+/// Compute bid-ask passive flow-imbalance impact from queues sampled at ask and
+/// bid market-order times. Inputs are ordered as (q, q_bar), where q is the
+/// no-metaorder baseline and q_bar is the queue with the passive metaorder.
+#[pyfunction]
+#[allow(clippy::too_many_arguments)]
+fn bidask_passive_impact_from_queue_samples<'py>(
+    py: Python<'py>,
+    q_a_at_ask: PyReadonlyArray1<u32>,
+    q_b_at_ask: PyReadonlyArray1<u32>,
+    q_bar_a_at_ask: PyReadonlyArray1<u32>,
+    q_bar_b_at_ask: PyReadonlyArray1<u32>,
+    q_a_at_bid: PyReadonlyArray1<u32>,
+    q_b_at_bid: PyReadonlyArray1<u32>,
+    q_bar_a_at_bid: PyReadonlyArray1<u32>,
+    q_bar_b_at_bid: PyReadonlyArray1<u32>,
+    ask_market_times: PyReadonlyArray1<f64>,
+    bid_market_times: PyReadonlyArray1<f64>,
+    mu: f64,
+    alpha: Vec<f64>,
+    beta: Vec<f64>,
+    b_l_own: f64,
+    b_l_cross: f64,
+    b_c_own: f64,
+    b_c_cross: f64,
+    c_kappa_effective: f64,
+) -> PyResult<Bound<'py, PyDict>> {
+    let q_a_ask = q_a_at_ask.as_slice()?;
+    let q_b_ask = q_b_at_ask.as_slice()?;
+    let q_bar_a_ask = q_bar_a_at_ask.as_slice()?;
+    let q_bar_b_ask = q_bar_b_at_ask.as_slice()?;
+    let q_a_bid = q_a_at_bid.as_slice()?;
+    let q_b_bid = q_b_at_bid.as_slice()?;
+    let q_bar_a_bid = q_bar_a_at_bid.as_slice()?;
+    let q_bar_b_bid = q_bar_b_at_bid.as_slice()?;
+    let ask_events = ask_market_times.as_slice()?;
+    let bid_events = bid_market_times.as_slice()?;
+
+    if alpha.len() != beta.len() {
+        return Err(pyo3::exceptions::PyValueError::new_err(
+            "alpha and beta must have matching lengths",
+        ));
+    }
+    if q_a_ask.len() != ask_events.len()
+        || q_b_ask.len() != ask_events.len()
+        || q_bar_a_ask.len() != ask_events.len()
+        || q_bar_b_ask.len() != ask_events.len()
+    {
+        return Err(pyo3::exceptions::PyValueError::new_err(
+            "ask-side queue sample arrays must match ask_market_times length",
+        ));
+    }
+    if q_a_bid.len() != bid_events.len()
+        || q_b_bid.len() != bid_events.len()
+        || q_bar_a_bid.len() != bid_events.len()
+        || q_bar_b_bid.len() != bid_events.len()
+    {
+        return Err(pyo3::exceptions::PyValueError::new_err(
+            "bid-side queue sample arrays must match bid_market_times length",
+        ));
+    }
+
+    let c_matrix = SymmetricCMatrix::from_affine_symmetric(b_l_own, b_l_cross, b_c_own, b_c_cross);
+    let tail_impact = BidAskTailImpact::new_symmetric_hawkes(
+        mu,
+        alpha,
+        beta,
+        c_matrix,
+        ask_events.to_vec(),
+        bid_events.to_vec(),
+    );
+    let mut impact = BidAskImpactPath::from_queue_samples(
+        q_a_ask,
+        q_b_ask,
+        q_bar_a_ask,
+        q_bar_b_ask,
+        q_a_bid,
+        q_b_bid,
+        q_bar_a_bid,
+        q_bar_b_bid,
+        &tail_impact,
+    );
+    for value in &mut impact.ask_impact {
+        *value *= c_kappa_effective;
+    }
+    for value in &mut impact.bid_impact {
+        *value *= c_kappa_effective;
+    }
+
+    let out = PyDict::new_bound(py);
+    out.set_item("ask_impact", impact.ask_impact.into_pyarray_bound(py))?;
+    out.set_item("bid_impact", impact.bid_impact.into_pyarray_bound(py))?;
+    Ok(out)
+}
+
 /// Compute passive flow-imbalance impact using direct fitted propagator tails.
 ///
 /// This is the propagator-input analogue of `passive_flow_impact_from_queue_samples`.
@@ -1278,6 +1430,7 @@ fn _native(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(events_to_dim, m)?)?;
     m.add_function(wrap_pyfunction!(extract_events_by_dim, m)?)?;
     m.add_function(wrap_pyfunction!(sample_queue_at_times, m)?)?;
+    m.add_function(wrap_pyfunction!(sample_bidask_queue_at_times, m)?)?;
     m.add_function(wrap_pyfunction!(simulate_anchored_affine_queue, m)?)?;
     m.add_function(wrap_pyfunction!(select_limit_flags_first_every, m)?)?;
     m.add_function(wrap_pyfunction!(select_limit_flags_indices, m)?)?;
@@ -1292,6 +1445,10 @@ fn _native(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(aggressive_impact_from_queue_samples, m)?)?;
     m.add_function(wrap_pyfunction!(compute_impact_path, m)?)?;
     m.add_function(wrap_pyfunction!(passive_flow_impact_from_queue_samples, m)?)?;
+    m.add_function(wrap_pyfunction!(
+        bidask_passive_impact_from_queue_samples,
+        m
+    )?)?;
     m.add_function(wrap_pyfunction!(
         passive_tail_propagator_impact_from_queue_samples,
         m

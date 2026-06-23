@@ -59,6 +59,52 @@ def test_passive_impact_with_without_use_opposite_conditioning_paths():
     )
 
 
+def test_passive_impact_double_smoke():
+    cfg = PassiveImpactConfig(
+        time_horizon=5.0,
+        n_simulations=2,
+        initial_queue_size=200,
+        mode="double",
+        metaorder=20,
+        metaorder_window=(0.1, 4.0),
+        b_l_cross=0.05,
+        b_c_cross=0.02,
+        seed=42,
+    )
+    result = run(cfg)
+
+    assert result["ask_queue_paths"].shape[1] == 3
+    assert result["bid_queue_paths"].shape[1] == 3
+    assert result["ask_impact_paths"].shape[1] == 2
+    assert result["bid_impact_paths"].shape[1] == 2
+    assert result["ask_queue_paths"].shape[0] == len(result["ask_times"])
+    assert result["bid_queue_paths"].shape[0] == len(result["bid_times"])
+
+
+def test_passive_impact_double_with_without_use_opposite_conditioning_paths():
+    base_kwargs = dict(
+        time_horizon=5.0,
+        n_simulations=2,
+        initial_queue_size=200,
+        mode="double",
+        metaorder=20,
+        metaorder_window=(0.1, 4.0),
+        b_l_cross=0.05,
+        b_c_cross=0.02,
+        seed=42,
+    )
+
+    with_result = run(PassiveImpactConfig(**base_kwargs, counterfactual=False))
+    without_result = run(PassiveImpactConfig(**base_kwargs, counterfactual=True))
+
+    assert with_result["ask_queue_paths"].shape == without_result["ask_queue_paths"].shape
+    assert with_result["bid_queue_paths"].shape == without_result["bid_queue_paths"].shape
+    assert not np.array_equal(
+        with_result["ask_queue_paths"][:, 0],
+        without_result["ask_queue_paths"][:, 0],
+    )
+
+
 def test_passive_impact_scales_by_c_kappa_effective():
     base_kwargs = dict(
         time_horizon=3.0,

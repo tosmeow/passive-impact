@@ -96,6 +96,13 @@ python experiments/passive_impact/custom_experiment/main.py
 
 The same shape applies to `agressive_impact` and `queue_simulation` — each has its own config dataclass (`AggressiveImpactConfig`, `QueueSimulationConfig`) and `main.py` template. The empirical passive execution-cost workflow lives under [`experiments/impact_cost/`](experiments/impact_cost/) and is driven by the canonical lifecycle config in `load_experiments/config.toml`.
 
+For `mode="double"`, the passive facade returns side-specific bid-ask arrays:
+`ask_times.npy`, `bid_times.npy`, `ask_queue_paths.npy`, `bid_queue_paths.npy`,
+`ask_impact_paths.npy`, and `bid_impact_paths.npy`. The queue-only facade
+returns `times.npy`, `ask_queue_paths.npy`, and `bid_queue_paths.npy`. Double
+mode also accepts `initial_ask_queue_size`, `initial_bid_queue_size`,
+`metaorder_side`, `b_l_cross`, and `b_c_cross`.
+
 
 ## Mathematical Background
 

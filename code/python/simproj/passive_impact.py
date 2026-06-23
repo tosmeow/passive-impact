@@ -8,11 +8,12 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass, field
-from typing import Union
+from typing import Optional, Union
 
 import numpy as np
 
 from . import _native
+from . import _bidask
 
 
 @dataclass
@@ -23,6 +24,9 @@ class PassiveImpactConfig:
     mode: str = "single"            # "single" | "double"
     counterfactual: bool = False     # False: with us | True: without us
     side: str = "ask"                # "ask" keeps sign; "bid" flips impact sign
+    initial_ask_queue_size: Optional[int] = None
+    initial_bid_queue_size: Optional[int] = None
+    metaorder_side: str = "ask"      # double mode: "ask" | "bid"
 
     # Hawkes
     mu: float = 1.0
@@ -32,8 +36,10 @@ class PassiveImpactConfig:
     # Affine queue
     a_l: float = 100.0
     b_l: float = -0.275
+    b_l_cross: float = 0.0
     a_c: float = 2.0
     b_c: float = 0.125
+    b_c_cross: float = 0.0
 
     # Effective price-impact slope multiplying the normalized passive impact.
     # This is the reduced-form analogue of c_kappa / propagator_gamma.
@@ -161,20 +167,143 @@ def _run_single_direction(cfg, direction: str) -> dict:
     }
 
 
+def _run_double_direction(cfg: PassiveImpactConfig, direction: str) -> dict:
+    """Run one direction ('with' or 'without') for bid-ask mode."""
+    q0_a, q0_b = _bidask.initial_sizes(cfg)
+    process = _bidask.make_bidask_process(cfg)
+    ask_market, bid_market, market = _bidask.make_bidask_market_orders(cfg)
+    meta = _bidask.make_bidask_meta_orders(cfg)
+
+    ask_times = np.asarray(ask_market.times(), dtype=np.float64)
+    bid_times = np.asarray(bid_market.times(), dtype=np.float64)
+    bar_q_externals = _native.merge_events(meta, market)
+    q_externals = market
+
+    ask_queue_paths = np.empty((len(ask_times), cfg.n_simulations + 1), dtype=np.uint32)
+    bid_queue_paths = np.empty((len(bid_times), cfg.n_simulations + 1), dtype=np.uint32)
+    ask_impact_paths = np.zeros((len(ask_times), cfg.n_simulations), dtype=np.float64)
+    bid_impact_paths = np.zeros((len(bid_times), cfg.n_simulations), dtype=np.float64)
+
+    if direction == "with":
+        q_internal = _native.simulate_with_externals(
+            process, cfg.time_horizon, q_externals, cfg.seed,
+        )
+        q_full = _native.merge_events(q_internal, q_externals)
+        cond_by_dim = _bidask.conditioning_events_without_market(q_internal)
+        cond_externals = q_externals
+        new_externals = bar_q_externals
+        ref_ask_at_ask, ref_bid_at_ask = _bidask.sample_bidask_at_times(
+            q_full, q0_a, q0_b, ask_times,
+        )
+        ref_ask_at_bid, ref_bid_at_bid = _bidask.sample_bidask_at_times(
+            q_full, q0_a, q0_b, bid_times,
+        )
+        ask_queue_paths[:, 0] = ref_ask_at_ask
+        bid_queue_paths[:, 0] = ref_bid_at_bid
+        simulating_bar_q = True
+    elif direction == "without":
+        bar_q_internal = _native.simulate_with_externals(
+            process, cfg.time_horizon, bar_q_externals, cfg.seed,
+        )
+        bar_q_full = _native.merge_events(bar_q_internal, bar_q_externals)
+        cond_by_dim = _bidask.conditioning_events_without_market(bar_q_internal)
+        cond_externals = bar_q_externals
+        new_externals = q_externals
+        ref_ask_at_ask, ref_bid_at_ask = _bidask.sample_bidask_at_times(
+            bar_q_full, q0_a, q0_b, ask_times,
+        )
+        ref_ask_at_bid, ref_bid_at_bid = _bidask.sample_bidask_at_times(
+            bar_q_full, q0_a, q0_b, bid_times,
+        )
+        ask_queue_paths[:, 0] = ref_ask_at_ask
+        bid_queue_paths[:, 0] = ref_bid_at_bid
+        simulating_bar_q = False
+    else:
+        raise ValueError(f"direction must be 'with' or 'without'; got {direction!r}")
+
+    ctx = _native.ConditionalSimulationContext(
+        process, cond_by_dim,
+        cfg.time_horizon,
+        cond_externals=cond_externals,
+        new_externals=new_externals,
+    )
+
+    for sim_idx in range(cfg.n_simulations):
+        sim_at_ask = ctx.simulate_bidask_queue_at_times(
+            ask_times, q0_a, q0_b, seed=sim_idx,
+        )
+        sim_at_bid = ctx.simulate_bidask_queue_at_times(
+            bid_times, q0_a, q0_b, seed=sim_idx,
+        )
+
+        sim_ask_at_ask = sim_at_ask["ask"]
+        sim_bid_at_ask = sim_at_ask["bid"]
+        sim_ask_at_bid = sim_at_bid["ask"]
+        sim_bid_at_bid = sim_at_bid["bid"]
+
+        if simulating_bar_q:
+            ask_queue_paths[:, sim_idx + 1] = sim_ask_at_ask
+            bid_queue_paths[:, sim_idx + 1] = sim_bid_at_bid
+            q_a_at_ask, q_b_at_ask = ref_ask_at_ask, ref_bid_at_ask
+            q_bar_a_at_ask, q_bar_b_at_ask = sim_ask_at_ask, sim_bid_at_ask
+            q_a_at_bid, q_b_at_bid = ref_ask_at_bid, ref_bid_at_bid
+            q_bar_a_at_bid, q_bar_b_at_bid = sim_ask_at_bid, sim_bid_at_bid
+        else:
+            ask_queue_paths[:, sim_idx + 1] = sim_ask_at_ask
+            bid_queue_paths[:, sim_idx + 1] = sim_bid_at_bid
+            q_a_at_ask, q_b_at_ask = sim_ask_at_ask, sim_bid_at_ask
+            q_bar_a_at_ask, q_bar_b_at_ask = ref_ask_at_ask, ref_bid_at_ask
+            q_a_at_bid, q_b_at_bid = sim_ask_at_bid, sim_bid_at_bid
+            q_bar_a_at_bid, q_bar_b_at_bid = ref_ask_at_bid, ref_bid_at_bid
+
+        impact = _native.bidask_passive_impact_from_queue_samples(
+            q_a_at_ask=q_a_at_ask,
+            q_b_at_ask=q_b_at_ask,
+            q_bar_a_at_ask=q_bar_a_at_ask,
+            q_bar_b_at_ask=q_bar_b_at_ask,
+            q_a_at_bid=q_a_at_bid,
+            q_b_at_bid=q_b_at_bid,
+            q_bar_a_at_bid=q_bar_a_at_bid,
+            q_bar_b_at_bid=q_bar_b_at_bid,
+            ask_market_times=ask_times,
+            bid_market_times=bid_times,
+            mu=cfg.mu,
+            alpha=list(cfg.alpha),
+            beta=list(cfg.beta),
+            b_l_own=cfg.b_l,
+            b_l_cross=cfg.b_l_cross,
+            b_c_own=cfg.b_c,
+            b_c_cross=cfg.b_c_cross,
+            c_kappa_effective=float(cfg.c_kappa_effective),
+        )
+        ask_impact_paths[:, sim_idx] = impact["ask_impact"]
+        bid_impact_paths[:, sim_idx] = impact["bid_impact"]
+
+    return {
+        "ask_times": ask_times,
+        "bid_times": bid_times,
+        "ask_queue_paths": ask_queue_paths,
+        "bid_queue_paths": bid_queue_paths,
+        "ask_impact_paths": ask_impact_paths,
+        "bid_impact_paths": bid_impact_paths,
+    }
+
+
 def run(config: PassiveImpactConfig) -> dict:
     """Run the passive impact experiment per `config`.
 
     Valid values:
         counterfactual: False for with-us, True for without-us
-        mode: 'single' (double-queue is deferred)
+        mode: 'single' or 'double'
     """
     if config.mode not in ("single", "double"):
         raise ValueError(f"mode must be 'single' or 'double'; got {config.mode!r}")
     _side_sign(config.side)
+    _bidask.metaorder_dim(config.metaorder_side)
     if not np.isfinite(float(config.c_kappa_effective)):
         raise ValueError("c_kappa_effective must be finite")
     if config.mode == "double":
-        raise NotImplementedError("double-queue facade — wired in a follow-up")
+        return _run_double_direction(config, "without" if config.counterfactual else "with")
     return _run_single_direction(config, "without" if config.counterfactual else "with")
 
 
