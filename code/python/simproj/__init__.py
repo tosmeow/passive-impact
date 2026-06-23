@@ -3,11 +3,16 @@ from . import _native
 
 MultiExponentialHawkes = _native.MultiExponentialHawkes
 SimulationResult = _native.SimulationResult
+AffineCountingProcess = _native.AffineCountingProcess
 AffineQueueProcess = _native.AffineQueueProcess
 AffineBidAskQueueProcess = _native.AffineBidAskQueueProcess
 
 simulate_hawkes = _native.simulate_hawkes
 simulate_hawkes_result = _native.simulate_hawkes_result
+simulate_affine_counting_process = _native.simulate_affine_counting_process
+simulate_affine_counting_process_with_externals = (
+    _native.simulate_affine_counting_process_with_externals
+)
 simulate_with_externals = _native.simulate_with_externals
 simulate_hawkes_as_market_orders = _native.simulate_hawkes_as_market_orders
 simulate_hawkes_with_externals = _native.simulate_hawkes_with_externals
@@ -24,6 +29,7 @@ select_limit_flags_random_fraction = _native.select_limit_flags_random_fraction
 track_passive_fills = _native.track_passive_fills
 simulate_execution_latency_grid = _native.simulate_execution_latency_grid
 ConditionalHawkesSimulationContext = _native.ConditionalHawkesSimulationContext
+ConditionalAffineCountingSimulationContext = _native.ConditionalAffineCountingSimulationContext
 ConditionalSimulationContext = _native.ConditionalSimulationContext
 TailImpact = _native.TailImpact
 AggressiveImpactPath = _native.AggressiveImpactPath

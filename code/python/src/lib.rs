@@ -108,6 +108,88 @@ impl PySimulationResult {
     }
 }
 
+#[pyclass(name = "AffineCountingProcess")]
+pub struct PyAffineCountingProcess {
+    pub inner: MarkovianProcess,
+    a: f64,
+    b: f64,
+}
+
+fn affine_counting_process(a: f64, b: f64) -> MarkovianProcess {
+    MarkovianProcess::new(
+        1,
+        vec![0.0],
+        move |state: &[f64], _t: f64, _t_last: f64| vec![b + a * state[0]],
+        move |state: &[f64], event, _t: f64, _t_prev: f64| {
+            let mut next = state.to_vec();
+            if event.dim == 0 {
+                next[0] += 1.0;
+            }
+            next
+        },
+    )
+}
+
+#[pymethods]
+impl PyAffineCountingProcess {
+    #[new]
+    #[pyo3(signature = (a, b))]
+    fn new(a: f64, b: f64) -> PyResult<Self> {
+        if !a.is_finite() || !b.is_finite() {
+            return Err(pyo3::exceptions::PyValueError::new_err(
+                "a and b must be finite",
+            ));
+        }
+        if a < 0.0 || b < 0.0 {
+            return Err(pyo3::exceptions::PyValueError::new_err(
+                "a and b must be non-negative",
+            ));
+        }
+        Ok(Self {
+            inner: affine_counting_process(a, b),
+            a,
+            b,
+        })
+    }
+
+    fn a(&self) -> f64 {
+        self.a
+    }
+
+    fn b(&self) -> f64 {
+        self.b
+    }
+
+    fn dim(&self) -> usize {
+        1
+    }
+}
+
+#[pyfunction]
+#[pyo3(signature = (process, t_max, seed=None))]
+fn simulate_affine_counting_process(
+    process: &PyAffineCountingProcess,
+    t_max: f64,
+    seed: Option<u64>,
+) -> PySimulationResult {
+    PySimulationResult {
+        inner: rs_simulate(&process.inner, t_max, seed),
+    }
+}
+
+#[pyfunction]
+#[pyo3(signature = (process, t_max, externals, seed=None))]
+fn simulate_affine_counting_process_with_externals(
+    process: &PyAffineCountingProcess,
+    t_max: f64,
+    externals: &PySimulationResult,
+    seed: Option<u64>,
+) -> PySimulationResult {
+    PySimulationResult {
+        inner: rs_simulate_with_externals(&process.inner, t_max, &externals.inner, seed),
+    }
+}
+
 /// Opaque wrapper for a MarkovianProcess (the queue process produced
 /// by AffineQueueProcess::new_queue). Treated as black-box.
 #[pyclass(name = "QueueProcess")]
@@ -806,6 +888,120 @@ impl PyConditionalHawkesSimulationContext {
     }
 }
 
+/// Conditional simulation context for one-dimensional affine counting paths.
+/// The intensity is lambda(N_t) = b + a * N_t.
+#[pyclass(name = "ConditionalAffineCountingSimulationContext")]
+pub struct PyConditionalAffineCountingSimulationContext {
+    process: Py<PyAffineCountingProcess>,
+    cond_events_by_dim: Vec<Vec<f64>>,
+    cond_externals: Option<MultivariateSimulationResult>,
+    new_externals: Option<MultivariateSimulationResult>,
+    t_max: f64,
+}
+
+#[pymethods]
+impl PyConditionalAffineCountingSimulationContext {
+    #[new]
+    #[pyo3(signature = (process, cond_events_by_dim, t_max, *, cond_externals=None, new_externals=None))]
+    fn new(
+        process: Py<PyAffineCountingProcess>,
+        cond_events_by_dim: Vec<Vec<f64>>,
+        t_max: f64,
+        cond_externals: Option<&PySimulationResult>,
+        new_externals: Option<&PySimulationResult>,
+    ) -> PyResult<Self> {
+        if cond_events_by_dim.len() != 1 {
+            return Err(pyo3::exceptions::PyValueError::new_err(
+                "cond_events_by_dim must contain exactly one event-time list",
+            ));
+        }
+        if !t_max.is_finite() || t_max <= 0.0 {
+            return Err(pyo3::exceptions::PyValueError::new_err(
+                "t_max must be positive and finite",
+            ));
+        }
+        Ok(Self {
+            process,
+            cond_events_by_dim,
+            cond_externals: cond_externals.map(|r| r.inner.clone()),
+            new_externals: new_externals.map(|r| r.inner.clone()),
+            t_max,
+        })
+    }
+
+    /// Single-shot conditional affine counting simulation.
+    fn simulate(&self, py: Python, seed: Option<u64>) -> PySimulationResult {
+        let process_borrow = self.process.borrow(py);
+        let ctx = ConditionalSimulationContext::new(
+            &process_borrow.inner,
+            &self.cond_events_by_dim,
+            self.cond_externals.as_ref(),
+            self.new_externals.as_ref(),
+            self.t_max,
+        );
+        PySimulationResult {
+            inner: ctx.simulate(None, seed),
+        }
+    }
+
+    /// Batched conditional affine counting simulation.
+    #[pyo3(signature = (n_simulations, base_seed=None, shared_acceptance=false))]
+    fn simulate_many(
+        &self,
+        py: Python,
+        n_simulations: usize,
+        base_seed: Option<u64>,
+        shared_acceptance: bool,
+    ) -> Vec<PySimulationResult> {
+        let process_borrow = self.process.borrow(py);
+        let ctx = ConditionalSimulationContext::new(
+            &process_borrow.inner,
+            &self.cond_events_by_dim,
+            self.cond_externals.as_ref(),
+            self.new_externals.as_ref(),
+            self.t_max,
+        );
+
+        if shared_acceptance {
+            let configs: Vec<SimulationConfig<'_, Vec<f64>>> = (0..n_simulations)
+                .map(|_| SimulationConfig::new(self.new_externals.as_ref(), None))
+                .collect();
+            return ctx
+                .simulate_multiple(&configs, base_seed.unwrap_or(0))
+                .into_iter()
+                .map(|inner| PySimulationResult { inner })
+                .collect();
+        }
+
+        (0..n_simulations)
+            .map(|sim_idx| {
+                let seed = base_seed.map(|s| s.wrapping_add(sim_idx as u64));
+                PySimulationResult {
+                    inner: ctx.simulate(None, seed),
+                }
+            })
+            .collect()
+    }
+
+    /// Batched conditional affine counting simulation returning ragged time arrays.
+    #[pyo3(signature = (n_simulations, base_seed=None, shared_acceptance=false))]
+    fn simulate_many_times<'py>(
+        &self,
+        py: Python<'py>,
+        n_simulations: usize,
+        base_seed: Option<u64>,
+        shared_acceptance: bool,
+    ) -> PyResult<Bound<'py, PyList>> {
+        let results = self.simulate_many(py, n_simulations, base_seed, shared_acceptance);
+        let out = PyList::empty_bound(py);
+        for result in results {
+            let times: Vec<f64> = result.inner.events.iter().map(|e| e.time).collect();
+            out.append(times.into_pyarray_bound(py))?;
+        }
+        Ok(out)
+    }
+}
+
 /// Conditional simulation context. Owns its inputs (conditioning events + externals + process)
 /// and rebuilds the borrowed Rust context on each call.
 #[pyclass(name = "ConditionalSimulationContext")]
@@ -1064,6 +1260,12 @@ fn _native(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(simulate_hawkes, m)?)?;
     m.add_function(wrap_pyfunction!(simulate_hawkes_result, m)?)?;
     m.add_class::<PySimulationResult>()?;
+    m.add_class::<PyAffineCountingProcess>()?;
+    m.add_function(wrap_pyfunction!(simulate_affine_counting_process, m)?)?;
+    m.add_function(wrap_pyfunction!(
+        simulate_affine_counting_process_with_externals,
+        m
+    )?)?;
     m.add_class::<PyQueueProcess>()?;
     m.add_class::<PyAffineQueueProcess>()?;
     m.add_class::<PyAffineBidAskQueueProcess>()?;
@@ -1083,6 +1285,7 @@ fn _native(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(track_passive_fills, m)?)?;
     m.add_function(wrap_pyfunction!(simulate_execution_latency_grid, m)?)?;
     m.add_class::<PyConditionalHawkesSimulationContext>()?;
+    m.add_class::<PyConditionalAffineCountingSimulationContext>()?;
     m.add_class::<PyConditionalSimulationContext>()?;
     m.add_class::<PyTailImpact>()?;
     m.add_class::<PyAggressiveImpactPath>()?;

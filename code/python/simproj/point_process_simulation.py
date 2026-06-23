@@ -1,4 +1,4 @@
-"""Facade for conditional Hawkes point-process perturbation experiments."""
+"""Facade for conditional point-process perturbation experiments."""
 from __future__ import annotations
 
 import os
@@ -15,6 +15,7 @@ class PointProcessSimulationConfig:
     time_horizon: float = 100.0
     n_simulations: int = 500
 
+    # Multi-exponential Hawkes parameters.
     mu: float = 1.0
     alpha: list = field(default_factory=lambda: [0.065, 0.2, 0.325, 0.65])
     beta: list = field(default_factory=lambda: [0.15, 0.60, 2.5, 10.0])
@@ -29,6 +30,21 @@ class PointProcessSimulationConfig:
 
     seed: int = 42
 
+    process: str = "hawkes"
+
+    # Affine counting-process parameters: lambda(N_t) = b + a * N_t.
+    a: float = 0.05
+    b: float = 1.0
+
+
+def _process_kind(cfg: PointProcessSimulationConfig) -> str:
+    kind = str(cfg.process).strip().lower()
+    if kind in {"hawkes", "multi_exponential_hawkes", "multi-exponential-hawkes"}:
+        return "hawkes"
+    if kind in {"affine", "affine_counting", "affine-counting", "affine_count"}:
+        return "affine"
+    raise ValueError("process must be 'hawkes' or 'affine'")
+
 
 def _make_hawkes(cfg: PointProcessSimulationConfig):
     if cfg.stationary:
@@ -36,6 +52,38 @@ def _make_hawkes(cfg: PointProcessSimulationConfig):
             cfg.mu, list(cfg.alpha), list(cfg.beta),
         )
     return _native.MultiExponentialHawkes(cfg.mu, list(cfg.alpha), list(cfg.beta))
+
+
+def _make_affine(cfg: PointProcessSimulationConfig):
+    return _native.AffineCountingProcess(float(cfg.a), float(cfg.b))
+
+
+def _make_process(cfg: PointProcessSimulationConfig, kind: str):
+    if kind == "hawkes":
+        return _make_hawkes(cfg)
+    if kind == "affine":
+        return _make_affine(cfg)
+    raise ValueError("process must be 'hawkes' or 'affine'")
+
+
+def _simulate_baseline(process, cfg: PointProcessSimulationConfig, kind: str):
+    if kind == "hawkes":
+        return _native.simulate_hawkes_result(process, cfg.time_horizon, cfg.seed)
+    return _native.simulate_affine_counting_process(process, cfg.time_horizon, cfg.seed)
+
+
+def _make_context(process, baseline_times: np.ndarray, perturbation, cfg, kind: str):
+    ctx_cls = (
+        _native.ConditionalHawkesSimulationContext
+        if kind == "hawkes"
+        else _native.ConditionalAffineCountingSimulationContext
+    )
+    return ctx_cls(
+        process,
+        [baseline_times.tolist()],
+        cfg.time_horizon,
+        new_externals=perturbation,
+    )
 
 
 def _perturbation_times(cfg: PointProcessSimulationConfig) -> np.ndarray:
@@ -70,17 +118,13 @@ def run(cfg: PointProcessSimulationConfig) -> dict:
     if cfg.time_horizon <= 0.0:
         raise ValueError("time_horizon must be positive")
 
-    hawkes = _make_hawkes(cfg)
-    baseline = _native.simulate_hawkes_result(hawkes, cfg.time_horizon, cfg.seed)
+    kind = _process_kind(cfg)
+    process = _make_process(cfg, kind)
+    baseline = _simulate_baseline(process, cfg, kind)
     baseline_times = np.asarray(baseline.times(), dtype=np.float64)
 
     perturbation = _make_perturbation_events(cfg)
-    ctx = _native.ConditionalHawkesSimulationContext(
-        hawkes,
-        [baseline_times.tolist()],
-        cfg.time_horizon,
-        new_externals=perturbation,
-    )
+    ctx = _make_context(process, baseline_times, perturbation, cfg, kind)
 
     sim_seed = int(cfg.seed) + 1
     paths = [
@@ -100,6 +144,9 @@ def run(cfg: PointProcessSimulationConfig) -> dict:
         "perturbed_lengths": perturbed_lengths,
         "baseline_count": np.array([len(baseline_times)], dtype=np.int64),
         "time_horizon": np.array([cfg.time_horizon], dtype=np.float64),
+        "process_kind": np.array([kind]),
+        "affine_a": np.array([cfg.a], dtype=np.float64),
+        "affine_b": np.array([cfg.b], dtype=np.float64),
     }
 
 

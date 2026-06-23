@@ -1,4 +1,4 @@
-"""Plot utilities for conditional Hawkes perturbation outputs."""
+"""Plot utilities for conditional point-process perturbation outputs."""
 from __future__ import annotations
 
 import argparse
@@ -24,6 +24,13 @@ from experiments.plot_utils_common import (
 )
 
 SCRIPT_DIR = script_dir(__file__)
+PROCESS_KINDS = ("affine", "hawkes")
+REQUIRED_OUTPUTS = [
+    "baseline_times.npy",
+    "perturbation_times.npy",
+    "perturbed_times.npy",
+    "perturbed_lengths.npy",
+]
 
 
 def _default_data_dir() -> Path:
@@ -34,16 +41,26 @@ def _default_output_dir() -> Path:
     return Path(SCRIPT_DIR) / "images"
 
 
+def _has_point_process_outputs(base: Path) -> bool:
+    return all((base / name).exists() for name in REQUIRED_OUTPUTS)
+
+
+def _available_data_dirs(data_base=None) -> list[Path]:
+    base = Path(data_base) if data_base is not None else _default_data_dir()
+    data_dirs = [base / kind for kind in PROCESS_KINDS if _has_point_process_outputs(base / kind)]
+    if data_dirs:
+        return data_dirs
+
+    if _has_point_process_outputs(base):
+        return [base]
+
+    raise FileNotFoundError(f"No point-process outputs found under {base}")
+
+
 def load_data(data_base=None) -> dict:
     """Load point-process simulation outputs from .npy files."""
     base = Path(data_base) if data_base is not None else _default_data_dir()
-    required = [
-        "baseline_times.npy",
-        "perturbation_times.npy",
-        "perturbed_times.npy",
-        "perturbed_lengths.npy",
-    ]
-    missing = [name for name in required if not (base / name).exists()]
+    missing = [name for name in REQUIRED_OUTPUTS if not (base / name).exists()]
     if missing:
         raise FileNotFoundError(f"Missing {missing} under {base}")
 
@@ -56,7 +73,19 @@ def load_data(data_base=None) -> dict:
     horizon_path = base / "time_horizon.npy"
     if horizon_path.exists():
         data["time_horizon"] = float(np.load(horizon_path)[0])
+    kind_path = base / "process_kind.npy"
+    if kind_path.exists():
+        data["process_kind"] = str(np.load(kind_path)[0])
     return data
+
+
+def _process_label(data: dict, data_dir: Path) -> str:
+    kind = data.get("process_kind")
+    if kind:
+        return str(kind)
+    if data_dir.name in PROCESS_KINDS:
+        return data_dir.name
+    return "point_process"
 
 
 def _path_rows(perturbed_times: np.ndarray, perturbed_lengths: np.ndarray) -> list[np.ndarray]:
@@ -139,7 +168,7 @@ def plot_counting_process_shades(
         where="post",
         color="black",
         linewidth=2.4,
-        label="Factual Hawkes path",
+        label="Factual path",
     )
 
     for idx, t in enumerate(data["perturbation_times"]):
@@ -156,7 +185,8 @@ def plot_counting_process_shades(
     ax.set_xlabel("Time")
     ax.set_ylabel("Event count")
     ax.set_xlim(0.0, horizon)
-    maybe_set_title(ax, "Conditional Hawkes paths after event perturbation", include_title)
+    kind = data.get("process_kind", "point-process").replace("_", " ")
+    maybe_set_title(ax, f"Conditional {kind} paths after event perturbation", include_title)
     ax.legend()
     plt.tight_layout()
     save_or_show(fig, save_path, dpi=300)
@@ -171,23 +201,47 @@ def generate_all_plots(
     include_title: bool = False,
     output_format: str = "png",
 ):
-    data = load_data(data_base=data_base)
+    data_dirs = _available_data_dirs(data_base=data_base)
     output_dir = Path(output_dir) if output_dir is not None else _default_output_dir()
-    plot_counting_process_shades(
-        data,
-        time_horizon=time_horizon,
-        path_alpha=path_alpha,
-        save_path=with_output_format(output_dir / "hawkes_shocked_paths.png", output_format),
-        include_title=include_title,
-    )
+    for data_dir in data_dirs:
+        data = load_data(data_base=data_dir)
+        label = _process_label(data, data_dir)
+        save_dir = output_dir / label if len(data_dirs) > 1 else output_dir
+        plot_counting_process_shades(
+            data,
+            time_horizon=time_horizon,
+            path_alpha=path_alpha,
+            save_path=with_output_format(
+                save_dir / f"point_process_shocked_paths_{label}.png", output_format,
+            ),
+            include_title=include_title,
+        )
 
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Generate point-process perturbation plots.")
-    parser.add_argument("--data-base", default=None, help="Directory containing the point-process .npy outputs.")
-    parser.add_argument("--output-dir", default=None, help="Directory where images should be written.")
-    parser.add_argument("--time-horizon", type=float, default=None, help="Plot horizon; defaults to saved/inferred horizon.")
-    parser.add_argument("--path-alpha", type=float, default=0.12, help="Alpha for each shocked path line.")
+    parser.add_argument(
+        "--data-base",
+        default=None,
+        help="Directory containing the point-process .npy outputs.",
+    )
+    parser.add_argument(
+        "--output-dir",
+        default=None,
+        help="Directory where images should be written.",
+    )
+    parser.add_argument(
+        "--time-horizon",
+        type=float,
+        default=None,
+        help="Plot horizon; defaults to saved/inferred horizon.",
+    )
+    parser.add_argument(
+        "--path-alpha",
+        type=float,
+        default=0.12,
+        help="Alpha for each shocked path line.",
+    )
     add_title_argument(parser, default=False)
     add_format_argument(parser, default="png")
     return parser.parse_args()
