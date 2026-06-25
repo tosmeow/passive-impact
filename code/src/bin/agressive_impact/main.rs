@@ -33,8 +33,13 @@ impl Direction {
 }
 
 fn main() {
+    for direction in parse_directions() {
+        run_direction(direction);
+    }
+}
+
+fn run_direction(direction: Direction) {
     let t_total = Instant::now();
-    let direction = parse_direction();
 
     // ==========================================================================
     // Configuration (hybrid aggressive-impact baseline)
@@ -275,12 +280,13 @@ fn main() {
     println!("[TIMING] TOTAL: {:?}", t_total.elapsed());
 }
 
-fn parse_direction() -> Direction {
-    let mut direction = Direction::WithUs;
+fn parse_directions() -> Vec<Direction> {
+    let mut directions = vec![Direction::WithUs, Direction::WithoutUs];
     for arg in env::args().skip(1) {
         match arg.as_str() {
-            "--counterfactual" | "--without-us" => direction = Direction::WithoutUs,
-            "--with-us" => direction = Direction::WithUs,
+            "--both" => directions = vec![Direction::WithUs, Direction::WithoutUs],
+            "--counterfactual" | "--without-us" => directions = vec![Direction::WithoutUs],
+            "--with-us" => directions = vec![Direction::WithUs],
             "-h" | "--help" => {
                 print_help();
                 process::exit(0);
@@ -292,16 +298,17 @@ fn parse_direction() -> Direction {
             }
         }
     }
-    direction
+    directions
 }
 
 fn print_help() {
     println!(
         "\
-Usage: agressive_impact [--with-us | --without-us | --counterfactual]
+Usage: agressive_impact [--both | --with-us | --without-us | --counterfactual]
 
 Options:
-  --with-us          Condition on q and simulate bar_q. This is the default.
+  --both             Run both with-us and without-us scenarios. This is the default.
+  --with-us          Condition on q and simulate bar_q.
   --without-us      Condition on bar_q and simulate q.
   --counterfactual  Alias for --without-us.
   -h, --help        Show this help message.
