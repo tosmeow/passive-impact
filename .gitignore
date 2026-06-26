@@ -23,7 +23,11 @@ data/
 experiments/**/data/**
 !experiments/**/data/
 !experiments/**/data/README.md
-!experiments/impact_cost/load_experiments/data/**
+
+# generated experiment figures
+experiments/impact_cost/load_experiments/images/**
+!experiments/impact_cost/load_experiments/images/
+!experiments/impact_cost/load_experiments/images/README.md
 
 # maturin / pyo3 build artifacts
 code/python/target/

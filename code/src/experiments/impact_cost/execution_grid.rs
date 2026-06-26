@@ -163,6 +163,7 @@ pub fn build_execution_latency_grid(
             event_qtys: window_qtys,
             queue_post: window_queue_post,
             passive_flags,
+            own_qtys: vec![0; window_len],
             cancellation_policy: input.cancellation_policy,
             cap_position_by_queue_post: input.cap_position_by_queue_post,
             seed: tracker_seed,

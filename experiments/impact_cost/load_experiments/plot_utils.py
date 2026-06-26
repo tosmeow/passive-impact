@@ -19,7 +19,6 @@ if __package__ in {None, ""}:
     from experiments.impact_cost.load_experiments.lifecycle_passive_cost import (
         DEFAULT_CONFIG_PATH,
         _plot_lifecycle_paths,
-        _plot_representative_step_paths,
         load_lifecycle_config,
     )
 else:
@@ -31,67 +30,38 @@ else:
     from .lifecycle_passive_cost import (
         DEFAULT_CONFIG_PATH,
         _plot_lifecycle_paths,
-        _plot_representative_step_paths,
         load_lifecycle_config,
     )
 
 
-def generate_all_plots(
+def generate_lifecycle_plot(
     config_path: str | Path = DEFAULT_CONFIG_PATH,
     *,
     include_title: bool = False,
     output_format: str = "png",
-) -> list[Path]:
-    """Regenerate all canonical lifecycle plots from saved output tables."""
+) -> Path:
+    """Regenerate the canonical lifecycle impact-cost plot from saved summaries."""
     cfg = load_lifecycle_config(config_path)
     data_dir = Path(cfg.output_dir)
     image_dir = Path(cfg.image_dir)
     image_dir.mkdir(parents=True, exist_ok=True)
 
-    samples = _read_csv(data_dir / "impact_cost_path_samples.csv")
     cost_summary = _read_csv(data_dir / "impact_cost_path_summary.csv")
     impact_summary = _read_csv(data_dir / "price_impact_path_summary.csv")
     active_summary = _read_csv(data_dir / "active_quantity_path_summary.csv")
-    jumps = _read_csv(data_dir / "impact_cost_fill_jumps.csv")
-    path_summary = _read_csv(data_dir / "policy_path_summary.csv")
 
     plot_path = with_output_format(image_dir / "lifecycle_impact_cost_paths.png", output_format)
-    step_path = with_output_format(
-        image_dir / "lifecycle_representative_cost_steps.png",
-        output_format,
-    )
-    shared_step_path = with_output_format(
-        image_dir / "lifecycle_representative_cost_steps_shared_y.png",
-        output_format,
-    )
 
     _plot_lifecycle_paths(
         plot_path,
-        samples,
+        pd.DataFrame(),
         cost_summary,
         impact_summary,
         active_summary,
         cfg,
         include_title=include_title,
     )
-    _plot_representative_step_paths(
-        step_path,
-        samples,
-        jumps,
-        path_summary,
-        cfg,
-        include_title=include_title,
-    )
-    _plot_representative_step_paths(
-        shared_step_path,
-        samples,
-        jumps,
-        path_summary,
-        cfg,
-        shared_y=True,
-        include_title=include_title,
-    )
-    return [plot_path, step_path, shared_step_path]
+    return plot_path
 
 
 def _read_csv(path: Path) -> pd.DataFrame:
@@ -112,12 +82,13 @@ def _parse_args() -> argparse.Namespace:
 
 def main() -> None:
     args = _parse_args()
-    for path in generate_all_plots(
-        args.config,
-        include_title=args.include_title,
-        output_format=args.output_format,
-    ):
-        print(path)
+    print(
+        generate_lifecycle_plot(
+            args.config,
+            include_title=args.include_title,
+            output_format=args.output_format,
+        )
+    )
 
 
 if __name__ == "__main__":

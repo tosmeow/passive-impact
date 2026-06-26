@@ -16,9 +16,11 @@ pub use events::{valid_dim, AffineQueueIntensity, CANCEL_DIM, LIMIT_DIM, MARKET_
 /// Input for anchored affine queue simulation.
 ///
 /// All event arrays are row-aligned. `bar_q_pre` and `bar_q_post` are the
-/// empirical queue immediately before and after each row; `passive_flags`
-/// marks own limit rows that should be present in `bar_q` but removed from the
-/// no-us queue.
+/// empirical queue immediately before and after each row; `own_qtys` marks the
+/// owned part of each limit/cancel row that should be present in `bar_q` but
+/// removed from the no-us queue. `passive_flags` is retained for older callers
+/// and is interpreted as full-row ownership for limit rows when `own_qtys` is
+/// zero.
 #[derive(Clone, Debug)]
 pub struct AnchoredQueueInput {
     /// Event row times in seconds from the chosen origin.
@@ -33,6 +35,8 @@ pub struct AnchoredQueueInput {
     pub bar_q_post: Vec<f64>,
     /// Rows representing our passive limit orders.
     pub passive_flags: Vec<bool>,
+    /// Owned quantity per row. Supports partial ownership of sized limit/cancel rows.
+    pub own_qtys: Vec<u32>,
     /// Times at which queue paths should be sampled.
     pub sample_times: Vec<f64>,
     /// Empirical queue before the first input row.
@@ -57,6 +61,7 @@ impl AnchoredQueueInput {
             bar_q_pre: &self.bar_q_pre,
             bar_q_post: &self.bar_q_post,
             passive_flags: &self.passive_flags,
+            own_qtys: &self.own_qtys,
             initial_q: self.initial_q,
         }
     }
@@ -77,8 +82,24 @@ pub struct AnchoredConditioningPath<'a> {
     pub bar_q_post: &'a [f64],
     /// Passive own-limit flags.
     pub passive_flags: &'a [bool],
+    /// Owned row quantities for limit/cancel rows.
+    pub own_qtys: &'a [u32],
     /// Empirical queue before the first row.
     pub initial_q: f64,
+}
+
+impl<'a> AnchoredConditioningPath<'a> {
+    /// Return the owned quantity for a row, capped by the observed row size.
+    pub fn own_qty_at(&self, row_idx: usize, dim: usize, qty: u32) -> u32 {
+        let explicit = self.own_qtys[row_idx].min(qty);
+        if explicit > 0 {
+            return explicit;
+        }
+        if self.passive_flags[row_idx] && dim == LIMIT_DIM {
+            return qty;
+        }
+        0
+    }
 }
 
 /// Sampled output of anchored queue simulation.
@@ -125,9 +146,23 @@ fn validate_input(input: &AnchoredQueueInput) -> Result<(), String> {
         && input.event_qtys.len() == n
         && input.bar_q_pre.len() == n
         && input.bar_q_post.len() == n
-        && input.passive_flags.len() == n;
+        && input.passive_flags.len() == n
+        && input.own_qtys.len() == n;
     if !same_len {
         return Err("anchored queue event arrays must have matching lengths".to_string());
+    }
+    for row_idx in 0..n {
+        let own_qty = input.own_qtys[row_idx];
+        if own_qty == 0 {
+            continue;
+        }
+        if own_qty > input.event_qtys[row_idx] {
+            return Err("own_qtys must be less than or equal to event_qtys".to_string());
+        }
+        match valid_dim(input.event_dims[row_idx]) {
+            Some(LIMIT_DIM) | Some(CANCEL_DIM) => {}
+            _ => return Err("own_qtys may only be positive on limit/cancel rows".to_string()),
+        }
     }
     if input.sample_times.is_empty() {
         return Err("sample_times must not be empty".to_string());
@@ -159,6 +194,7 @@ mod tests {
             bar_q_pre: vec![10.0, 20.0, 19.0],
             bar_q_post: vec![20.0, 19.0, 21.0],
             passive_flags: vec![false, false, false],
+            own_qtys: vec![0, 0, 0],
             sample_times: vec![0.0, 0.5, 1.0, 2.0],
             initial_q: 10.0,
             horizon_seconds: 2.0,
@@ -205,12 +241,55 @@ mod tests {
         input.bar_q_pre = vec![1.0];
         input.bar_q_post = vec![0.0];
         input.passive_flags = vec![false];
+        input.own_qtys = vec![0];
         input.sample_times = vec![0.0];
         input.initial_q = 1.0;
         input.n_simulations = 1;
         let out = simulate_anchored_affine_queue(input).unwrap();
         assert_eq!(out.queue_samples, vec![0.0]);
         assert_eq!(out.offset_samples, vec![0.0]);
+    }
+
+    #[test]
+    fn partial_limit_ownership_removes_only_owned_row_quantity() {
+        let mut input = base_input();
+        input.event_times = vec![0.0];
+        input.event_dims = vec![0];
+        input.event_qtys = vec![5];
+        input.bar_q_pre = vec![10.0];
+        input.bar_q_post = vec![15.0];
+        input.passive_flags = vec![false];
+        input.own_qtys = vec![2];
+        input.sample_times = vec![0.0];
+        input.initial_q = 10.0;
+        input.n_simulations = 1;
+
+        let out = simulate_anchored_affine_queue(input).unwrap();
+        assert_eq!(out.factual_queue, vec![15.0]);
+        assert_eq!(out.mechanical_queue, vec![13.0]);
+        assert_eq!(out.queue_samples, vec![13.0]);
+        assert_eq!(out.offset_samples, vec![-2.0]);
+    }
+
+    #[test]
+    fn partial_cancel_ownership_removes_only_owned_cancel_from_no_us() {
+        let mut input = base_input();
+        input.event_times = vec![0.0];
+        input.event_dims = vec![1];
+        input.event_qtys = vec![5];
+        input.bar_q_pre = vec![10.0];
+        input.bar_q_post = vec![5.0];
+        input.passive_flags = vec![false];
+        input.own_qtys = vec![2];
+        input.sample_times = vec![0.0];
+        input.initial_q = 10.0;
+        input.n_simulations = 1;
+
+        let out = simulate_anchored_affine_queue(input).unwrap();
+        assert_eq!(out.factual_queue, vec![5.0]);
+        assert_eq!(out.mechanical_queue, vec![7.0]);
+        assert_eq!(out.queue_samples, vec![7.0]);
+        assert_eq!(out.offset_samples, vec![2.0]);
     }
 
     #[test]

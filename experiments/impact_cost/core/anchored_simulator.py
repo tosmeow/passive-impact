@@ -51,6 +51,7 @@ def build_anchored_events(
     market_side: str | None = None,
     initial_q: int,
     origin: object | None = None,
+    own_qtys: Iterable[int] | None = None,
     qty_col: str = "qty",
     ts_col: str = "ts",
     order_type_col: str = "order_type",
@@ -65,6 +66,12 @@ def build_anchored_events(
     flags = np.asarray(list(passive_l_flags), dtype=bool)
     if flags.shape != (len(window),):
         raise ValueError("passive_l_flags must have one boolean per dataframe row")
+    if own_qtys is None:
+        own_qty_arr = np.zeros(len(window), dtype=np.int64)
+    else:
+        own_qty_arr = np.asarray(list(own_qtys), dtype=np.int64)
+        if own_qty_arr.shape != (len(window),):
+            raise ValueError("own_qtys must have one integer per dataframe row")
 
     seconds = event_seconds(window, ts_col=ts_col, origin=origin)
     types = window[order_type_col].astype(str).str.lower().to_numpy()
@@ -73,6 +80,10 @@ def build_anchored_events(
     bar_post = window[queue_col].to_numpy(dtype=np.float64)
     if np.any(qty < 0):
         raise ValueError("qty must be non-negative")
+    if np.any(own_qty_arr < 0):
+        raise ValueError("own_qtys must be non-negative")
+    if np.any(own_qty_arr > qty):
+        raise ValueError("own_qtys must be less than or equal to qty")
 
     bar_pre = np.empty(len(window), dtype=np.float64)
     if len(window) > 0:
@@ -93,6 +104,13 @@ def build_anchored_events(
     dim[(types == MARKET) & market_consuming_side] = MARKET_DIM
 
     is_passive_ours = flags & (types == LIMIT) & posting_side
+    positive_own = own_qty_arr > 0
+    if np.any(positive_own & ~(((types == LIMIT) | (types == CANCEL)) & posting_side)):
+        bad = int(np.flatnonzero(positive_own & ~(((types == LIMIT) | (types == CANCEL)) & posting_side))[0])
+        raise ValueError(
+            "own_qtys may only be positive on selected-side limit/cancel rows; "
+            f"first invalid row_pos={bad}"
+        )
     return pd.DataFrame(
         {
             "row_pos": np.arange(len(window), dtype=np.int64),
@@ -105,6 +123,7 @@ def build_anchored_events(
             "bar_q_pre": bar_pre,
             "bar_q_post": bar_post,
             "is_passive_ours": is_passive_ours,
+            "own_qty": own_qty_arr,
         }
     )
 
@@ -237,6 +256,7 @@ def simulate_anchored_queue_paths(
     a_c: float,
     b_c: float,
     origin: object | None = None,
+    own_qtys: Iterable[int] | None = None,
 ) -> AnchoredSimulationResult:
     """Simulate counterfactual queues anchored on empirical snapshots.
 
@@ -252,6 +272,7 @@ def simulate_anchored_queue_paths(
         market_side=market_side,
         initial_q=initial_q,
         origin=origin,
+        own_qtys=own_qtys,
     )
     native = simproj.simulate_anchored_affine_queue(
         anchored_events["time"].to_numpy(dtype=np.float64),
@@ -269,6 +290,7 @@ def simulate_anchored_queue_paths(
         float(a_c),
         float(b_c),
         None if seed is None else int(seed),
+        anchored_events["own_qty"].to_numpy(dtype=np.uint32),
     )
 
     n_times = int(native["n_times"])

@@ -31,6 +31,10 @@ if __package__ in {None, ""}:
         timestamp_like,
         window_from_aggregated,
     )
+    from experiments.impact_cost.core.empirical_lifecycle import (
+        UNRESOLVED_COLUMNS,
+        resolve_lifecycle_to_observed_rows,
+    )
     from experiments.impact_cost.core.level_execution import market_side_for_queue
     from experiments.impact_cost.core.passive_impact import (
         PassiveImpactModelConfig,
@@ -64,6 +68,10 @@ else:
         sample_previous_value,
         timestamp_like,
         window_from_aggregated,
+    )
+    from ..core.empirical_lifecycle import (
+        UNRESOLVED_COLUMNS,
+        resolve_lifecycle_to_observed_rows,
     )
     from ..core.level_execution import market_side_for_queue
     from ..core.passive_impact import (
@@ -161,10 +169,11 @@ def run_lifecycle_passive_cost_pipeline(
     cancel_rows: list[dict[str, Any]] = []
     event_rows: list[dict[str, Any]] = []
     cycle_rows: list[dict[str, Any]] = []
-    jump_rows: list[dict[str, Any]] = []
+    unresolved_rows: list[dict[str, Any]] = []
     path_rows: list[dict[str, Any]] = []
     impact_rows: list[dict[str, Any]] = []
     active_rows: list[dict[str, Any]] = []
+    n_cost_jumps = 0
 
     for candidate in candidates.itertuples(index=False):
         episode_id = int(candidate.episode_id)
@@ -208,7 +217,7 @@ def run_lifecycle_passive_cost_pipeline(
             market_times,
             warmup_seconds=float(cfg.warmup_seconds),
         )
-        q_bar = queue_to_u32(market["q_bar"].to_numpy(dtype=np.float64))
+        q_with_us = queue_to_u32(market["q_with_us"].to_numpy(dtype=np.float64))
         final_costs: list[float] = []
         final_impacts: list[float] = []
         total_filled: list[int] = []
@@ -222,11 +231,22 @@ def run_lifecycle_passive_cost_pipeline(
                 episode_id=episode_id,
                 policy_path_id=policy_path_id,
             )
+            lifecycle = resolve_lifecycle_to_observed_rows(
+                window,
+                lifecycle,
+                raw_side=cfg.raw_side,
+                origin=window_start,
+                horizon_seconds=cfg.horizon_seconds,
+            )
             orders = _tag_path_frame(lifecycle["orders"], window_start)
             fills_all = _tag_path_frame(lifecycle["fills"], window_start)
             cancels_all = _tag_path_frame(lifecycle["cancels"], window_start)
             events_all = _tag_path_frame(lifecycle["events"], window_start)
             cycles = _tag_path_frame(lifecycle["cycle_summary"], window_start)
+            unresolved = _tag_path_frame(
+                lifecycle.get("unresolved", pd.DataFrame()),  # type: ignore[union-attr]
+                window_start,
+            )
             fills = fills_all[fills_all["fill_time_s"] <= cfg.horizon_seconds].copy()
             cancels = cancels_all[
                 cancels_all["cancel_time_s"] <= cfg.horizon_seconds
@@ -234,11 +254,11 @@ def run_lifecycle_passive_cost_pipeline(
             events = events_all[events_all["time_s"] <= cfg.horizon_seconds].copy()
 
             active_market_qty = active_displacement_at_times(events, market_times)
-            q_no_us = queue_to_u32(q_bar.astype(np.float64) - active_market_qty)
-            clipped = int(np.sum(active_market_qty > q_bar.astype(np.float64)))
+            q_no_us = queue_to_u32(q_with_us.astype(np.float64) - active_market_qty)
+            clipped = int(np.sum(active_market_qty > q_with_us.astype(np.float64)))
             impact_at_markets = passive_impact_path_from_queue_samples(
                 q_no_us,
-                q_bar,
+                q_with_us,
                 impact_market_times,
                 queue_col=cfg.queue_col,
                 cfg=impact_cfg,
@@ -265,6 +285,7 @@ def run_lifecycle_passive_cost_pipeline(
                     "window_start": str(window_start),
                 },
             )
+            n_cost_jumps += int(len(jumps))
             cumulative_path = sample_previous_value(
                 event_times=jumps["fill_time_s"].to_numpy(dtype=np.float64),
                 event_values=jumps["cumulative_cost"].to_numpy(dtype=np.float64),
@@ -276,6 +297,7 @@ def run_lifecycle_passive_cost_pipeline(
             n_generated_filled = int(len(fills_all))
             n_generated_canceled = int(len(cancels_all))
             n_open_at_horizon = int(len(orders) - n_filled - n_canceled)
+            n_unresolved = int(len(unresolved))
             final_cost = float(cumulative_path[-1]) if len(cumulative_path) else 0.0
             final_impact = float(impact_on_grid[-1]) if len(impact_on_grid) else 0.0
             max_active_qty = float(np.max(active_on_grid)) if len(active_on_grid) else 0.0
@@ -290,7 +312,7 @@ def run_lifecycle_passive_cost_pipeline(
             cancel_rows.extend(cancels_all.to_dict("records"))
             event_rows.extend(events_all.to_dict("records"))
             cycle_rows.extend(cycles.to_dict("records"))
-            jump_rows.extend(jumps.to_dict("records"))
+            unresolved_rows.extend(unresolved.to_dict("records"))
             path_summary_rows.append(
                 {
                     "episode_id": episode_id,
@@ -301,6 +323,7 @@ def run_lifecycle_passive_cost_pipeline(
                     "n_canceled_orders": n_canceled,
                     "n_generated_filled_orders": n_generated_filled,
                     "n_generated_canceled_orders": n_generated_canceled,
+                    "n_unresolved_lifecycle_events": n_unresolved,
                     "n_open_orders_at_horizon": n_open_at_horizon,
                     "n_clipped_market_samples": clipped,
                     "max_active_qty": max_active_qty,
@@ -368,14 +391,17 @@ def run_lifecycle_passive_cost_pipeline(
     cancels = pd.DataFrame(cancel_rows)
     events = pd.DataFrame(event_rows)
     cycles = pd.DataFrame(cycle_rows)
-    jumps = pd.DataFrame(jump_rows)
+    unresolved = pd.DataFrame(unresolved_rows)
+    if unresolved.empty and len(unresolved.columns) == 0:
+        unresolved = pd.DataFrame(columns=["window_start", *UNRESOLVED_COLUMNS])
     samples = pd.DataFrame(path_rows)
     impact_samples = pd.DataFrame(impact_rows)
     active_samples = pd.DataFrame(active_rows)
     cost_summary = _summarize_cost_paths(samples)
-    cost_summary_by_fill_count = _summarize_cost_paths(samples, by_fill_count=True)
     impact_summary = _summarize_impact_paths(impact_samples)
     active_summary = _summarize_active_paths(active_samples)
+
+    _remove_obsolete_lifecycle_outputs(output_dir, image_dir, output_format=output_format)
 
     episodes.to_csv(output_dir / "episode_summary.csv", index=False)
     path_summary.to_csv(output_dir / "policy_path_summary.csv", index=False)
@@ -384,27 +410,12 @@ def run_lifecycle_passive_cost_pipeline(
     cancels.to_csv(output_dir / "policy_cancels.csv", index=False)
     events.to_csv(output_dir / "policy_events.csv", index=False)
     cycles.to_csv(output_dir / "policy_cycle_summary.csv", index=False)
-    jumps.to_csv(output_dir / "impact_cost_fill_jumps.csv", index=False)
-    samples.to_csv(output_dir / "impact_cost_path_samples.csv", index=False)
+    unresolved.to_csv(output_dir / "policy_unresolved_events.csv", index=False)
     cost_summary.to_csv(output_dir / "impact_cost_path_summary.csv", index=False)
-    cost_summary_by_fill_count.to_csv(
-        output_dir / "impact_cost_path_summary_by_fill_count.csv",
-        index=False,
-    )
-    impact_samples.to_csv(output_dir / "price_impact_path_samples.csv", index=False)
     impact_summary.to_csv(output_dir / "price_impact_path_summary.csv", index=False)
-    active_samples.to_csv(output_dir / "active_quantity_path_samples.csv", index=False)
     active_summary.to_csv(output_dir / "active_quantity_path_summary.csv", index=False)
     plot_path = with_output_format(
         image_dir / "lifecycle_impact_cost_paths.png",
-        output_format,
-    )
-    step_plot_path = with_output_format(
-        image_dir / "lifecycle_representative_cost_steps.png",
-        output_format,
-    )
-    step_shared_y_plot_path = with_output_format(
-        image_dir / "lifecycle_representative_cost_steps_shared_y.png",
         output_format,
     )
 
@@ -417,23 +428,6 @@ def run_lifecycle_passive_cost_pipeline(
         cfg,
         include_title=include_title,
     )
-    _plot_representative_step_paths(
-        step_plot_path,
-        samples,
-        jumps,
-        path_summary,
-        cfg,
-        include_title=include_title,
-    )
-    _plot_representative_step_paths(
-        step_shared_y_plot_path,
-        samples,
-        jumps,
-        path_summary,
-        cfg,
-        shared_y=True,
-        include_title=include_title,
-    )
 
     with open(output_dir / "lifecycle_passive_cost_config.json", "w", encoding="utf-8") as f:
         json.dump(asdict(cfg), f, indent=2)
@@ -444,7 +438,7 @@ def run_lifecycle_passive_cost_pipeline(
         "n_candidate_episodes": int(len(candidates)),
         "n_ok_episodes": int(len(ok)),
         "n_policy_paths": int(len(path_summary)),
-        "n_fill_jumps": int(len(jumps)),
+        "n_cost_jumps": int(n_cost_jumps),
         "mean_final_cost": float(path_summary["final_cost"].mean())
         if len(path_summary)
         else float("nan"),
@@ -455,10 +449,7 @@ def run_lifecycle_passive_cost_pipeline(
         if len(path_summary)
         else float("nan"),
         "plot_path": plot_path,
-        "step_plot_path": step_plot_path,
-        "step_shared_y_plot_path": step_shared_y_plot_path,
         "path_summary_path": output_dir / "policy_path_summary.csv",
-        "fill_jumps_path": output_dir / "impact_cost_fill_jumps.csv",
     }
 
 
@@ -476,13 +467,13 @@ def _market_samples(
         return pd.DataFrame(
             {
                 "time_s": pd.Series(dtype=np.float64),
-                "q_bar": pd.Series(dtype=np.float64),
+                "q_with_us": pd.Series(dtype=np.float64),
             }
         )
     return pd.DataFrame(
         {
             "time_s": event_seconds(rows, origin=origin).astype(np.float64),
-            "q_bar": rows[queue_col].to_numpy(dtype=np.float64),
+            "q_with_us": rows[queue_col].to_numpy(dtype=np.float64),
         }
     )
 
@@ -503,7 +494,7 @@ def _impact_clock_times(
 def _tag_path_frame(frame: pd.DataFrame, window_start: pd.Timestamp) -> pd.DataFrame:
     out = frame.copy()
     if "window_start" not in out.columns:
-        out.insert(2, "window_start", str(window_start))
+        out.insert(min(2, len(out.columns)), "window_start", str(window_start))
     return out
 
 
@@ -515,14 +506,9 @@ def _output_grid(cfg: LifecyclePassiveCostConfig) -> np.ndarray:
     return np.unique(grid).astype(np.float64)
 
 
-def _summarize_cost_paths(
-    samples: pd.DataFrame,
-    *,
-    by_fill_count: bool = False,
-) -> pd.DataFrame:
-    group_cols = ["time_s"] if not by_fill_count else ["n_filled_orders", "time_s"]
+def _summarize_cost_paths(samples: pd.DataFrame) -> pd.DataFrame:
+    group_cols = ["time_s"]
     columns = [
-        *([] if not by_fill_count else ["n_filled_orders"]),
         "time_s",
         "n_samples",
         "mean_cost",
@@ -644,148 +630,6 @@ def _plot_lifecycle_paths(
     plt.close(fig)
 
 
-def _plot_representative_step_paths(
-    path: Path,
-    samples: pd.DataFrame,
-    jumps: pd.DataFrame,
-    path_summary: pd.DataFrame,
-    cfg: LifecyclePassiveCostConfig,
-    *,
-    n_windows: int = 3,
-    shared_y: bool = False,
-    include_title: bool = False,
-) -> None:
-    _setup_matplotlib()
-    import matplotlib.pyplot as plt
-
-    selected = _select_representative_step_paths(path_summary, n_windows=n_windows)
-    if selected.empty:
-        fig, ax = plt.subplots(figsize=(10.0, 3.2))
-        ax.text(0.5, 0.5, "no individual cost paths", ha="center", va="center")
-        ax.axis("off")
-        fig.tight_layout()
-        fig.savefig(path, dpi=170)
-        plt.close(fig)
-        return
-
-    n_panels = int(len(selected))
-    fig, axes = plt.subplots(
-        n_panels,
-        1,
-        figsize=(10.8, max(3.0, 2.55 * n_panels)),
-        sharex=True,
-    )
-    axes = np.atleast_1d(axes)
-
-    y_max = _representative_y_max(samples, selected) if shared_y else np.nan
-
-    for ax, row in zip(axes, selected.itertuples(index=False)):
-        episode_id = int(row.episode_id)
-        policy_path_id = int(row.policy_path_id)
-        path_rows = samples[
-            (samples["episode_id"] == episode_id)
-            & (samples["policy_path_id"] == policy_path_id)
-        ].sort_values("time_s")
-        jump_rows = jumps[
-            (jumps["episode_id"] == episode_id)
-            & (jumps["policy_path_id"] == policy_path_id)
-        ].sort_values("fill_time_s")
-
-        if not path_rows.empty:
-            ax.step(
-                path_rows["time_s"],
-                path_rows["cumulative_cost"],
-                where="post",
-                color="#1f5d99",
-                linewidth=2.0,
-                label="Cost path",
-            )
-        if not jump_rows.empty:
-            ax.scatter(
-                jump_rows["fill_time_s"],
-                jump_rows["cumulative_cost"],
-                s=24,
-                color="#b83232",
-                zorder=3,
-                label="Fills",
-            )
-            for fill_time in jump_rows["fill_time_s"].to_numpy(dtype=np.float64):
-                ax.axvline(fill_time, color="#b83232", linewidth=0.6, alpha=0.16)
-
-        ax.axhline(0.0, color="black", linewidth=0.75, alpha=0.45)
-        if np.isfinite(y_max):
-            ax.set_ylim(min(0.0, -0.04 * y_max), 1.08 * y_max)
-        ax.grid(True, alpha=0.25)
-        ax.set_ylabel("Cost")
-        if include_title:
-            ax.set_title(
-                "window {episode}, policy path {policy}, fills {fills}, final {final:.6g}".format(
-                    episode=episode_id,
-                    policy=policy_path_id,
-                    fills=int(row.n_filled_orders),
-                    final=float(row.final_cost),
-                ),
-                fontsize=10,
-            )
-        ax.legend(loc="best")
-
-    axes[-1].set_xlabel("Seconds from first post")
-    axes[-1].set_xlim(0.0, float(cfg.horizon_seconds))
-    title = "Representative individual lifecycle cost paths"
-    if shared_y:
-        title += " (shared y-axis)"
-    if include_title:
-        fig.suptitle(title, y=0.995)
-    fig.tight_layout()
-    fig.savefig(path, dpi=170)
-    plt.close(fig)
-
-
-def _select_representative_step_paths(
-    path_summary: pd.DataFrame,
-    *,
-    n_windows: int,
-) -> pd.DataFrame:
-    columns = [
-        "episode_id",
-        "policy_path_id",
-        "n_filled_orders",
-        "final_cost",
-    ]
-    if path_summary.empty:
-        return pd.DataFrame({col: pd.Series(dtype="float64") for col in columns})
-
-    candidates = path_summary[path_summary["n_filled_orders"] > 0].copy()
-    if candidates.empty:
-        candidates = path_summary.copy()
-
-    rows: list[pd.Series] = []
-    for episode_id in sorted(candidates["episode_id"].unique())[: int(n_windows)]:
-        frame = candidates[candidates["episode_id"] == episode_id].copy()
-        target = float(frame["final_cost"].median())
-        idx = (frame["final_cost"] - target).abs().idxmin()
-        rows.append(frame.loc[idx])
-
-    if not rows:
-        return pd.DataFrame({col: pd.Series(dtype="float64") for col in columns})
-    out = pd.DataFrame(rows)
-    return out[columns]
-
-
-def _representative_y_max(samples: pd.DataFrame, selected: pd.DataFrame) -> float:
-    values: list[float] = []
-    for row in selected.itertuples(index=False):
-        path_rows = samples[
-            (samples["episode_id"] == int(row.episode_id))
-            & (samples["policy_path_id"] == int(row.policy_path_id))
-        ]
-        if not path_rows.empty:
-            values.append(float(path_rows["cumulative_cost"].max()))
-    if not values:
-        return np.nan
-    return max(max(values), 1e-12)
-
-
 def _episode_status(candidate: Any, *, status: str, **values: Any) -> dict[str, Any]:
     base = {
         "episode_id": int(candidate.episode_id),
@@ -809,10 +653,42 @@ def _episode_status(candidate: Any, *, status: str, **values: Any) -> dict[str, 
 def _setup_matplotlib() -> None:
     mpl_cache = Path("/private/tmp/matplotlib-cache")
     mpl_cache.mkdir(parents=True, exist_ok=True)
-    os.environ.setdefault("MPLCONFIGDIR", str(mpl_cache))
+    mpl_config_dir = os.environ.get("MPLCONFIGDIR")
+    if not mpl_config_dir or not os.access(mpl_config_dir, os.W_OK):
+        os.environ["MPLCONFIGDIR"] = str(mpl_cache)
+    xdg_cache_home = os.environ.get("XDG_CACHE_HOME")
+    if not xdg_cache_home or not os.access(xdg_cache_home, os.W_OK):
+        os.environ["XDG_CACHE_HOME"] = str(mpl_cache)
     import matplotlib
 
     matplotlib.use("Agg")
+
+
+def _remove_obsolete_lifecycle_outputs(
+    output_dir: Path,
+    image_dir: Path,
+    *,
+    output_format: str,
+) -> None:
+    """Delete files produced by older lifecycle plotting/reporting paths."""
+    for filename in [
+        "impact_cost_fill_jumps.csv",
+        "impact_cost_path_samples.csv",
+        "impact_cost_path_summary_by_fill_count.csv",
+        "price_impact_path_samples.csv",
+        "active_quantity_path_samples.csv",
+    ]:
+        path = output_dir / filename
+        if path.exists():
+            path.unlink()
+
+    for stem in [
+        "lifecycle_representative_cost_steps",
+        "lifecycle_representative_cost_steps_shared_y",
+    ]:
+        path = with_output_format(image_dir / f"{stem}.png", output_format)
+        if path.exists():
+            path.unlink()
 
 
 def _passive_impact_model_config(cfg: LifecyclePassiveCostConfig) -> PassiveImpactModelConfig:
@@ -932,9 +808,12 @@ def _import_simproj():
         code_python = repo_root / "code" / "python"
         sys.path = [path for path in sys.path if path != str(code_python)]
         sys.path.insert(0, str(code_python))
-        import simproj  # type: ignore
+        try:
+            import simproj  # type: ignore
 
-        return simproj
+            return simproj
+        except (ImportError, ModuleNotFoundError):
+            return None
 
 
 def _parse_args() -> argparse.Namespace:

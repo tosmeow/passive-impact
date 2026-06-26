@@ -81,18 +81,19 @@ impl<'a> AnchoredConditionalSimulationContext<'a> {
             let bar_model = self.conditioning_path.bar_q_pre[row_idx].max(0.0);
             let dim_raw = self.conditioning_path.event_dims[row_idx];
             let qty = self.conditioning_path.event_qtys[row_idx];
-            let passive = self.conditioning_path.passive_flags[row_idx];
 
             if let Some(dim) = valid_dim(dim_raw) {
+                let own_qty = self.conditioning_path.own_qty_at(row_idx, dim, qty);
+                let background_qty = qty - own_qty;
                 let q_model = (bar_model + dq).max(0.0);
                 match dim {
                     LIMIT_DIM | CANCEL_DIM => {
-                        let accepted_qty = if passive && dim == LIMIT_DIM {
+                        let accepted_qty = if background_qty == 0 {
                             0
                         } else {
                             let cond_int = self.intensity.intensity(bar_model, dim);
                             let new_int = self.intensity.intensity(q_model, dim);
-                            accepted_count(&mut rng, qty, cond_int, new_int)
+                            accepted_count(&mut rng, background_qty, cond_int, new_int)
                         };
                         let bar_after = apply_sized_event_to_queue(bar_model, dim, qty);
                         let q_after = apply_sized_event_to_queue(q_model, dim, accepted_qty);
@@ -152,12 +153,8 @@ impl<'a> AnchoredConditionalSimulationContext<'a> {
             if let Some(dim) = valid_dim(self.conditioning_path.event_dims[row_idx]) {
                 let qty = self.conditioning_path.event_qtys[row_idx];
                 let q_model = (bar_model + dq).max(0.0);
-                let accepted_qty =
-                    if self.conditioning_path.passive_flags[row_idx] && dim == LIMIT_DIM {
-                        0
-                    } else {
-                        qty
-                    };
+                let own_qty = self.conditioning_path.own_qty_at(row_idx, dim, qty);
+                let accepted_qty = qty - own_qty;
                 let bar_after = apply_sized_event_to_queue(bar_model, dim, qty);
                 let q_after = apply_sized_event_to_queue(q_model, dim, accepted_qty);
                 dq = q_after - bar_after;

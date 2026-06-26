@@ -36,9 +36,11 @@ impl CancellationPolicy {
 
 /// Row-aligned input for passive fill tracking.
 ///
-/// `passive_flags` marks own limit rows. Market rows consume queue volume and
-/// can fill active passive orders; cancellation rows update priority according
-/// to `cancellation_policy`.
+/// `own_qtys` marks owned quantities on limit/cancel rows. `passive_flags` is
+/// retained for older callers and means full-row ownership on limit rows when
+/// `own_qtys` is zero. Market rows consume queue volume and can fill active
+/// passive orders; background cancellation rows update priority according to
+/// `cancellation_policy`.
 #[derive(Clone, Debug)]
 pub struct PassiveFillTrackerInput {
     /// Event row times in seconds.
@@ -51,6 +53,8 @@ pub struct PassiveFillTrackerInput {
     pub queue_post: Vec<f64>,
     /// Flags selecting own passive limit rows.
     pub passive_flags: Vec<bool>,
+    /// Owned quantity per row. Supports partial ownership of sized limit/cancel rows.
+    pub own_qtys: Vec<u32>,
     /// Cancellation priority convention.
     pub cancellation_policy: CancellationPolicy,
     /// Whether to cap active order positions by each row's post-event queue.
@@ -74,6 +78,8 @@ pub struct PassiveFillTrackerResult {
     pub executed_qtys: Vec<u32>,
     /// Remaining quantity for each passive order.
     pub remaining_qtys: Vec<u32>,
+    /// Quantity canceled by own cancel rows for each passive order.
+    pub canceled_qtys: Vec<u32>,
     /// Final scalar position for each passive order.
     pub final_position_qtys: Vec<f64>,
     /// Final volume above each passive order.
@@ -98,6 +104,8 @@ struct ActiveOrder {
     row_pos: usize,
     time: f64,
     initial_qty: u32,
+    executed_qty: u32,
+    canceled_qty: u32,
     remaining_qty: u32,
     position_qty: f64,
     top_qty: u32,
@@ -127,31 +135,38 @@ pub fn track_passive_fills(
         if event_qty > 0 {
             match dim {
                 Some(LIMIT_DIM) => {
-                    let is_own_limit = input.passive_flags[row_idx];
-                    if !is_own_limit {
-                        let has_active = orders.iter().any(|o| o.remaining_qty > 0);
-                        if has_active {
-                            global_top_qty = global_top_qty.saturating_add(event_qty);
-                            for order in orders.iter_mut().filter(|o| o.remaining_qty > 0) {
-                                order.top_qty = global_top_qty;
-                            }
-                        }
-                    }
+                    let own_qty = own_qty_at(&input, row_idx, LIMIT_DIM, event_qty);
+                    let background_qty = event_qty - own_qty;
 
-                    if is_own_limit {
-                        let initial_position = input.queue_post[row_idx]
-                            .max(minimum_new_order_position(&orders, event_qty));
+                    if own_qty > 0 {
+                        let queue_after_own = input.queue_post[row_idx]
+                            - f64::from(background_qty);
+                        let initial_position = queue_after_own
+                            .max(own_qty as f64)
+                            .max(minimum_new_order_position(&orders, own_qty));
                         orders.push(ActiveOrder {
                             order_id: orders.len(),
                             row_pos: row_idx,
                             time,
-                            initial_qty: event_qty,
-                            remaining_qty: event_qty,
+                            initial_qty: own_qty,
+                            executed_qty: 0,
+                            canceled_qty: 0,
+                            remaining_qty: own_qty,
                             position_qty: initial_position,
                             top_qty: global_top_qty,
                             completed_time: None,
                         });
                         enforce_order_positions(&mut orders);
+                    }
+
+                    if background_qty > 0 {
+                        let has_active = orders.iter().any(|o| o.remaining_qty > 0);
+                        if has_active {
+                            global_top_qty = global_top_qty.saturating_add(background_qty);
+                            for order in orders.iter_mut().filter(|o| o.remaining_qty > 0) {
+                                order.top_qty = global_top_qty;
+                            }
+                        }
                     }
                 }
                 Some(MARKET_DIM) => {
@@ -160,6 +175,7 @@ pub fn track_passive_fills(
                             market_fill_qty(order.position_qty, order.remaining_qty, event_qty);
                         if fill_qty > 0 {
                             order.remaining_qty -= fill_qty;
+                            order.executed_qty += fill_qty;
                             fill_order_ids.push(order.order_id);
                             fill_order_row_pos.push(order.row_pos);
                             fill_event_row_pos.push(row_idx);
@@ -179,11 +195,20 @@ pub fn track_passive_fills(
                     enforce_order_positions(&mut orders);
                 }
                 Some(CANCEL_DIM) => {
+                    let own_qty = own_qty_at(&input, row_idx, CANCEL_DIM, event_qty);
+                    if own_qty > 0 {
+                        cancel_own_orders(&mut orders, own_qty);
+                    }
+                    let background_qty = event_qty - own_qty;
+                    if background_qty == 0 {
+                        enforce_order_positions(&mut orders);
+                        continue;
+                    }
                     let desired_top_qty =
-                        desired_top_cancel_qty(&mut rng, event_qty, input.cancellation_policy);
+                        desired_top_cancel_qty(&mut rng, background_qty, input.cancellation_policy);
                     let cancel_top_qty = global_top_qty.min(desired_top_qty);
                     global_top_qty -= cancel_top_qty;
-                    let cancel_position_qty = event_qty - cancel_top_qty;
+                    let cancel_position_qty = background_qty - cancel_top_qty;
                     for order in orders.iter_mut().filter(|o| o.remaining_qty > 0) {
                         order.position_qty = (order.position_qty - cancel_position_qty as f64)
                             .max(order.remaining_qty as f64);
@@ -206,6 +231,7 @@ pub fn track_passive_fills(
     let mut initial_qtys = Vec::with_capacity(orders.len());
     let mut executed_qtys = Vec::with_capacity(orders.len());
     let mut remaining_qtys = Vec::with_capacity(orders.len());
+    let mut canceled_qtys = Vec::with_capacity(orders.len());
     let mut final_position_qtys = Vec::with_capacity(orders.len());
     let mut final_top_qtys = Vec::with_capacity(orders.len());
     let mut completed_times = Vec::with_capacity(orders.len());
@@ -215,8 +241,9 @@ pub fn track_passive_fills(
         order_row_pos.push(order.row_pos);
         order_times.push(order.time);
         initial_qtys.push(order.initial_qty);
-        executed_qtys.push(order.initial_qty - order.remaining_qty);
+        executed_qtys.push(order.executed_qty);
         remaining_qtys.push(order.remaining_qty);
+        canceled_qtys.push(order.canceled_qty);
         final_position_qtys.push(order.position_qty);
         final_top_qtys.push(order.top_qty);
         completed_times.push(order.completed_time.unwrap_or(f64::NAN));
@@ -229,6 +256,7 @@ pub fn track_passive_fills(
         initial_qtys,
         executed_qtys,
         remaining_qtys,
+        canceled_qtys,
         final_position_qtys,
         final_top_qtys,
         completed_times,
@@ -238,6 +266,17 @@ pub fn track_passive_fills(
         fill_times,
         fill_qtys,
     })
+}
+
+fn own_qty_at(input: &PassiveFillTrackerInput, row_idx: usize, dim: usize, qty: u32) -> u32 {
+    let explicit = input.own_qtys[row_idx].min(qty);
+    if explicit > 0 {
+        return explicit;
+    }
+    if input.passive_flags[row_idx] && dim == LIMIT_DIM {
+        return qty;
+    }
+    0
 }
 
 fn market_fill_qty(position: f64, remaining: u32, event_qty: u32) -> u32 {
@@ -250,6 +289,23 @@ fn market_fill_qty(position: f64, remaining: u32, event_qty: u32) -> u32 {
         .max(0.0)
         .floor()
         .min(remaining as f64) as u32
+}
+
+fn cancel_own_orders(orders: &mut [ActiveOrder], mut qty: u32) {
+    for order in orders.iter_mut().filter(|o| o.remaining_qty > 0) {
+        if qty == 0 {
+            break;
+        }
+        let cancel_qty = order.remaining_qty.min(qty);
+        order.remaining_qty -= cancel_qty;
+        order.canceled_qty += cancel_qty;
+        qty -= cancel_qty;
+        order.position_qty = if order.remaining_qty == 0 {
+            0.0
+        } else {
+            (order.position_qty - cancel_qty as f64).max(order.remaining_qty as f64)
+        };
+    }
 }
 
 fn desired_top_cancel_qty<R: rand::Rng>(
@@ -337,9 +393,23 @@ fn validate_input(input: &PassiveFillTrackerInput) -> Result<(), String> {
     let same_len = input.event_dims.len() == n
         && input.event_qtys.len() == n
         && input.queue_post.len() == n
-        && input.passive_flags.len() == n;
+        && input.passive_flags.len() == n
+        && input.own_qtys.len() == n;
     if !same_len {
         return Err("passive fill tracker arrays must have matching lengths".to_string());
+    }
+    for row_idx in 0..n {
+        let own_qty = input.own_qtys[row_idx];
+        if own_qty == 0 {
+            continue;
+        }
+        if own_qty > input.event_qtys[row_idx] {
+            return Err("own_qtys must be less than or equal to event_qtys".to_string());
+        }
+        match valid_dim(input.event_dims[row_idx]) {
+            Some(LIMIT_DIM) | Some(CANCEL_DIM) => {}
+            _ => return Err("own_qtys may only be positive on limit/cancel rows".to_string()),
+        }
     }
     Ok(())
 }
@@ -356,6 +426,7 @@ mod tests {
             event_qtys: vec![5, 3, 7, 2, 3, 4],
             queue_post: vec![10.0, 13.0, 6.0, 4.0, 4.0, 0.0],
             passive_flags: vec![true, false, false, false, false, false],
+            own_qtys: vec![0, 0, 0, 0, 0, 0],
             cancellation_policy: CancellationPolicy::Top,
             cap_position_by_queue_post: false,
             seed: Some(7),
@@ -377,6 +448,7 @@ mod tests {
             event_qtys: vec![5, 5, 2],
             queue_post: vec![10.0, 5.0, 3.0],
             passive_flags: vec![true, false, false],
+            own_qtys: vec![0, 0, 0],
             cancellation_policy: CancellationPolicy::Top,
             cap_position_by_queue_post: false,
             seed: Some(7),
@@ -395,6 +467,7 @@ mod tests {
             event_qtys: vec![1, 0, 1],
             queue_post: vec![10.0, 1.0, 0.0],
             passive_flags: vec![true, false, false],
+            own_qtys: vec![0, 0, 0],
             cancellation_policy: CancellationPolicy::Top,
             cap_position_by_queue_post: true,
             seed: Some(7),
@@ -413,6 +486,7 @@ mod tests {
             event_qtys: vec![1, 1, 2, 5],
             queue_post: vec![5.0, 2.0, 0.0, 0.0],
             passive_flags: vec![true, true, false, false],
+            own_qtys: vec![0, 0, 0, 0],
             cancellation_policy: CancellationPolicy::Top,
             cap_position_by_queue_post: false,
             seed: Some(7),
@@ -432,6 +506,7 @@ mod tests {
             event_qtys: vec![5, 5, 10, 5, 5],
             queue_post: vec![10.0, 15.0, 5.0, 0.0, 0.0],
             passive_flags: vec![true, true, false, false, false],
+            own_qtys: vec![0, 0, 0, 0, 0],
             cancellation_policy: CancellationPolicy::Below,
             cap_position_by_queue_post: false,
             seed: Some(7),
@@ -452,6 +527,7 @@ mod tests {
             event_qtys: vec![5, 5, 5, 5, 5],
             queue_post: vec![10.0, 5.0, 0.0, 0.0, 0.0],
             passive_flags: vec![true, true, false, false, false],
+            own_qtys: vec![0, 0, 0, 0, 0],
             cancellation_policy: CancellationPolicy::Top,
             cap_position_by_queue_post: false,
             seed: Some(7),

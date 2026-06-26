@@ -1,8 +1,7 @@
 # Impact Cost Lifecycle Experiment
 
-Canonical load experiment for passive impact cost. This directory mirrors the
-older experiment layout: edit `config.toml`, run the lifecycle experiment, and
-regenerate display figures with `plot_utils.py`.
+Canonical load experiment for passive impact cost. Edit `config.toml`, run the
+lifecycle experiment, and regenerate the display figure with `plot_utils.py`.
 
 ## Run
 
@@ -31,6 +30,11 @@ The checked-in config defaults to a small showcase run (`max_episodes = 20`,
 `n_policy_paths = 10`) so figures can be regenerated quickly. Increase those
 two values in `config.toml` for larger sweeps.
 
+The lifecycle keeps randomized fill/execution times, but resolves generated
+post/cancel displayed quantity to the next observed limit/cancel row quantities
+on the selected side. There is no synthetic post/cancel timestamp mode in the
+canonical runner.
+
 To retarget the propagator to a chosen implied Hawkes norm while preserving the
 shape stored in `base_config.toml`, run:
 
@@ -40,14 +44,11 @@ python -m experiments.impact_cost.load_experiments.set_propagator_norm 0.95
 
 This rewrites only the `propagator_weights` line in `config.toml`.
 
-For the formulas behind the lifecycle, tail propagator, and cost accounting,
-see [`FORMULAS.md`](FORMULAS.md).
-
 ## Display
 
 ```bash
 python -m experiments.impact_cost.load_experiments.plot_utils
 ```
 
-CSV/JSON outputs are written under `data/lifecycle_passive_cost/`; PNG figures
-are written under `images/`.
+CSV/JSON outputs are written under `data/lifecycle_passive_cost/`; the
+canonical PNG is written to `images/lifecycle_impact_cost_paths.png`.

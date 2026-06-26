@@ -25,6 +25,9 @@ from experiments.impact_cost.core.experiment_utils import (
     sample_previous_value,
     select_limit_sequences,
 )
+from experiments.impact_cost.core.empirical_lifecycle import (
+    resolve_lifecycle_to_observed_rows,
+)
 from experiments.impact_cost.core.level_execution import (
     first_level_execution_events_from_snapshots,
     market_side_for_queue,
@@ -221,6 +224,152 @@ def test_regroup_event_times_by_dim_accepts_simulation_times_and_dims():
         {"time": 3.0, "dim": 1, "qty": 2},
         {"time": 3.0, "dim": 2, "qty": 1},
         {"time": 4.0, "dim": 1, "qty": 1},
+    ]
+
+
+def test_resolve_lifecycle_uses_first_observed_limit_units_and_keeps_random_fill():
+    window = pd.DataFrame(
+        {
+            "ts": pd.to_datetime(
+                [
+                    "2025-01-01 09:30:00.05",
+                    "2025-01-01 09:30:00.10",
+                    "2025-01-01 09:30:00.20",
+                ]
+            ),
+            "order_type": ["limit", "limit", "limit"],
+            "side": ["A", "A", "A"],
+            "qty": [2, 4, 8],
+            "q_b": [12, 16, 24],
+            "q_a": [0, 0, 0],
+            "source_row_pos": [10, 11, 12],
+        }
+    )
+    lifecycle = {
+        "orders": pd.DataFrame(
+            [
+                {
+                    "episode_id": 0,
+                    "policy_path_id": 0,
+                    "cycle_id": 0,
+                    "order_id": 7,
+                    "order_slot": 0,
+                    "post_time_s": 0.08,
+                    "qty": 5,
+                    "filled": True,
+                    "fill_time_s": 0.25,
+                    "cancel_time_s": np.nan,
+                    "terminal_time_s": 0.25,
+                    "terminal_action": "fill",
+                }
+            ]
+        ),
+        "fills": pd.DataFrame(
+            [
+                {
+                    "episode_id": 0,
+                    "policy_path_id": 0,
+                    "cycle_id": 0,
+                    "order_id": 7,
+                    "order_slot": 0,
+                    "post_time_s": 0.08,
+                    "qty": 5,
+                    "fill_time_s": 0.25,
+                }
+            ]
+        ),
+        "cancels": pd.DataFrame(),
+        "events": pd.DataFrame(),
+        "cycle_summary": pd.DataFrame(),
+    }
+
+    resolved = resolve_lifecycle_to_observed_rows(
+        window,
+        lifecycle,
+        raw_side="A",
+        origin=pd.Timestamp("2025-01-01 09:30:00"),
+        horizon_seconds=1.0,
+    )
+
+    assert resolved["own_qtys"].tolist() == [0, 4, 1]
+    events = resolved["events"].sort_values(["time_s", "event_kind"]).reset_index(drop=True)
+    assert events[["time_s", "event_kind", "qty", "displacement_delta"]].to_dict("records") == [
+        {"time_s": 0.1, "event_kind": "post", "qty": 4, "displacement_delta": 4},
+        {"time_s": 0.2, "event_kind": "post", "qty": 1, "displacement_delta": 1},
+        {"time_s": 0.25, "event_kind": "fill", "qty": 5, "displacement_delta": -5},
+    ]
+    assert resolved["fills"]["fill_time_s"].tolist() == [0.25]
+
+
+def test_resolve_lifecycle_snaps_cancel_intentions_to_observed_cancel_units():
+    window = pd.DataFrame(
+        {
+            "ts": pd.to_datetime(
+                [
+                    "2025-01-01 09:30:00.10",
+                    "2025-01-01 09:30:00.12",
+                    "2025-01-01 09:30:00.30",
+                ]
+            ),
+            "order_type": ["limit", "cancel", "cancel"],
+            "side": ["A", "A", "A"],
+            "qty": [5, 2, 5],
+            "q_b": [15, 13, 8],
+            "q_a": [0, 0, 0],
+            "source_row_pos": [20, 21, 22],
+        }
+    )
+    lifecycle = {
+        "orders": pd.DataFrame(
+            [
+                {
+                    "episode_id": 0,
+                    "policy_path_id": 0,
+                    "cycle_id": 0,
+                    "order_id": 3,
+                    "order_slot": 0,
+                    "post_time_s": 0.05,
+                    "qty": 5,
+                    "filled": False,
+                    "fill_time_s": np.nan,
+                    "cancel_time_s": 0.20,
+                    "terminal_time_s": 0.20,
+                    "terminal_action": "cancel",
+                }
+            ]
+        ),
+        "fills": pd.DataFrame(),
+        "cancels": pd.DataFrame(
+            [
+                {
+                    "episode_id": 0,
+                    "policy_path_id": 0,
+                    "cycle_id": 0,
+                    "order_id": 3,
+                    "order_slot": 0,
+                    "post_time_s": 0.05,
+                    "qty": 5,
+                    "cancel_time_s": 0.20,
+                }
+            ]
+        ),
+        "events": pd.DataFrame(),
+        "cycle_summary": pd.DataFrame(),
+    }
+
+    resolved = resolve_lifecycle_to_observed_rows(
+        window,
+        lifecycle,
+        raw_side="A",
+        origin=pd.Timestamp("2025-01-01 09:30:00"),
+        horizon_seconds=1.0,
+    )
+
+    assert resolved["own_qtys"].tolist() == [5, 0, 5]
+    events = resolved["events"].sort_values(["time_s", "event_kind"]).reset_index(drop=True)
+    assert events[["time_s", "event_kind", "qty", "displacement_delta"]].to_dict("records") == [
+        {"time_s": 0.1, "event_kind": "post", "qty": 5, "displacement_delta": 5},
+        {"time_s": 0.3, "event_kind": "cancel", "qty": 5, "displacement_delta": -5},
     ]
 
 

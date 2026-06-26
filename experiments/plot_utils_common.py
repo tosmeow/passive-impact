@@ -1,7 +1,19 @@
 """Shared helpers for experiment plotting scripts."""
 from __future__ import annotations
 
+import os
 from pathlib import Path
+
+_MPL_CACHE = Path(os.environ.get("TMPDIR", "/private/tmp")) / "matplotlib-cache"
+_MPL_CACHE.mkdir(parents=True, exist_ok=True)
+if not os.environ.get("MPLCONFIGDIR") or not os.access(
+    os.environ["MPLCONFIGDIR"], os.W_OK
+):
+    os.environ["MPLCONFIGDIR"] = str(_MPL_CACHE)
+if not os.environ.get("XDG_CACHE_HOME") or not os.access(
+    os.environ["XDG_CACHE_HOME"], os.W_OK
+):
+    os.environ["XDG_CACHE_HOME"] = str(_MPL_CACHE)
 
 import matplotlib.pyplot as plt
 

@@ -12,7 +12,7 @@ not document archived diagnostics or earlier prototypes.
 | `core/` | Reusable dataframe, lifecycle, impact, and accounting helpers. |
 | `load_experiments/config.toml` | Main file to edit before running the experiment. |
 | `load_experiments/lifecycle_passive_cost.py` | Canonical lifecycle runner. |
-| `load_experiments/plot_utils.py` | Regenerates figures from saved outputs. |
+| `load_experiments/plot_utils.py` | Regenerates the canonical figure from saved outputs. |
 | `load_experiments/data/` | Local parquet inputs and generated CSV/JSON outputs. |
 | `load_experiments/images/` | Generated PNG figures. |
 
@@ -47,7 +47,7 @@ The config has five sections:
 - `[paths]`: input parquet, CSV/JSON output directory, image directory
 - `[episodes]`: episode sampling, horizon, grid step, warmup, seed
 - `[queue]`: queue side conventions
-- `[lifecycle]`: synthetic post/fill/cancel behavior
+- `[lifecycle]`: random lifecycle rules and empirical post/cancel row resolution
 - `[impact]`: fixed tail-propagator coefficients
 
 The current experiment is fixed to `tail_propagator`. There is no
@@ -66,16 +66,20 @@ The runner does the following:
 
 1. Loads the processed aggregate queue.
 2. Samples candidate lifecycle episodes from empirical market-event windows.
-3. Generates synthetic passive post, fill, and cancel events.
-4. Converts active displayed quantity into a no-us queue:
+3. Generates random passive lifecycle intentions.
+4. Resolves intended post/cancel displayed quantity onto the next observed
+   limit/cancel row quantities on the selected side. Fill/execution times remain
+   the random lifecycle times; they are not inferred from observed market
+   events.
+5. Converts active displayed quantity into a no-us queue:
 
 ```text
-q_no_us(t) = max(q_factual(t) - active_own_qty(t), 0)
+q_no_us(t) = max(q_with_us(t) - active_own_qty(t), 0)
 ```
 
-5. Computes the tail-propagator passive price-impact path.
-6. Samples the left-limit impact at fill times.
-7. Accumulates running execution cost:
+6. Computes the tail-propagator passive price-impact path.
+7. Samples the left-limit impact at fill times.
+8. Accumulates running execution cost:
 
 ```text
 C_t = sum_{fills tau_j <= t} qty_j * Delta P_{tau_j-}
@@ -104,6 +108,7 @@ Bid-queue impacts are signed negative; ask-queue impacts are signed positive.
 
 - `core/experiment_utils.py`: load aggregate data, choose windows, sample paths
 - `core/passive_lifecycle.py`: generate post/fill/cancel lifecycle events
+- `core/empirical_lifecycle.py`: resolve lifecycle post/cancel intentions onto observed row quantities
 - `core/passive_impact.py`: bridge queue paths to impact and cost jumps
 - `core/reduced_form_impact.py`: tail-propagator impact implementation
 - `core/cost_utils.py`: event-time and left-limit accounting utilities
@@ -130,13 +135,9 @@ Main output files:
 - `policy_cancels.csv`
 - `policy_events.csv`
 - `policy_cycle_summary.csv`
-- `impact_cost_fill_jumps.csv`
-- `impact_cost_path_samples.csv`
+- `policy_unresolved_events.csv`
 - `impact_cost_path_summary.csv`
-- `impact_cost_path_summary_by_fill_count.csv`
-- `price_impact_path_samples.csv`
 - `price_impact_path_summary.csv`
-- `active_quantity_path_samples.csv`
 - `active_quantity_path_summary.csv`
 - `lifecycle_passive_cost_config.json`
 
@@ -146,11 +147,9 @@ PNG figures are written under:
 load_experiments/images/
 ```
 
-Generated figures:
+Generated figure:
 
 - `lifecycle_impact_cost_paths.png`
-- `lifecycle_representative_cost_steps.png`
-- `lifecycle_representative_cost_steps_shared_y.png`
 
 Regenerate figures from saved CSV outputs with:
 

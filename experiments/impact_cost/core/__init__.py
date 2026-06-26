@@ -17,6 +17,7 @@ from .level_execution import (
     price_sign_for_queue,
     q1_column_for_side,
 )
+from .empirical_lifecycle import resolve_lifecycle_to_observed_rows
 from .passive_impact import (
     PassiveImpactModelConfig,
     execution_cost_jump_series,
@@ -56,6 +57,7 @@ __all__ = [
     "opposite_side",
     "price_sign_for_queue",
     "q1_column_for_side",
+    "resolve_lifecycle_to_observed_rows",
     "PassiveImpactModelConfig",
     "execution_cost_jump_series",
     "passive_cost_from_fills",

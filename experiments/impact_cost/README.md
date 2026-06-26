@@ -25,12 +25,16 @@ python -m experiments.impact_cost.load_experiments.lifecycle_passive_cost \
 ```
 
 This final experiment uses empirical consuming-side market-event times and the
-factual aggregate queue, then generates our own passive post/fill/cancel
-lifecycle. It is fixed to the `tail_propagator` impact model; vary lifecycle,
-episode, queue, and tail-propagator parameters in `config.toml`.
+factual aggregate queue, then generates our own passive lifecycle. By default,
+generated post/cancel intentions are resolved onto actual observed limit/cancel
+row quantities on the selected side, while fill/execution times remain random
+lifecycle times independent of observed market executions. It is fixed to the
+`tail_propagator` impact model; vary lifecycle, episode, queue, and
+tail-propagator parameters in `config.toml`.
 
-Generated CSV/JSON outputs land in `load_experiments/data/`; PNG figures land
-in `load_experiments/images/`. Regenerate figures from saved outputs with:
+Generated CSV/JSON outputs land in `load_experiments/data/`; the lifecycle PNG
+lands in `load_experiments/images/`. Regenerate the figure from saved summary
+outputs with:
 
 ```bash
 python -m experiments.impact_cost.load_experiments.plot_utils
@@ -59,6 +63,4 @@ Reusable dataframe, lifecycle, impact, and accounting helpers live in `core/`;
 the canonical runnable workflow lives in `load_experiments/`.
 
 For the current file map, config sections, data schema, and lifecycle outputs,
-see [`COMPONENTS.md`](COMPONENTS.md). For the lifecycle and tail-propagator
-formulas with config-parameter mapping, see
-[`load_experiments/FORMULAS.md`](load_experiments/FORMULAS.md).
+see [`COMPONENTS.md`](COMPONENTS.md).

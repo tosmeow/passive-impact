@@ -407,6 +407,24 @@ fn sample_bidask_queue_at_times<'py>(
 /// and returns sampled queues/offsets on `sample_times`.
 #[pyfunction]
 #[allow(clippy::too_many_arguments)]
+#[pyo3(signature = (
+    event_times,
+    event_dims,
+    event_qtys,
+    bar_q_pre,
+    bar_q_post,
+    passive_flags,
+    sample_times,
+    initial_q,
+    horizon_seconds,
+    n_simulations,
+    a_l,
+    b_l,
+    a_c,
+    b_c,
+    seed,
+    own_qtys = None
+))]
 fn simulate_anchored_affine_queue<'py>(
     py: Python<'py>,
     event_times: PyReadonlyArray1<f64>,
@@ -424,14 +442,34 @@ fn simulate_anchored_affine_queue<'py>(
     a_c: f64,
     b_c: f64,
     seed: Option<u64>,
+    own_qtys: Option<PyReadonlyArray1<u32>>,
 ) -> PyResult<Bound<'py, PyDict>> {
+    let event_dims_slice = event_dims.as_slice()?;
+    let event_qtys_slice = event_qtys.as_slice()?;
+    let passive_flags_slice = passive_flags.as_slice()?;
+    let own_qtys_vec = match own_qtys {
+        Some(values) => values.as_slice()?.to_vec(),
+        None => event_dims_slice
+            .iter()
+            .zip(event_qtys_slice.iter())
+            .zip(passive_flags_slice.iter())
+            .map(|((&dim, &qty), &flag)| {
+                if flag && dim == 0 {
+                    qty
+                } else {
+                    0
+                }
+            })
+            .collect(),
+    };
     let input = AnchoredQueueInput {
         event_times: event_times.as_slice()?.to_vec(),
-        event_dims: event_dims.as_slice()?.to_vec(),
-        event_qtys: event_qtys.as_slice()?.to_vec(),
+        event_dims: event_dims_slice.to_vec(),
+        event_qtys: event_qtys_slice.to_vec(),
         bar_q_pre: bar_q_pre.as_slice()?.to_vec(),
         bar_q_post: bar_q_post.as_slice()?.to_vec(),
-        passive_flags: passive_flags.as_slice()?.to_vec(),
+        passive_flags: passive_flags_slice.to_vec(),
+        own_qtys: own_qtys_vec,
         sample_times: sample_times.as_slice()?.to_vec(),
         initial_q,
         horizon_seconds,
@@ -516,7 +554,8 @@ fn select_limit_flags_random_fraction<'py>(
     cancellation_policy,
     theta,
     seed,
-    cap_position_by_queue_post = false
+    cap_position_by_queue_post = false,
+    own_qtys = None
 ))]
 fn track_passive_fills<'py>(
     py: Python<'py>,
@@ -529,15 +568,35 @@ fn track_passive_fills<'py>(
     theta: f64,
     seed: Option<u64>,
     cap_position_by_queue_post: bool,
+    own_qtys: Option<PyReadonlyArray1<u32>>,
 ) -> PyResult<Bound<'py, PyDict>> {
     let policy = CancellationPolicy::from_name(&cancellation_policy, theta)
         .map_err(pyo3::exceptions::PyValueError::new_err)?;
+    let event_dims_slice = event_dims.as_slice()?;
+    let event_qtys_slice = event_qtys.as_slice()?;
+    let passive_flags_slice = passive_flags.as_slice()?;
+    let own_qtys_vec = match own_qtys {
+        Some(values) => values.as_slice()?.to_vec(),
+        None => event_dims_slice
+            .iter()
+            .zip(event_qtys_slice.iter())
+            .zip(passive_flags_slice.iter())
+            .map(|((&dim, &qty), &flag)| {
+                if flag && dim == 0 {
+                    qty
+                } else {
+                    0
+                }
+            })
+            .collect(),
+    };
     let input = PassiveFillTrackerInput {
         event_times: event_times.as_slice()?.to_vec(),
-        event_dims: event_dims.as_slice()?.to_vec(),
-        event_qtys: event_qtys.as_slice()?.to_vec(),
+        event_dims: event_dims_slice.to_vec(),
+        event_qtys: event_qtys_slice.to_vec(),
         queue_post: queue_post.as_slice()?.to_vec(),
-        passive_flags: passive_flags.as_slice()?.to_vec(),
+        passive_flags: passive_flags_slice.to_vec(),
+        own_qtys: own_qtys_vec,
         cancellation_policy: policy,
         cap_position_by_queue_post,
         seed,
@@ -554,6 +613,7 @@ fn track_passive_fills<'py>(
         "remaining_qtys",
         result.remaining_qtys.into_pyarray_bound(py),
     )?;
+    out.set_item("canceled_qtys", result.canceled_qtys.into_pyarray_bound(py))?;
     out.set_item(
         "final_position_qtys",
         result.final_position_qtys.into_pyarray_bound(py),

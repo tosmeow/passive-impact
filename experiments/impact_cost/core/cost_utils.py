@@ -41,6 +41,8 @@ class _ActiveOrder:
     l_index: int
     time: float
     initial_qty: int
+    executed_qty: int
+    canceled_qty: int
     remaining_qty: int
     position_qty: float
     top_qty: int = 0
@@ -296,6 +298,27 @@ def _market_fill_qty(position: float, remaining: int, event_qty: int) -> int:
     return int(max(0.0, consumed_until - ahead_before))
 
 
+def _cancel_own_orders(
+    orders: list[_ActiveOrder],
+    qty: int,
+) -> None:
+    remaining_cancel = int(max(qty, 0))
+    for order in orders:
+        if remaining_cancel <= 0:
+            break
+        if order.remaining_qty <= 0:
+            continue
+        cancel_qty = min(order.remaining_qty, remaining_cancel)
+        order.remaining_qty -= cancel_qty
+        order.canceled_qty += cancel_qty
+        remaining_cancel -= cancel_qty
+        order.position_qty = (
+            0.0
+            if order.remaining_qty == 0
+            else max(float(order.remaining_qty), order.position_qty - cancel_qty)
+        )
+
+
 def track_passive_fills(
     df: pd.DataFrame,
     passive_l_flags: Iterable[bool],
@@ -312,6 +335,7 @@ def track_passive_fills(
     ts_col: str = "ts",
     order_type_col: str = "order_type",
     side_col: str = "side",
+    own_qtys: Iterable[int] | None = None,
     include_ledger: bool = False,
 ) -> TrackingResult:
     """Track execution of flagged passive limit orders.
@@ -338,6 +362,14 @@ def track_passive_fills(
     flags = np.asarray(list(passive_l_flags), dtype=bool)
     if flags.shape != (len(df),):
         raise ValueError("passive_l_flags must have one boolean per dataframe row")
+    if own_qtys is None:
+        own_qty_arr = np.zeros(len(df), dtype=np.int64)
+    else:
+        own_qty_arr = np.asarray(list(own_qtys), dtype=np.int64)
+        if own_qty_arr.shape != (len(df),):
+            raise ValueError("own_qtys must have one integer per dataframe row")
+        if np.any(own_qty_arr < 0):
+            raise ValueError("own_qtys must be non-negative")
 
     active_level = _level_mask(df, level_col=level_col, target_level=target_level)
     bad_flags = np.flatnonzero(flags & ~active_level)
@@ -351,10 +383,23 @@ def track_passive_fills(
     types = _normalised_types(df, order_type_col)
     sides = _normalised_sides(df, side_col)
     qty = df[qty_col].to_numpy(dtype=np.int64)
+    if np.any(own_qty_arr > qty):
+        raise ValueError("own_qtys must be less than or equal to row qty")
     queue = None if queue_col is None else df[queue_col].to_numpy(dtype=np.float64)
     rng = np.random.default_rng(seed)
     posting_side = None if side is None else str(side).upper()
     consuming_side = posting_side if market_side is None else str(market_side).upper()
+    positive_own = own_qty_arr > 0
+    allowed_own = (types == LIMIT) | (types == CANCEL)
+    if posting_side is not None:
+        allowed_own &= sides == posting_side
+    allowed_own &= active_level
+    bad_own = np.flatnonzero(positive_own & ~allowed_own)
+    if bad_own.size > 0:
+        raise ValueError(
+            "own_qtys may only be positive on selected-side limit/cancel rows; "
+            f"first invalid row_pos={int(bad_own[0])}"
+        )
 
     l_positions = limit_event_positions(
         df,
@@ -388,43 +433,32 @@ def track_passive_fills(
         time = float(seconds[row_pos])
 
         if typ == LIMIT:
-            is_own_limit = bool(flags[row_pos])
-            if not is_own_limit:
-                active_orders = [order for order in orders if order.remaining_qty > 0]
-                for order in active_orders:
-                    before_pos = order.position_qty
-                    before_top = global_top_qty
-                    order.top_qty = global_top_qty + event_qty
-                    if include_ledger:
-                        ledger.append(
-                            _ledger_row(
-                                row_pos, time, typ, event_qty, order,
-                                before_pos, order.position_qty,
-                                order.remaining_qty, order.remaining_qty,
-                                top_before=before_top, top_after=global_top_qty + event_qty,
-                                fill_qty=0,
-                                cancel_position_qty=0,
-                                cancel_top_qty=0,
-                            )
-                        )
-                if active_orders:
-                    global_top_qty += event_qty
-                    for order in active_orders:
-                        order.top_qty = global_top_qty
+            explicit_own_qty = int(own_qty_arr[row_pos])
+            own_qty = (
+                explicit_own_qty
+                if explicit_own_qty > 0
+                else (event_qty if bool(flags[row_pos]) else 0)
+            )
+            background_qty = event_qty - own_qty
 
-            if is_own_limit:
-                initial_qty = event_qty
-                initial_position = float(queue[row_pos]) if queue is not None else initial_qty
+            if own_qty > 0:
+                initial_position = (
+                    max(float(queue[row_pos]) - float(background_qty), float(own_qty))
+                    if queue is not None
+                    else float(own_qty)
+                )
                 order = _ActiveOrder(
                     order_id=next_order_id,
                     row_pos=row_pos,
                     l_index=l_rank_by_row.get(row_pos, -1),
                     time=time,
-                    initial_qty=initial_qty,
-                    remaining_qty=initial_qty,
+                    initial_qty=own_qty,
+                    executed_qty=0,
+                    canceled_qty=0,
+                    remaining_qty=own_qty,
                     position_qty=max(
                         initial_position,
-                        _minimum_new_order_position(orders, initial_qty),
+                        _minimum_new_order_position(orders, own_qty),
                     ),
                     top_qty=global_top_qty,
                 )
@@ -434,7 +468,7 @@ def track_passive_fills(
                 if include_ledger:
                     ledger.append(
                         _ledger_row(
-                            row_pos, time, "own_limit", event_qty, order,
+                            row_pos, time, "own_limit", own_qty, order,
                             np.nan, order.position_qty,
                             0, order.remaining_qty,
                             top_before=global_top_qty, top_after=global_top_qty,
@@ -443,6 +477,30 @@ def track_passive_fills(
                             cancel_top_qty=0,
                         )
                     )
+
+            if background_qty > 0:
+                active_orders = [order for order in orders if order.remaining_qty > 0]
+                for order in active_orders:
+                    before_pos = order.position_qty
+                    before_top = global_top_qty
+                    order.top_qty = global_top_qty + background_qty
+                    if include_ledger:
+                        ledger.append(
+                            _ledger_row(
+                                row_pos, time, typ, background_qty, order,
+                                before_pos, order.position_qty,
+                                order.remaining_qty, order.remaining_qty,
+                                top_before=before_top,
+                                top_after=global_top_qty + background_qty,
+                                fill_qty=0,
+                                cancel_position_qty=0,
+                                cancel_top_qty=0,
+                            )
+                        )
+                if active_orders:
+                    global_top_qty += background_qty
+                    for order in active_orders:
+                        order.top_qty = global_top_qty
             continue
 
         if typ == MARKET:
@@ -454,6 +512,7 @@ def track_passive_fills(
                 before_top = global_top_qty
                 fill_qty = _market_fill_qty(before_pos, before_remaining, event_qty)
                 order.remaining_qty -= fill_qty
+                order.executed_qty += fill_qty
                 order.position_qty = (
                     0.0
                     if order.remaining_qty == 0
@@ -489,6 +548,13 @@ def track_passive_fills(
             continue
 
         if typ == CANCEL:
+            explicit_own_qty = int(own_qty_arr[row_pos])
+            if explicit_own_qty > 0:
+                _cancel_own_orders(orders, explicit_own_qty)
+            event_qty = event_qty - explicit_own_qty
+            if event_qty <= 0:
+                _enforce_order_positions(orders)
+                continue
             top_before_event = global_top_qty
             desired_top_qty = _desired_top_cancel_qty(
                 event_qty, policy=cancellation_policy, theta=theta, rng=rng
@@ -529,7 +595,8 @@ def track_passive_fills(
                 "l_index": order.l_index,
                 "time": order.time,
                 "initial_qty": order.initial_qty,
-                "executed_qty": order.initial_qty - order.remaining_qty,
+                "executed_qty": order.executed_qty,
+                "canceled_qty": order.canceled_qty,
                 "remaining_qty": order.remaining_qty,
                 "final_position_qty": order.position_qty,
                 "final_top_qty": order.top_qty,
