@@ -48,6 +48,6 @@ directions exist, run:
 python experiments/agressive_impact/load_experiments/plot_utils.py
 ```
 
-to generate `impact_paths_given_q.png`, `queue_paths_given_q.png`,
-`impact_paths_given_qbar.png`, and `queue_paths_given_qbar.png` under
+to generate `impact_paths_given_q.pdf`, `queue_paths_given_q.pdf`,
+`impact_paths_given_qbar.pdf`, and `queue_paths_given_qbar.pdf` under
 `load_experiments/images/`.

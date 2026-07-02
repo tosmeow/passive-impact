@@ -15,13 +15,13 @@ Passive market impact from a limit-order metaorder in a single-sided queue. We c
 
 ### Conditioning on the baseline queue $q$
 
-[Impact given q](images/impact_given_q.png) · [Queue given q](images/queue_given_q.png)
+[Impact given q](images/impact_given_q.pdf) · [Queue given q](images/queue_given_q.pdf)
 
 *Left*: Distribution of passive impact $I(t)$ across counterfactual paths, given the observed queue $q$. *Right*: Counterfactual queue $\bar{q}$ (with metaorder) versus the baseline $q$.
 
 ### Conditioning on the impacted queue $\bar{q}$
 
-[Impact given qbar](images/impact_given_qbar.png) · [Queue given qbar](images/queue_given_qbar.png)
+[Impact given qbar](images/impact_given_qbar.pdf) · [Queue given qbar](images/queue_given_qbar.pdf)
 
 *Left*: Impact distribution given the impacted queue $\bar{q}$. *Right*: Counterfactual baseline $q$ (without metaorder) versus the observed $\bar{q}$.
 

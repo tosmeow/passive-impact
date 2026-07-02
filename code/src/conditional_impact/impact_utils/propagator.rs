@@ -59,24 +59,22 @@ impl Propagator {
             1e-3
         };
         let fd_solver = FDSolver::new(&f, root, bounds);
+        let derivative = fd_solver
+            .solve(100, bounds * 1e-6)
+            .expect("derivative failed");
         lambda.push(-root);
-        c.push(
-            fd_solver
-                .solve(100, bounds * 1e-6)
-                .expect("derivative failed"),
-        );
+        c.push(1.0 / derivative);
         for i in 0..len - 1 {
             let solver = IVTSolver::new(&f, -hawkes_params.beta[i + 1], -hawkes_params.beta[i]);
             let root = solver.find_zero(1e-10, 100).expect("root not found");
             let bounds =
                 (root + hawkes_params.beta[i + 1]).min(-hawkes_params.beta[i] - root) / 2.0;
             let fd_solver = FDSolver::new(&f, root, bounds);
+            let derivative = fd_solver
+                .solve(100, bounds * 1e-6)
+                .expect("derivative failed");
             lambda.push(-root);
-            c.push(
-                fd_solver
-                    .solve(100, bounds * 1e-6)
-                    .expect("derivative failed"),
-            );
+            c.push(1.0 / derivative);
         }
 
         Self {

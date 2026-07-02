@@ -29,6 +29,7 @@ experiments/**/data/**
 experiments/impact_cost/load_experiments/images/**
 !experiments/impact_cost/load_experiments/images/
 !experiments/impact_cost/load_experiments/images/README.md
+!experiments/impact_cost/load_experiments/images/lifecycle_impact_cost_paths.pdf
 
 # maturin / pyo3 build artifacts
 code/python/target/

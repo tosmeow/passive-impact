@@ -51,4 +51,4 @@ python -m experiments.impact_cost.load_experiments.plot_utils
 ```
 
 CSV/JSON outputs are written under `data/lifecycle_passive_cost/`; the
-canonical PNG is written to `images/lifecycle_impact_cost_paths.png`.
+canonical PDF is written to `images/lifecycle_impact_cost_paths.pdf`.

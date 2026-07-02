@@ -32,7 +32,7 @@ lifecycle times independent of observed market executions. It is fixed to the
 `tail_propagator` impact model; vary lifecycle, episode, queue, and
 tail-propagator parameters in `config.toml`.
 
-Generated CSV/JSON outputs land in `load_experiments/data/`; the lifecycle PNG
+Generated CSV/JSON outputs land in `load_experiments/data/`; the lifecycle PDF
 lands in `load_experiments/images/`. Regenerate the figure from saved summary
 outputs with:
 

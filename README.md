@@ -4,14 +4,9 @@ A high-performance Rust library for simulating and analyzing market impact using
 
 ## Visual Overview
 
-<p align="center">
-  <img src="experiments/passive_impact/load_experiments/images/impact_given_q.png" width="48%" alt="Conditional impact distribution given baseline queue"/>
-  <img src="experiments/passive_impact/load_experiments/images/queue_given_q.png" width="48%" alt="Conditional queue distribution given baseline"/>
-</p>
-<p align="center">
-  <img src="experiments/passive_impact/load_experiments/images/impact_given_qbar.png" width="48%" alt="Impact given shocked queue"/>
-  <img src="experiments/passive_impact/load_experiments/images/queue_given_qbar.png" width="48%" alt="Queue given shocked queue"/>
-</p>
+[Impact given q](experiments/passive_impact/load_experiments/images/impact_given_q.pdf) · [Queue given q](experiments/passive_impact/load_experiments/images/queue_given_q.pdf)
+
+[Impact given qbar](experiments/passive_impact/load_experiments/images/impact_given_qbar.pdf) · [Queue given qbar](experiments/passive_impact/load_experiments/images/queue_given_qbar.pdf)
 
 *Conditional simulation of 500 counterfactual market paths (gray shading) with empirical mean (red) and observed baseline (black). Each panel shows a different initial queue state.*
 
@@ -268,7 +263,7 @@ python -m experiments.impact_cost.load_experiments.lifecycle_passive_cost \
 ```
 
 This lifecycle path is fixed to the tail-propagator impact model. CSV/JSON
-outputs land under `load_experiments/data/`; PNG figures land under
+outputs land under `load_experiments/data/`; PDF figures land under
 `load_experiments/images/`. Older raw-fill inference and diagnostic scripts are
 kept under `experiments/impact_cost/archive/diagnostics/`.
 
