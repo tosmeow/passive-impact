@@ -18,7 +18,8 @@ if not os.environ.get("XDG_CACHE_HOME") or not os.access(
 import matplotlib.pyplot as plt
 
 DEFAULT_OUTPUT_FORMAT = "png"
-OUTPUT_FORMATS = ("png", "pdf")
+OUTPUT_FORMATS = ("png", "pdf", "svg")
+plt.rcParams["svg.fonttype"] = "none"
 
 
 def script_dir(file: str) -> Path:

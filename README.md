@@ -4,9 +4,11 @@ A high-performance Rust library for simulating and analyzing market impact using
 
 ## Visual Overview
 
-[Impact given q](experiments/passive_impact/load_experiments/images/impact_given_q.pdf) · [Queue given q](experiments/passive_impact/load_experiments/images/queue_given_q.pdf)
-
-[Impact given qbar](experiments/passive_impact/load_experiments/images/impact_given_qbar.pdf) · [Queue given qbar](experiments/passive_impact/load_experiments/images/queue_given_qbar.pdf)
+| Impact given q | Queue given q |
+| --- | --- |
+| [![Impact given q](experiments/passive_impact/load_experiments/images/impact_given_q.svg)](experiments/passive_impact/load_experiments/images/impact_given_q.pdf) | [![Queue given q](experiments/passive_impact/load_experiments/images/queue_given_q.svg)](experiments/passive_impact/load_experiments/images/queue_given_q.pdf) |
+| Impact given qbar | Queue given qbar |
+| [![Impact given qbar](experiments/passive_impact/load_experiments/images/impact_given_qbar.svg)](experiments/passive_impact/load_experiments/images/impact_given_qbar.pdf) | [![Queue given qbar](experiments/passive_impact/load_experiments/images/queue_given_qbar.svg)](experiments/passive_impact/load_experiments/images/queue_given_qbar.pdf) |
 
 *Conditional simulation of 500 counterfactual market paths (gray shading) with empirical mean (red) and observed baseline (black). Each panel shows a different initial queue state.*
 

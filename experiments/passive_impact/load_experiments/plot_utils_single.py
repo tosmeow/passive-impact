@@ -109,17 +109,35 @@ def plot_queue_shades(
     include_title=False,
 ):
     fig, ax = plt.subplots(figsize=(12, 6))
+    rasterize_sim_paths = (
+        save_path is not None and Path(save_path).suffix.lower() == '.svg'
+    )
 
     sim_cols = [col for col in df.columns if col.startswith(sim_col)]
 
     for col in sim_cols:
-        ax.plot(df.index, df[col], color='gray', alpha=0.05, linewidth=0.5)
+        ax.plot(
+            df.index,
+            df[col],
+            color='gray',
+            alpha=0.05,
+            linewidth=0.5,
+            rasterized=rasterize_sim_paths,
+            zorder=1,
+        )
 
     if mean_label is None:
         mean_label = _default_mean_label(sim_col, label)
 
     avg_sims = df[sim_cols].mean(axis=1)
-    ax.plot(df.index, avg_sims, color='red', linewidth=2.5, label=mean_label)
+    ax.plot(
+        df.index,
+        avg_sims,
+        color='red',
+        linewidth=2.5,
+        label=mean_label,
+        zorder=3,
+    )
 
     if ref_col is not None:
         ax.plot(
@@ -128,10 +146,17 @@ def plot_queue_shades(
             color='black',
             linewidth=2.5,
             label=_display_col_label(ref_col),
+            zorder=3,
         )
 
     if meta_end is not None:
-        ax.axvline(x=meta_end, color='green', linestyle='--', label='End of metaorder')
+        ax.axvline(
+            x=meta_end,
+            color='green',
+            linestyle='--',
+            label='End of metaorder',
+            zorder=4,
+        )
 
     ax.set_xlabel('Time (seconds)')
     ax.set_ylabel(label)
