@@ -1,6 +1,6 @@
 # Passive Market Impact Simulation
 
-A high-performance Rust library for simulating and analyzing market impact using point processes. Combines Hawkes processes (for market orders) with queue-reactive Markovian dynamics (for limit orders and cancellations) to compute the price effect of trading strategies through conditional path simulation. This comes accompanying our paper **Conditional Simulation of Poisson Measures and Market Impact** [link].
+A high-performance Rust library for simulating and analyzing market impact using point processes. Combines Hawkes processes (for market orders) with queue-reactive Markovian dynamics (for limit orders and cancellations) to compute the price effect of trading strategies through conditional path simulation. This comes accompanying our paper **Conditional Simulation of Poisson Measures and Market Impact** [arXiv:2607.03239](https://arxiv.org/abs/2607.03239).
 
 ## Visual Overview
 
